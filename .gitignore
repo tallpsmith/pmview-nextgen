@@ -1,0 +1,22 @@
+# Claude Code temporary files
+.claude/
+
+# BMAD user memory
+.bmad-user-memory/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Build artifacts (future)
+build/
+dist/
+*.exe
+*.app
