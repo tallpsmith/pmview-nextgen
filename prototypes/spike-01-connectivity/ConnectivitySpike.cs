@@ -1,5 +1,6 @@
 using Godot;
 using System;
+using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 
@@ -9,8 +10,7 @@ using System.Threading.Tasks;
 /// </summary>
 public partial class ConnectivitySpike : Node
 {
-    // FQN required: Godot has its own HttpClient that collides with System.Net.Http.HttpClient
-    private static readonly System.Net.Http.HttpClient Http = new();
+    private static readonly HttpClient Http = new();
     private const string PmproxyUrl = "http://localhost:44322";
 
     public override async void _Ready()
