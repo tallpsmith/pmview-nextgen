@@ -1,0 +1,24 @@
+[gd_scene load_steps=2 format=3 uid="uid://test_bars_scene"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_bar"]
+size = Vector3(0.8, 1, 0.8)
+
+[node name="TestBars" type="Node3D"]
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.866, 0.5, 0, -0.5, 0.866, 0, 3, 5)
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.707, -0.707, 0, 0.707, 0.707, 0, 5, 5)
+
+[node name="LoadBar1Min" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.5, 0)
+mesh = SubResource("BoxMesh_bar")
+
+[node name="LoadBar5Min" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+mesh = SubResource("BoxMesh_bar")
+
+[node name="LoadBar15Min" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.5, 0)
+mesh = SubResource("BoxMesh_bar")

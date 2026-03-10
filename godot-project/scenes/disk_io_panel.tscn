@@ -1,0 +1,25 @@
+[gd_scene load_steps=3 format=3 uid="uid://disk_io_panel_scene"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_flat"]
+size = Vector3(1.5, 0.5, 1.5)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_spinner"]
+top_radius = 0.4
+bottom_radius = 0.4
+height = 0.3
+
+[node name="DiskIOPanel" type="Node3D"]
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.866, 0.5, 0, -0.5, 0.866, 0, 4, 6)
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.707, -0.707, 0, 0.707, 0.707, 0, 5, 5)
+
+[node name="ReadSpinner" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0.5, 0)
+mesh = SubResource("CylinderMesh_spinner")
+
+[node name="WriteBar" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0.25, 0)
+mesh = SubResource("BoxMesh_flat")

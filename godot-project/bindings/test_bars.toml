@@ -1,0 +1,31 @@
+# CPU load bar visualisation
+# Maps kernel.all.load instances to vertical bar height
+
+[meta]
+scene = "res://scenes/test_bars.tscn"
+poll_interval_ms = 1000
+description = "CPU load averages as vertical bars"
+
+[[bindings]]
+scene_node = "LoadBar1Min"
+metric = "kernel.all.load"
+property = "height"
+source_range = [0.0, 10.0]
+target_range = [0.2, 5.0]
+instance_id = 0
+
+[[bindings]]
+scene_node = "LoadBar5Min"
+metric = "kernel.all.load"
+property = "height"
+source_range = [0.0, 10.0]
+target_range = [0.2, 5.0]
+instance_id = 1
+
+[[bindings]]
+scene_node = "LoadBar15Min"
+metric = "kernel.all.load"
+property = "height"
+source_range = [0.0, 10.0]
+target_range = [0.2, 5.0]
+instance_id = 2
