@@ -15,8 +15,27 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Build artifacts (future)
+# Build artifacts
 build/
 dist/
 *.exe
 *.app
+
+# .NET / C#
+bin/
+obj/
+*.user
+*.suo
+packages/
+*.nupkg
+*.snupkg
+
+# Godot
+.godot/
+*.import
+*.uid
+
+# Environment
+.env*
+*.log
+*.tmp
