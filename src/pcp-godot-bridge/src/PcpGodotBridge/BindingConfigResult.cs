@@ -20,5 +20,11 @@ public record BindingConfigResult(
     IReadOnlyList<ValidationMessage> Messages)
 {
     public bool HasErrors => Messages.Any(m => m.Severity == ValidationSeverity.Error);
-    public bool IsValid => Config != null && !HasErrors;
+
+    /// <summary>
+    /// True if a usable config was produced. A config with some skipped bindings
+    /// (binding-level errors) is still valid — HasErrors will be true but Config is usable.
+    /// Only fatal errors (TOML parse failure, missing meta/scene) result in IsValid=false.
+    /// </summary>
+    public bool IsValid => Config != null;
 }
