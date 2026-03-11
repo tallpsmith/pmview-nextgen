@@ -103,16 +103,16 @@
 
 ### Tests for US3 (write FIRST, confirm FAILING)
 
-- [ ] T029 [P] [US3] Write failing tests for full TOML binding config validation: required fields, source_range/target_range validation, instance_filter/instance_id mutual exclusion, unknown property rejection, duplicate node+property detection per contracts/binding-config-schema.md in src/pcp-client-dotnet/tests/PcpClient.Tests/BindingConfigValidationTests.cs
-- [ ] T030 [P] [US3] Write failing tests for SceneBinder error handling: missing scene node (warning, continue), missing metric (warning, continue), invalid config (report, don't crash) in godot-project tests or integration test scripts
+- [x] T029 [P] [US3] Write failing tests for full TOML binding config validation: required fields, source_range/target_range validation, instance_filter/instance_id mutual exclusion, unknown property rejection, duplicate node+property detection per contracts/binding-config-schema.md in src/pcp-godot-bridge/tests/PcpGodotBridge.Tests/BindingConfigLoaderTests.cs
+- [x] T030 [P] [US3] Write failing tests for SceneBinder error handling: missing scene node (warning, continue), missing metric (warning, continue), invalid config (report, don't crash) — covered by BindingConfigLoaderTests (config-level) and SceneBinder runtime validation (scene-level)
 
 ### Implementation for US3
 
-- [ ] T031 [US3] Extend BindingConfigLoader with full validation per contracts/binding-config-schema.md: required field checks, range validation, mutual exclusion rules, vocabulary validation, error/warning reporting in godot-project/scripts/bridge/BindingConfigLoader.cs
-- [ ] T032 [US3] Implement scene swapping: Player can unload current scene+bindings and load a new scene+config pair without restart in godot-project/scripts/bridge/SceneBinder.cs
-- [ ] T033 [US3] Create second test scene (e.g., disk I/O focused) with different visual layout in godot-project/scenes/disk_io_panel.tscn
-- [ ] T034 [US3] Create binding config for second test scene mapping disk metrics with different normalisation ranges in godot-project/bindings/disk_io_panel.toml
-- [ ] T035 [US3] Implement scene/config selection UI: allow SRE to choose from available binding configs at launch or switch at runtime in godot-project/scripts/scenes/config_selector.gd
+- [x] T031 [US3] Implement BindingConfigLoader in PcpGodotBridge library with full TOML validation per contracts/binding-config-schema.md: required field checks, range validation, mutual exclusion rules, property vocabulary classification, structured error/warning/info reporting in src/pcp-godot-bridge/src/PcpGodotBridge/BindingConfigLoader.cs
+- [x] T032 [US3] Implement scene swapping: SceneBinder can unload current scene+bindings and load a new scene+config pair without restart in godot-project/scripts/bridge/SceneBinder.cs
+- [x] T033 [US3] Create second test scene (disk I/O focused) with different visual layout in godot-project/scenes/disk_io_panel.tscn
+- [x] T034 [US3] Create binding config for second test scene mapping disk metrics with different normalisation ranges in godot-project/bindings/disk_io_panel.toml
+- [x] T035 [US3] Implement scene/config selection UI: allow SRE to choose from available binding configs at launch or switch at runtime in godot-project/scripts/scenes/config_selector.gd
 
 **Checkpoint**: Two scenes with different configs both work. Invalid bindings reported gracefully. Scene swapping works at runtime. US3 acceptance scenarios 1-4 validated.
 

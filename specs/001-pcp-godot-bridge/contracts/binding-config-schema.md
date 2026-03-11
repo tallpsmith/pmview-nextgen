@@ -107,9 +107,9 @@ instance_filter = "sda"  # primary disk only
 3. **`source_range` and `target_range`** must each have exactly 2 elements with `[0] < [1]`.
 4. **`instance_filter` and `instance_id`** are mutually exclusive. Specifying both is a validation error.
 5. **`instance_filter`/`instance_id`** on a singular metric (no instance domain) produces a warning.
-6. **`property`** must be a recognised vocabulary term. Unrecognised properties are a validation error.
+6. **`property`** must be either a recognised vocabulary term (built-in) or a valid custom property name. Built-in properties are validated at config load time. Custom properties are classified as pass-through and validated at scene load time against the node's actual properties via `GetPropertyList()`. An info message is logged for custom properties.
 7. **Multiple bindings to the same node** are allowed (e.g., one metric drives height, another drives colour). Multiple bindings to the same node+property is a validation error (last-write-wins is unpredictable).
-8. **`poll_interval_ms`** must be >= 100. Values below 100ms risk overwhelming pmproxy.
+8. **`poll_interval_ms`** must be >= 100. Values below 100ms are an error; the loader logs the error and substitutes the default (1000ms) to avoid aborting the entire config.
 
 ## Error Handling
 
@@ -120,7 +120,7 @@ instance_filter = "sda"  # primary disk only
 | Missing required binding field | Error | Skip binding, report field name |
 | `scene_node` not found in scene | Warning | Skip binding, continue others |
 | `metric` not found on endpoint | Warning | Skip binding, continue others |
-| Unknown `property` value | Error | Skip binding, report value |
+| Unknown `property` value (not built-in) | Info | Classify as custom pass-through, validate at scene load |
 | Duplicate node+property binding | Error | Skip duplicate, keep first |
 | `instance_filter` + `instance_id` both set | Error | Skip binding |
 | `source_range[0] >= source_range[1]` | Error | Skip binding |

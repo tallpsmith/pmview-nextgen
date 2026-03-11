@@ -111,6 +111,7 @@ Top-level binding configuration loaded from a TOML file.
 | ScenePath | `string` | Required, valid Godot resource path | e.g., `res://scenes/pmview_classic.tscn` |
 | Endpoint | `string?` | Optional, valid URL | Overrides default endpoint |
 | PollIntervalMs | `int` | Default: 1000, min: 100 | Polling frequency |
+| Description | `string?` | Optional | Human-readable description of this binding set |
 | Bindings | `IReadOnlyList<MetricBinding>` | At least one | Scene-to-metric mappings |
 
 ### MetricBinding
@@ -124,7 +125,8 @@ Maps a single scene node property to a PCP metric value.
 | Property | `string` | Required, valid visual property name | See binding vocabulary below |
 | SourceRange | `(double Min, double Max)` | Min < Max | Expected metric value range |
 | TargetRange | `(double Min, double Max)` | Min < Max | Visual output range |
-| InstanceFilter | `string?` | Optional glob pattern | Filter to specific instance(s) |
+| InstanceFilter | `string?` | Optional glob pattern | Filter to specific instance(s). Mutually exclusive with InstanceId |
+| InstanceId | `int?` | Optional | Specific instance ID. Mutually exclusive with InstanceFilter |
 
 ### Binding Vocabulary (Visual Properties)
 

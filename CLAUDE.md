@@ -13,9 +13,24 @@ src/
 tests/
 ```
 
+## Environment
+
+- **dotnet**: `export PATH="/opt/homebrew/opt/dotnet@8/bin:$PATH"` and `export DOTNET_ROOT="/opt/homebrew/opt/dotnet@8/libexec"`
+- **Godot**: NOT installed in Claude Code VM (no UI). Write `.tscn`, `.gd`, and `.cs` files directly. User tests scenes in their host Godot editor.
+- Always include `/usr/bin:/bin:/usr/sbin:/sbin` in PATH when running shell commands (VM quirk).
+
 ## Commands
 
-# Add commands for C# (.NET 8.0 LTS) for PcpClient library and Godot bridge; GDScript for scene logic
+```bash
+# Build PcpClient library
+dotnet build src/pcp-client-dotnet/PcpClient.sln
+
+# Run PcpClient unit tests
+dotnet test src/pcp-client-dotnet/PcpClient.sln
+
+# Build Godot project C# (when godot-project/ exists)
+dotnet build godot-project/pmview-nextgen.sln
+```
 
 ## Code Style
 
