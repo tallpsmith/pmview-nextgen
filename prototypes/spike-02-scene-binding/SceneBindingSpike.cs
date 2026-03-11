@@ -51,7 +51,7 @@ public partial class SceneBindingSpike : Node3D
         try
         {
             var loadValue = await FetchLoadValue();
-            var normalised = Lerp(loadValue, 0.0, 10.0, 0.1, 5.0);
+            var normalised = Lerp(loadValue, 0.0, 1.0, 0.1, 5.0);
 
             if (_targetBar != null)
             {
