@@ -37,6 +37,8 @@ public partial class MetricPoller : Node
 	private double _archiveSamplingIntervalSeconds;
 	private readonly Dictionary<string, double> _lastEmittedTimestamp = new();
 	private readonly Dictionary<string, Dictionary<string, SeriesInstanceInfo>> _seriesInstanceMap = new();
+	private readonly Dictionary<string, Dictionary<string, int>> _liveInstanceNames = new();
+	private readonly HashSet<string> _liveInstanceNamesPopulated = new();
 	private Godot.Collections.Dictionary? _lastEmittedMetrics;
 
 	public ConnectionState CurrentState => _client?.State ?? ConnectionState.Disconnected;
@@ -82,6 +84,8 @@ public partial class MetricPoller : Node
 		{
 			_lastEmittedTimestamp.Clear();
 			_seriesInstanceMap.Clear();
+			_liveInstanceNames.Clear();
+			_liveInstanceNamesPopulated.Clear();
 			await DiscoverArchiveMetadata();
 			_timeCursor.StartPlayback(startTime);
 			EmitSignal(SignalName.PlaybackPositionChanged,
@@ -142,6 +146,9 @@ public partial class MetricPoller : Node
 	public void UpdateEndpoint(string endpoint, int pollIntervalMs)
 	{
 		StopPolling();
+		_liveInstanceNames.Clear();
+		_liveInstanceNamesPopulated.Clear();
+		_seriesInstanceMap.Clear();
 		_client?.Dispose();
 		_client = null;
 
@@ -276,6 +283,31 @@ public partial class MetricPoller : Node
 		var converted = _rateConverter != null
 			? _rateConverter.Convert(values)
 			: values;
+
+		foreach (var metricName in MetricNames)
+		{
+			if (_liveInstanceNamesPopulated.Contains(metricName))
+				continue;
+			_liveInstanceNamesPopulated.Add(metricName);
+			try
+			{
+				var indom = await _client!.GetInstanceDomainAsync(metricName);
+				if (indom != null)
+				{
+					var nameMap = new Dictionary<string, int>();
+					foreach (var inst in indom.Instances)
+						nameMap[inst.Name] = inst.Id;
+					_liveInstanceNames[metricName] = nameMap;
+					GD.Print($"[MetricPoller] Live instance names for {metricName}: " +
+						string.Join(", ", nameMap.Select(kv => $"{kv.Key}→{kv.Value}")));
+				}
+			}
+			catch (Exception ex)
+			{
+				GD.PushWarning($"[MetricPoller] Instance domain lookup failed for {metricName}: {ex.Message}");
+			}
+		}
+
 		if (converted.Count > 0)
 		{
 			var dict = MarshalMetricValues(converted);
@@ -469,13 +501,22 @@ public partial class MetricPoller : Node
 						$"= {sv.NumericValue:F4}");
 				}
 
+				// Build name→id lookup for SceneBinder
+				var nameToId = new Godot.Collections.Dictionary();
+				if (instanceMap != null)
+				{
+					foreach (var kv in instanceMap.Values)
+						nameToId[kv.Name] = kv.PcpInstanceId;
+				}
+
 				if (instances.Count > 0)
 				{
 					dict[metricName] = new Godot.Collections.Dictionary
 					{
 						["timestamp"] = cursorPosition
 							.Subtract(DateTime.UnixEpoch).TotalSeconds,
-						["instances"] = instances
+						["instances"] = instances,
+						["name_to_id"] = nameToId
 					};
 				}
 			}
@@ -552,8 +593,9 @@ public partial class MetricPoller : Node
 	/// <summary>
 	/// Marshals C# MetricValue list into a GDScript-friendly Dictionary.
 	/// Singular metrics use key -1 (matching PCP wire protocol convention).
+	/// Includes name_to_id mapping for instance name resolution in SceneBinder.
 	/// </summary>
-	private static Godot.Collections.Dictionary MarshalMetricValues(
+	private Godot.Collections.Dictionary MarshalMetricValues(
 		IReadOnlyList<MetricValue> values)
 	{
 		var dict = new Godot.Collections.Dictionary();
@@ -567,10 +609,18 @@ public partial class MetricPoller : Node
 				instances[key] = iv.Value;
 			}
 
+			var nameToId = new Godot.Collections.Dictionary();
+			if (_liveInstanceNames.TryGetValue(metric.Name, out var nameMap))
+			{
+				foreach (var kv in nameMap)
+					nameToId[kv.Key] = kv.Value;
+			}
+
 			var metricDict = new Godot.Collections.Dictionary
 			{
 				["timestamp"] = metric.Timestamp,
-				["instances"] = instances
+				["instances"] = instances,
+				["name_to_id"] = nameToId
 			};
 
 			dict[metric.Name] = metricDict;

@@ -105,8 +105,11 @@ public partial class SceneBinder : Node
 
             var metricData = metrics[binding.Metric].AsGodotDictionary();
             var instances = metricData["instances"].AsGodotDictionary();
+            var nameToId = metricData.ContainsKey("name_to_id")
+                ? metricData["name_to_id"].AsGodotDictionary()
+                : new Godot.Collections.Dictionary();
 
-            double? rawValue = ExtractValue(binding, instances);
+            double? rawValue = ExtractValue(binding, instances, nameToId);
             if (rawValue == null)
             {
                 GD.Print($"[SceneBinder] {binding.SceneNode}: no value for " +
@@ -305,22 +308,29 @@ public partial class SceneBinder : Node
     }
 
     private static double? ExtractValue(MetricBinding binding,
-        Godot.Collections.Dictionary instances)
+        Godot.Collections.Dictionary instances,
+        Godot.Collections.Dictionary nameToId)
     {
+        if (binding.InstanceName != null)
+        {
+            if (!nameToId.ContainsKey(binding.InstanceName))
+            {
+                GD.Print($"[SceneBinder] {binding.SceneNode}: instance name " +
+                    $"'{binding.InstanceName}' not found for {binding.Metric} " +
+                    $"(available: {string.Join(", ", nameToId.Keys)})");
+                return null;
+            }
+            var resolvedId = nameToId[binding.InstanceName].AsInt32();
+            return instances.ContainsKey(resolvedId)
+                ? instances[resolvedId].AsDouble()
+                : null;
+        }
+
         if (binding.InstanceId != null)
         {
             return instances.ContainsKey(binding.InstanceId.Value)
                 ? instances[binding.InstanceId.Value].AsDouble()
                 : null;
-        }
-
-        if (binding.InstanceName != null)
-        {
-            // Instance name matching not yet fully implemented — takes first
-            // available instance. Full name→id resolution is handled by Task 5.
-            foreach (var key in instances.Keys)
-                return instances[key].AsDouble();
-            return null;
         }
 
         // Singular metric (key -1) or first available instance
