@@ -32,6 +32,7 @@ public partial class SceneBinder : Node
 
     public BindingConfig? CurrentConfig => _currentConfig;
     public int ActiveBindingCount => _activeBindings.Count;
+    private readonly Dictionary<string, List<Node3D>> _instanceNodes = new();
 
     public override void _Process(double delta)
     {
@@ -107,20 +108,121 @@ public partial class SceneBinder : Node
 
             double? rawValue = ExtractValue(binding, instances);
             if (rawValue == null)
+            {
+                GD.Print($"[SceneBinder] {binding.SceneNode}: no value for " +
+                    $"{binding.Metric}[instance={binding.InstanceId}] " +
+                    $"(available keys: {string.Join(",", instances.Keys)})");
                 continue;
+            }
 
             var normalised = Normalise(rawValue.Value,
                 binding.SourceRangeMin, binding.SourceRangeMax,
                 binding.TargetRangeMin, binding.TargetRangeMax);
 
+            GD.Print($"[SceneBinder] {binding.SceneNode}.{binding.Property}: " +
+                $"raw={rawValue.Value:F4} -> normalised={normalised:F4} " +
+                $"(src [{binding.SourceRangeMin}-{binding.SourceRangeMax}] " +
+                $"-> tgt [{binding.TargetRangeMin}-{binding.TargetRangeMax}])");
+
             ApplyProperty(active, (float)normalised);
         }
+    }
+
+    /// <summary>
+    /// Creates distinct 3D objects for each instance of a metric.
+    /// Clones a template node and creates one binding per instance.
+    /// Call after scene is loaded and instance domain is known.
+    /// </summary>
+    public void CreatePerInstanceBindings(string metricName, string templateNodePath,
+        string property, double sourceMin, double sourceMax,
+        double targetMin, double targetMax,
+        Godot.Collections.Array instances)
+    {
+        if (_currentScene == null)
+            return;
+
+        var templateNode = _currentScene.GetNodeOrNull<Node3D>(templateNodePath);
+        if (templateNode == null)
+        {
+            GD.PushWarning(
+                $"[SceneBinder] Template node not found: '{templateNodePath}'");
+            return;
+        }
+
+        // Clean up any previous per-instance nodes for this metric
+        ClearInstanceNodes(metricName);
+
+        var createdNodes = new List<Node3D>();
+        var spacing = 2.0f;
+
+        for (int i = 0; i < instances.Count; i++)
+        {
+            var instDict = instances[i].AsGodotDictionary();
+            var instanceId = instDict["id"].AsInt32();
+            var instanceName = instDict["name"].AsString();
+
+            var clone = (Node3D)templateNode.Duplicate();
+            clone.Name = $"{templateNode.Name}_{instanceName}";
+            clone.Position = templateNode.Position + new Vector3(spacing * i, 0, 0);
+            templateNode.GetParent().AddChild(clone);
+
+            var binding = new PcpGodotBridge.MetricBinding(
+                clone.Name, metricName, property,
+                sourceMin, sourceMax, targetMin, targetMax,
+                null, instanceId);
+
+            var resolved = PcpGodotBridge.PropertyVocabulary.Resolve(binding);
+            _activeBindings.Add(new ActiveBinding(resolved, clone));
+            createdNodes.Add(clone);
+
+            GD.Print($"[SceneBinder] Instance binding: {clone.Name}.{property} " +
+                     $"<- {metricName}[{instanceName}]");
+        }
+
+        _instanceNodes[metricName] = createdNodes;
+
+        // Hide the template
+        templateNode.Visible = false;
+
+        GD.Print($"[SceneBinder] Created {createdNodes.Count} per-instance nodes " +
+                 $"for {metricName}");
+    }
+
+    private void ClearInstanceNodes(string metricName)
+    {
+        if (!_instanceNodes.TryGetValue(metricName, out var nodes))
+            return;
+
+        // Remove active bindings that target these nodes
+        _activeBindings.RemoveAll(ab => nodes.Contains(ab.TargetNode));
+
+        foreach (var node in nodes)
+        {
+            if (IsInstanceValid(node))
+            {
+                _rotationSpeeds.Remove(node);
+                node.QueueFree();
+            }
+        }
+
+        _instanceNodes.Remove(metricName);
     }
 
     public void UnloadCurrentScene()
     {
         _activeBindings.Clear();
         _rotationSpeeds.Clear();
+
+        // Clean up all per-instance nodes
+        foreach (var nodes in _instanceNodes.Values)
+        {
+            foreach (var node in nodes)
+            {
+                if (IsInstanceValid(node))
+                    node.QueueFree();
+            }
+        }
+        _instanceNodes.Clear();
 
         if (_currentScene != null)
         {
