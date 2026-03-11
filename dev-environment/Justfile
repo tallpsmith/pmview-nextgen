@@ -1,0 +1,6 @@
+up:
+	podman compose build --no-cache pmlogsynth-generator
+	podman compose up --wait --wait-timeout 120
+
+teardown:
+	podman compose down --volumes

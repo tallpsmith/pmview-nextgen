@@ -1,17 +1,27 @@
 # pmview-nextgen Dev Environment
 
-Local development stack providing PCP (with pmcd, pmproxy, pmlogger, and all services) plus Valkey for time-series storage.
+Local development stack providing PCP with synthetic metric data. A pmlogsynth pipeline generates 7-day SaaS workload archives and seeds them into Valkey via pmseries, so PCP serves realistic historical data out of the box.
 
 Modelled after [pmmcp's docker-compose.yml](https://github.com/tallpsmith/pmmcp/blob/main/docker-compose.yml).
 
 ## Services
 
-| Service   | Port  | Purpose                                                      |
-|-----------|-------|--------------------------------------------------------------|
-| **pcp**   | 44322 | Full PCP stack (pmcd, pmproxy, pmlogger) via init.d          |
-| **valkey**| 6379  | Redis-compatible time-series backend for pmseries            |
+| Service                    | Port  | Purpose                                                      |
+|----------------------------|-------|--------------------------------------------------------------|
+| **pmlogsynth-generator**   | —     | Builds PCP archives from YAML profiles in `profiles/`        |
+| **pmlogsynth-seeder**      | —     | Loads archives into pmseries via Valkey                      |
+| **pcp**                    | 44322 | Full PCP stack (pmcd, pmproxy, pmlogger) via init.d          |
+| **valkey**                 | 6379  | Redis-compatible time-series backend for pmseries            |
 
-The PCP container runs **all** PCP services internally — pmcd (44321 inside the container), pmproxy (44322 exposed to host), pmlogger, etc. No need for separate containers.
+### Pipeline order
+
+```
+pmlogsynth-generator (build archives)
+        ↓
+pmlogsynth-seeder (load into pmseries) ← waits for valkey healthy
+        ↓
+pcp (serve metrics) ← waits for seeder to complete
+```
 
 ## Quick Start
 
@@ -21,8 +31,11 @@ cd dev-environment
 # Start the stack (detached)
 docker compose up -d
 
-# Follow logs
-docker compose logs -f
+# Watch the generator + seeder pipeline
+docker compose logs -f pmlogsynth-generator pmlogsynth-seeder
+
+# Follow PCP logs once seeded
+docker compose logs -f pcp
 
 # Stop everything
 docker compose down
@@ -30,6 +43,12 @@ docker compose down
 # Stop and remove volumes (clean slate)
 docker compose down -v
 ```
+
+## Adding Profiles
+
+Drop YAML profile files into `profiles/`. The generator iterates all `*.yml` and `*.yaml` files. See [pmlogsynth](https://github.com/tallpsmith/pmlogsynth) for the profile format.
+
+The included `saas-diurnal-week.yml` generates a 7-day SaaS workload with realistic diurnal patterns — overnight lows, morning ramps, peak hours, lunch lulls, afternoon spikes, and evening tail-offs.
 
 ## Verifying the Stack
 
@@ -39,28 +58,23 @@ docker compose down -v
 docker compose ps
 ```
 
-### 2. Create a pmproxy context
+### 2. Query pmseries for historical data
+
+```bash
+docker compose exec pcp pmseries 'kernel.all.cpu.user'
+```
+
+### 3. Create a pmproxy context
 
 ```bash
 curl -s http://localhost:44322/pmapi/context | python3 -m json.tool
 ```
 
-You should get a JSON response with a `context` number.
-
-### 3. Fetch a metric value
+### 4. Fetch a metric value
 
 ```bash
-# Grab a context first
 CTX=$(curl -s http://localhost:44322/pmapi/context | python3 -c "import sys,json; print(json.load(sys.stdin)['context'])")
-
-# Fetch load average
 curl -s "http://localhost:44322/pmapi/fetch?context=${CTX}&names=kernel.all.load" | python3 -m json.tool
-```
-
-### 4. Browse the metric namespace
-
-```bash
-curl -s "http://localhost:44322/pmapi/children?prefix=kernel" | python3 -m json.tool
 ```
 
 ### 5. Verify Valkey is responding
@@ -74,10 +88,10 @@ docker compose exec valkey valkey-cli ping
 
 ### "Connection refused" on port 44322
 
-Give the stack a moment — the PCP container needs time to start all services via init.d. Watch progress with:
+The PCP container waits for the seeder to finish before starting. Watch progress with:
 
 ```bash
-docker compose logs -f pcp
+docker compose logs -f pmlogsynth-generator pmlogsynth-seeder
 ```
 
 ### PCP container won't start
