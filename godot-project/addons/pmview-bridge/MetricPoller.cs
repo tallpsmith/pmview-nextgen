@@ -36,7 +36,7 @@ public partial class MetricPoller : Node
 	private DateTime _lastPollTime = DateTime.UtcNow;
 	private double _archiveSamplingIntervalSeconds;
 	private readonly Dictionary<string, double> _lastEmittedTimestamp = new();
-	private readonly Dictionary<string, Dictionary<string, int>> _seriesInstanceMap = new();
+	private readonly Dictionary<string, Dictionary<string, SeriesInstanceInfo>> _seriesInstanceMap = new();
 	private Godot.Collections.Dictionary? _lastEmittedMetrics;
 
 	public ConnectionState CurrentState => _client?.State ?? ConnectionState.Disconnected;
@@ -459,10 +459,10 @@ public partial class MetricPoller : Node
 				var instances = new Godot.Collections.Dictionary();
 				foreach (var sv in resolvedValues)
 				{
-					// Map series ID back to PCP instance ID for binding lookup
+					var lookupKey = sv.InstanceId ?? sv.SeriesId;
 					int instanceKey = instanceMap != null
-						&& instanceMap.TryGetValue(sv.SeriesId, out var pcpId)
-						? pcpId
+						&& instanceMap.TryGetValue(lookupKey, out var info)
+						? info.PcpInstanceId
 						: -1;  // singular metric fallback
 					instances[instanceKey] = sv.NumericValue;
 					GD.Print($"[MetricPoller] {metricName}: instance {instanceKey} " +
@@ -513,7 +513,7 @@ public partial class MetricPoller : Node
 			{
 				GD.PushWarning($"[MetricPoller] /series/instances failed for {metricName} " +
 					$"({response.StatusCode}) — falling back to singular mapping");
-				_seriesInstanceMap[metricName] = new Dictionary<string, int>();
+				_seriesInstanceMap[metricName] = new Dictionary<string, SeriesInstanceInfo>();
 				return;
 			}
 
@@ -524,7 +524,7 @@ public partial class MetricPoller : Node
 
 			if (mapping.Count > 0)
 			{
-				var pairs = mapping.Select(kv => $"{kv.Key[..8]}..→{kv.Value}");
+				var pairs = mapping.Select(kv => $"{kv.Key[..8]}..→{kv.Value.PcpInstanceId} ({kv.Value.Name})");
 				GD.Print($"[MetricPoller] Instance mapping for {metricName}: " +
 					$"{string.Join(", ", pairs)}");
 			}
@@ -533,7 +533,7 @@ public partial class MetricPoller : Node
 		{
 			GD.PushWarning($"[MetricPoller] Instance mapping failed for {metricName}: " +
 				$"{ex.Message}");
-			_seriesInstanceMap[metricName] = new Dictionary<string, int>();
+			_seriesInstanceMap[metricName] = new Dictionary<string, SeriesInstanceInfo>();
 		}
 	}
 

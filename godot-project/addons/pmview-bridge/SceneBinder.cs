@@ -169,7 +169,7 @@ public partial class SceneBinder : Node
             var binding = new PcpGodotBridge.MetricBinding(
                 clone.Name, metricName, property,
                 sourceMin, sourceMax, targetMin, targetMax,
-                null, instanceId);
+                InstanceId: instanceId, InstanceName: null);
 
             var resolved = PcpGodotBridge.PropertyVocabulary.Resolve(binding);
             _activeBindings.Add(new ActiveBinding(resolved, clone));
@@ -314,11 +314,10 @@ public partial class SceneBinder : Node
                 : null;
         }
 
-        if (binding.InstanceFilter != null)
+        if (binding.InstanceName != null)
         {
-            // Glob matching not yet implemented — takes first available instance.
-            // Config validation accepts the filter value but the actual filtering
-            // will be implemented when instance domain names are available (T039).
+            // Instance name matching not yet fully implemented — takes first
+            // available instance. Full name→id resolution is handled by Task 5.
             foreach (var key in instances.Keys)
                 return instances[key].AsDouble();
             return null;
