@@ -76,7 +76,7 @@ public class BindingConfigLoaderTests
             property = "rotation_speed"
             source_range = [0.0, 5000.0]
             target_range = [0.0, 360.0]
-            instance_filter = "sd*"
+            instance_name = "sda"
             """;
 
         var result = BindingConfigLoader.Load(toml);
@@ -90,7 +90,7 @@ public class BindingConfigLoaderTests
         Assert.Equal(5000.0, binding.SourceRangeMax);
         Assert.Equal(0.0, binding.TargetRangeMin);
         Assert.Equal(360.0, binding.TargetRangeMax);
-        Assert.Equal("sd*", binding.InstanceFilter);
+        Assert.Equal("sda", binding.InstanceName);
         Assert.Null(binding.InstanceId);
     }
 
@@ -114,7 +114,7 @@ public class BindingConfigLoaderTests
 
         Assert.True(result.IsValid);
         Assert.Equal(1, result.Config!.Bindings[0].InstanceId);
-        Assert.Null(result.Config.Bindings[0].InstanceFilter);
+        Assert.Null(result.Config.Bindings[0].InstanceName);
     }
 
     [Fact]
@@ -442,10 +442,10 @@ public class BindingConfigLoaderTests
             m.Message.Contains("2 elements"));
     }
 
-    // ── Mutual Exclusion: instance_filter + instance_id ──
+    // ── Mutual Exclusion: instance_name + instance_id ──
 
     [Fact]
-    public void Load_BothInstanceFilterAndId_SkipsBinding()
+    public void Load_BothInstanceNameAndId_SkipsBinding()
     {
         var toml = """
             [meta]
@@ -457,7 +457,7 @@ public class BindingConfigLoaderTests
             property = "height"
             source_range = [0.0, 10.0]
             target_range = [0.0, 5.0]
-            instance_filter = "sd*"
+            instance_name = "1 minute"
             instance_id = 1
             """;
 

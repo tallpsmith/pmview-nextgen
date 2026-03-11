@@ -155,18 +155,18 @@ public static class BindingConfigLoader
                 context));
         }
 
-        var hasFilter = binding.TryGetValue("instance_filter", out var filterObj);
+        var hasName = binding.TryGetValue("instance_name", out var nameObj);
         var hasId = binding.TryGetValue("instance_id", out var idObj);
 
-        if (hasFilter && hasId)
+        if (hasName && hasId)
         {
             messages.Add(new ValidationMessage(ValidationSeverity.Error,
-                "instance_filter and instance_id are mutually exclusive",
+                "instance_name and instance_id are mutually exclusive",
                 context));
             return null;
         }
 
-        var instanceFilter = hasFilter ? filterObj?.ToString() : null;
+        string? instanceName = hasName ? nameObj?.ToString() : null;
         int? instanceId = hasId ? Convert.ToInt32(idObj) : null;
 
         var nodePropertyKey = $"{sceneNode}+{property}";
@@ -181,7 +181,7 @@ public static class BindingConfigLoader
         return new MetricBinding(sceneNode, metric, property,
             sourceRange.Value.min, sourceRange.Value.max,
             targetRange.Value.min, targetRange.Value.max,
-            instanceFilter, instanceId);
+            instanceId, instanceName);
     }
 
     private static string? GetRequiredString(TomlTable table, string key, string context,
@@ -230,8 +230,8 @@ public static class BindingConfigLoader
     private static void LogBindingInfo(MetricBinding binding, int index,
         List<ValidationMessage> messages, string context)
     {
-        var instanceInfo = binding.InstanceFilter != null
-            ? $" (filter: {binding.InstanceFilter})"
+        var instanceInfo = binding.InstanceName != null
+            ? $" (name: {binding.InstanceName})"
             : binding.InstanceId != null
                 ? $" (instance: {binding.InstanceId})"
                 : "";

@@ -12,5 +12,5 @@ public record MetricBinding(
     double SourceRangeMax,
     double TargetRangeMin,
     double TargetRangeMax,
-    string? InstanceFilter,
-    int? InstanceId);
+    int? InstanceId,
+    string? InstanceName);

@@ -22,8 +22,8 @@ public class ModelTests
             SourceRangeMax: 10.0,
             TargetRangeMin: 0.0,
             TargetRangeMax: 5.0,
-            InstanceFilter: null,
-            InstanceId: null);
+            InstanceId: null,
+            InstanceName: "1 minute");
 
         Assert.Equal("CpuLoadBar", binding.SceneNode);
         Assert.Equal("kernel.all.load", binding.Metric);
@@ -32,17 +32,17 @@ public class ModelTests
         Assert.Equal(10.0, binding.SourceRangeMax);
         Assert.Equal(0.0, binding.TargetRangeMin);
         Assert.Equal(5.0, binding.TargetRangeMax);
-        Assert.Null(binding.InstanceFilter);
         Assert.Null(binding.InstanceId);
+        Assert.Equal("1 minute", binding.InstanceName);
     }
 
     [Fact]
-    public void MetricBinding_WithInstanceFilter()
+    public void MetricBinding_WithInstanceName()
     {
         var binding = new MetricBinding("Node", "metric", "height",
-            0, 10, 0, 5, InstanceFilter: "sd*", InstanceId: null);
+            0, 10, 0, 5, InstanceId: null, InstanceName: "5 minute");
 
-        Assert.Equal("sd*", binding.InstanceFilter);
+        Assert.Equal("5 minute", binding.InstanceName);
         Assert.Null(binding.InstanceId);
     }
 
@@ -50,10 +50,10 @@ public class ModelTests
     public void MetricBinding_WithInstanceId()
     {
         var binding = new MetricBinding("Node", "metric", "height",
-            0, 10, 0, 5, InstanceFilter: null, InstanceId: 42);
+            0, 10, 0, 5, InstanceId: 42, InstanceName: null);
 
-        Assert.Null(binding.InstanceFilter);
         Assert.Equal(42, binding.InstanceId);
+        Assert.Null(binding.InstanceName);
     }
 
     [Fact]
