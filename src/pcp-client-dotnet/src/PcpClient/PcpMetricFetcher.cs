@@ -40,16 +40,15 @@ internal static class PcpMetricFetcher
             int? parsedId = instanceId == -1 ? null : instanceId;
 
             var valueElement = inst.GetProperty("value");
-            object value = valueElement.ValueKind switch
+            if (valueElement.ValueKind == JsonValueKind.String)
             {
-                JsonValueKind.Number when valueElement.TryGetInt64(out var l) &&
-                    !valueElement.GetRawText().Contains('.') => (double)l,
-                JsonValueKind.Number => valueElement.GetDouble(),
-                JsonValueKind.String => valueElement.GetString()!,
-                _ => valueElement.GetRawText()
-            };
-
-            values.Add(new InstanceValue(parsedId, value));
+                values.Add(new InstanceValue(parsedId, valueElement.GetString()!));
+            }
+            else
+            {
+                // All numeric JSON values (integer, float, scientific notation) → double
+                values.Add(new InstanceValue(parsedId, valueElement.GetDouble()));
+            }
         }
 
         return values;

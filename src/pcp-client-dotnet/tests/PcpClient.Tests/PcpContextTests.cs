@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using PcpClient.Tests.TestHelpers;
 using Xunit;
 
 namespace PcpClient.Tests;
@@ -156,24 +157,5 @@ public class PcpContextTests
         {
             Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json")
         };
-    }
-}
-
-/// <summary>
-/// Simple HTTP handler for mocking pmproxy responses in tests.
-/// </summary>
-public class MockHttpHandler : HttpMessageHandler
-{
-    private readonly Func<HttpRequestMessage, HttpResponseMessage> _handler;
-
-    public MockHttpHandler(Func<HttpRequestMessage, HttpResponseMessage> handler)
-    {
-        _handler = handler;
-    }
-
-    protected override Task<HttpResponseMessage> SendAsync(
-        HttpRequestMessage request, CancellationToken cancellationToken)
-    {
-        return Task.FromResult(_handler(request));
     }
 }

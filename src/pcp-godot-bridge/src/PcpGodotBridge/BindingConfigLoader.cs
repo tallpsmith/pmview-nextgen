@@ -123,7 +123,7 @@ public static class BindingConfigLoader
         var pollValue = Convert.ToInt32(pollObj);
         if (pollValue < MinPollIntervalMs)
         {
-            messages.Add(new ValidationMessage(ValidationSeverity.Error,
+            messages.Add(new ValidationMessage(ValidationSeverity.Warning,
                 $"poll_interval_ms must be >= {MinPollIntervalMs}, got {pollValue}. Using default {DefaultPollIntervalMs}.",
                 null));
             return DefaultPollIntervalMs;

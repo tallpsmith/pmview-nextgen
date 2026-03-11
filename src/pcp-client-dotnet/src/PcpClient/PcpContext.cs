@@ -37,6 +37,11 @@ internal sealed class PcpContext
         return contextId;
     }
 
+    /// <summary>
+    /// Marks the local context as invalid. Does not notify the server —
+    /// the server-side context will expire after its polltimeout elapses.
+    /// pmproxy does not currently expose a context destruction endpoint.
+    /// </summary>
     public void Invalidate()
     {
         ContextId = null;

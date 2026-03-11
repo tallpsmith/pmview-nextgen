@@ -24,6 +24,7 @@ public partial class MetricPoller : Node
 	[Export] public int PollIntervalMs { get; set; } = 1000;
 	[Export] public string[] MetricNames { get; set; } = [];
 
+	private readonly System.Net.Http.HttpClient _sharedHttpClient = new();
 	private PcpClientConnection? _client;
 	private MetricRateConverter? _rateConverter;
 	private Godot.Timer? _pollTimer;
@@ -39,8 +40,16 @@ public partial class MetricPoller : Node
 
 	public async void StartPolling()
 	{
-		await ConnectToEndpoint();
-		StartPollTimer();
+		try
+		{
+			await ConnectToEndpoint();
+			StartPollTimer();
+		}
+		catch (Exception ex)
+		{
+			EmitConnectionState("Failed");
+			EmitSignal(SignalName.ErrorOccurred, $"StartPolling failed: {ex.Message}");
+		}
 	}
 
 	public void StopPolling()
@@ -72,7 +81,7 @@ public partial class MetricPoller : Node
 		try
 		{
 			_client?.Dispose();
-			_client = new PcpClientConnection(new Uri(Endpoint));
+			_client = new PcpClientConnection(new Uri(Endpoint), _sharedHttpClient);
 			EmitConnectionState("Connecting");
 
 			await _client.ConnectAsync();
@@ -180,7 +189,7 @@ public partial class MetricPoller : Node
 			foreach (var iv in metric.InstanceValues)
 			{
 				var key = iv.InstanceId ?? -1;
-				instances[key] = iv.Value is double d ? d : Convert.ToDouble(iv.Value);
+				instances[key] = iv.Value;
 			}
 
 			var metricDict = new Godot.Collections.Dictionary
@@ -205,5 +214,6 @@ public partial class MetricPoller : Node
 		StopPolling();
 		_client?.Dispose();
 		_client = null;
+		_sharedHttpClient.Dispose();
 	}
 }

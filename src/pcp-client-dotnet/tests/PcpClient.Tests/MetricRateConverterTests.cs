@@ -40,7 +40,7 @@ public class MetricRateConverterTests
         var result = converter.Convert(values);
 
         Assert.Single(result);
-        Assert.Equal(3.5, (double)result[0].InstanceValues[0].Value);
+        Assert.Equal(3.5, result[0].InstanceValues[0].Value);
     }
 
     [Fact]
@@ -52,7 +52,7 @@ public class MetricRateConverterTests
         var result = converter.Convert(values);
 
         Assert.Single(result);
-        Assert.Equal(8.0, (double)result[0].InstanceValues[0].Value);
+        Assert.Equal(8.0, result[0].InstanceValues[0].Value);
     }
 
     // ── Counter: first fetch returns empty (no previous to diff against) ──
@@ -83,7 +83,7 @@ public class MetricRateConverterTests
             new[] { MakeValue("disk.dev.read", 1001.0, (0, 50200.0)) });
 
         Assert.Single(result);
-        var rate = (double)result[0].InstanceValues[0].Value;
+        var rate = result[0].InstanceValues[0].Value;
         Assert.Equal(200.0, rate, precision: 1);
     }
 
@@ -98,7 +98,7 @@ public class MetricRateConverterTests
         var result = converter.Convert(
             new[] { MakeValue("disk.dev.write", 1000.5, (0, 10100.0)) });
 
-        var rate = (double)result[0].InstanceValues[0].Value;
+        var rate = result[0].InstanceValues[0].Value;
         Assert.Equal(200.0, rate, precision: 1);
     }
 
@@ -124,8 +124,8 @@ public class MetricRateConverterTests
         Assert.Single(result);
         var instances = result[0].InstanceValues;
         Assert.Equal(2, instances.Count);
-        Assert.Equal(300.0, (double)instances[0].Value, precision: 1); // inst 0: +300/1s
-        Assert.Equal(100.0, (double)instances[1].Value, precision: 1); // inst 1: +100/1s
+        Assert.Equal(300.0, instances[0].Value, precision: 1); // inst 0: +300/1s
+        Assert.Equal(100.0, instances[1].Value, precision: 1); // inst 1: +100/1s
     }
 
     // ── Mixed counter and instant metrics in same fetch ──
@@ -157,11 +157,11 @@ public class MetricRateConverterTests
 
         // disk.dev.read: rate converted
         var diskResult = result.First(r => r.Name == "disk.dev.read");
-        Assert.Equal(500.0, (double)diskResult.InstanceValues[0].Value, precision: 1);
+        Assert.Equal(500.0, diskResult.InstanceValues[0].Value, precision: 1);
 
         // kernel.all.load: passed through
         var loadResult = result.First(r => r.Name == "kernel.all.load");
-        Assert.Equal(2.0, (double)loadResult.InstanceValues[0].Value);
+        Assert.Equal(2.0, loadResult.InstanceValues[0].Value);
     }
 
     // ── Counter wrap (value decreases) — treat as reset, skip that sample ──
@@ -192,7 +192,7 @@ public class MetricRateConverterTests
         var result = converter.Convert(values);
 
         Assert.Single(result);
-        Assert.Equal(42.0, (double)result[0].InstanceValues[0].Value);
+        Assert.Equal(42.0, result[0].InstanceValues[0].Value);
     }
 
     // ── New instance appearing mid-stream ──
@@ -215,7 +215,7 @@ public class MetricRateConverterTests
         Assert.Single(result);
         Assert.Single(result[0].InstanceValues);
         Assert.Equal(0, result[0].InstanceValues[0].InstanceId);
-        Assert.Equal(500.0, (double)result[0].InstanceValues[0].Value, precision: 1);
+        Assert.Equal(500.0, result[0].InstanceValues[0].Value, precision: 1);
     }
 
     // ── Zero time delta (duplicate timestamp) — skip to avoid division by zero ──

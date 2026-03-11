@@ -53,7 +53,7 @@ internal static class PcpMetricDescriber
             "32" => MetricType.I32,
             "64" => MetricType.I64,
             "STRING" => MetricType.String,
-            _ => MetricType.Double // safe fallback
+            _ => MetricType.Unknown
         };
 
     private static MetricSemantics ParseSemantics(string semStr) =>
@@ -62,7 +62,7 @@ internal static class PcpMetricDescriber
             "counter" => MetricSemantics.Counter,
             "instant" => MetricSemantics.Instant,
             "discrete" => MetricSemantics.Discrete,
-            _ => MetricSemantics.Instant // safe fallback
+            _ => MetricSemantics.Unknown
         };
 
     private static string? GetOptionalString(JsonElement element, string propertyName)

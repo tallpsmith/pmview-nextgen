@@ -551,7 +551,7 @@ public class BindingConfigLoaderTests
 
         Assert.Equal(1000, result.Config!.PollIntervalMs);
         Assert.Contains(result.Messages, m =>
-            m.Severity == ValidationSeverity.Error &&
+            m.Severity == ValidationSeverity.Warning &&
             m.Message.Contains("poll_interval_ms"));
     }
 

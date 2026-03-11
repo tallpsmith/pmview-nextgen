@@ -214,7 +214,9 @@ public partial class SceneBinder : Node
 
         if (binding.InstanceFilter != null)
         {
-            // Take first matching instance (full glob matching is a future enhancement)
+            // Glob matching not yet implemented — takes first available instance.
+            // Config validation accepts the filter value but the actual filtering
+            // will be implemented when instance domain names are available (T039).
             foreach (var key in instances.Keys)
                 return instances[key].AsDouble();
             return null;
@@ -303,8 +305,12 @@ public partial class SceneBinder : Node
     private static double Normalise(double value,
         double srcMin, double srcMax, double tgtMin, double tgtMax)
     {
+        var range = srcMax - srcMin;
+        if (range <= 0)
+            return tgtMin;
+
         var clamped = Math.Clamp(value, srcMin, srcMax);
-        var ratio = (clamped - srcMin) / (srcMax - srcMin);
+        var ratio = (clamped - srcMin) / range;
         return tgtMin + ratio * (tgtMax - tgtMin);
     }
 

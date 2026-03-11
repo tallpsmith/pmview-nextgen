@@ -44,10 +44,11 @@ public sealed class PcpClientConnection : IPcpClient
             throw new PcpConnectionException(
                 $"Failed to connect to pmproxy at {BaseUrl}: {ex.Message}", ex);
         }
-        catch (Exception) when (State == ConnectionState.Connecting)
+        catch (Exception ex) when (ex is not PcpConnectionException)
         {
             State = ConnectionState.Failed;
-            throw;
+            throw new PcpConnectionException(
+                $"Unexpected response from pmproxy at {BaseUrl}: {ex.Message}", ex);
         }
     }
 
@@ -145,11 +146,23 @@ public sealed class PcpClientConnection : IPcpClient
         IEnumerable<string> metricNames,
         CancellationToken cancellationToken = default)
     {
-        var url = PcpMetricDescriber.BuildDescribeUrl(BaseUrl, metricNames);
-        var response = await _httpClient.GetAsync(url, cancellationToken);
-        response.EnsureSuccessStatusCode();
-        var json = await response.Content.ReadAsStringAsync(cancellationToken);
-        return PcpMetricDescriber.ParseDescribeResponse(json);
+        if (State != ConnectionState.Connected)
+            throw new PcpConnectionException(
+                $"Not connected to pmproxy at {BaseUrl}. Call ConnectAsync first.");
+
+        try
+        {
+            var url = PcpMetricDescriber.BuildDescribeUrl(BaseUrl, metricNames);
+            var response = await _httpClient.GetAsync(url, cancellationToken);
+            response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
+            return PcpMetricDescriber.ParseDescribeResponse(json);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new PcpConnectionException(
+                $"Failed to describe metrics from pmproxy at {BaseUrl}: {ex.Message}", ex);
+        }
     }
 
     public Task<InstanceDomain> GetInstanceDomainAsync(string metricName,

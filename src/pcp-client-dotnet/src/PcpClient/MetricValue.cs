@@ -12,5 +12,28 @@ public record MetricValue(
 /// <summary>
 /// A single value for a specific instance of a metric.
 /// Singular metrics have InstanceId = null.
+/// Numeric values use Value directly; string metrics use the StringValue constructor.
 /// </summary>
-public record InstanceValue(int? InstanceId, object Value);
+public record InstanceValue
+{
+    public int? InstanceId { get; }
+    public double Value { get; }
+    public string? StringValue { get; }
+    public bool IsString => StringValue != null;
+
+    public InstanceValue(int? instanceId, double value)
+    {
+        InstanceId = instanceId;
+        Value = value;
+    }
+
+    public InstanceValue(int? instanceId, string stringValue)
+    {
+        InstanceId = instanceId;
+        StringValue = stringValue;
+    }
+
+    public double AsDouble() => IsString
+        ? throw new InvalidOperationException($"Cannot convert string value '{StringValue}' to double")
+        : Value;
+}

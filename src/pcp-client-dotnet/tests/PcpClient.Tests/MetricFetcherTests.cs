@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using PcpClient.Tests.TestHelpers;
 using Xunit;
 
 namespace PcpClient.Tests;
@@ -71,7 +72,7 @@ public class MetricFetcherTests
     [Fact]
     public async Task FetchAsync_SingularMetric_ReturnsSingleValue()
     {
-        var client = CreateConnectedClient(SingularMetricResponse);
+        var client = await CreateConnectedClientAsync(SingularMetricResponse);
 
         var values = await client.FetchAsync(new[] { "kernel.all.load" });
 
@@ -83,7 +84,7 @@ public class MetricFetcherTests
     [Fact]
     public async Task FetchAsync_SingularMetric_ParsesTimestamp()
     {
-        var client = CreateConnectedClient(SingularMetricResponse);
+        var client = await CreateConnectedClientAsync(SingularMetricResponse);
 
         var values = await client.FetchAsync(new[] { "kernel.all.load" });
 
@@ -93,7 +94,7 @@ public class MetricFetcherTests
     [Fact]
     public async Task FetchAsync_SingularMetric_InstanceIdIsNull()
     {
-        var client = CreateConnectedClient(SingularMetricResponse);
+        var client = await CreateConnectedClientAsync(SingularMetricResponse);
 
         var values = await client.FetchAsync(new[] { "kernel.all.load" });
 
@@ -104,11 +105,11 @@ public class MetricFetcherTests
     [Fact]
     public async Task FetchAsync_SingularMetric_ParsesFloatValue()
     {
-        var client = CreateConnectedClient(SingularMetricResponse);
+        var client = await CreateConnectedClientAsync(SingularMetricResponse);
 
         var values = await client.FetchAsync(new[] { "kernel.all.load" });
 
-        var value = Convert.ToDouble(values[0].InstanceValues[0].Value);
+        var value = values[0].InstanceValues[0].Value;
         Assert.Equal(2.45, value, precision: 2);
     }
 
@@ -117,7 +118,7 @@ public class MetricFetcherTests
     [Fact]
     public async Task FetchAsync_InstancedMetric_ReturnsMultipleInstances()
     {
-        var client = CreateConnectedClient(InstancedMetricResponse);
+        var client = await CreateConnectedClientAsync(InstancedMetricResponse);
 
         var values = await client.FetchAsync(new[] { "disk.dev.read" });
 
@@ -128,7 +129,7 @@ public class MetricFetcherTests
     [Fact]
     public async Task FetchAsync_InstancedMetric_InstanceIdsPreserved()
     {
-        var client = CreateConnectedClient(InstancedMetricResponse);
+        var client = await CreateConnectedClientAsync(InstancedMetricResponse);
 
         var values = await client.FetchAsync(new[] { "disk.dev.read" });
 
@@ -139,12 +140,12 @@ public class MetricFetcherTests
     [Fact]
     public async Task FetchAsync_InstancedMetric_ValuesPreserved()
     {
-        var client = CreateConnectedClient(InstancedMetricResponse);
+        var client = await CreateConnectedClientAsync(InstancedMetricResponse);
 
         var values = await client.FetchAsync(new[] { "disk.dev.read" });
 
-        Assert.Equal(1234.0, Convert.ToDouble(values[0].InstanceValues[0].Value));
-        Assert.Equal(5678.0, Convert.ToDouble(values[0].InstanceValues[1].Value));
+        Assert.Equal(1234.0, values[0].InstanceValues[0].Value);
+        Assert.Equal(5678.0, values[0].InstanceValues[1].Value);
     }
 
     // ── Multiple Metrics ──
@@ -152,7 +153,7 @@ public class MetricFetcherTests
     [Fact]
     public async Task FetchAsync_MultipleMetrics_ReturnsAll()
     {
-        var client = CreateConnectedClient(MultiMetricResponse);
+        var client = await CreateConnectedClientAsync(MultiMetricResponse);
 
         var values = await client.FetchAsync(new[] { "kernel.all.load", "disk.dev.read" });
 
@@ -175,7 +176,7 @@ public class MetricFetcherTests
     [Fact]
     public async Task FetchAsync_EmptyMetricNames_ThrowsArgumentException()
     {
-        var client = CreateConnectedClient(SingularMetricResponse);
+        var client = await CreateConnectedClientAsync(SingularMetricResponse);
 
         await Assert.ThrowsAsync<ArgumentException>(
             () => client.FetchAsync(Array.Empty<string>()));
@@ -183,7 +184,7 @@ public class MetricFetcherTests
 
     // ── Helpers ──
 
-    private static PcpClientConnection CreateConnectedClient(string fetchResponse)
+    private static async Task<PcpClientConnection> CreateConnectedClientAsync(string fetchResponse)
     {
         var handler = new MockHttpHandler(request =>
         {
@@ -209,7 +210,7 @@ public class MetricFetcherTests
 
         var httpClient = new HttpClient(handler);
         var client = new PcpClientConnection(new Uri("http://localhost:44322"), httpClient);
-        client.ConnectAsync().GetAwaiter().GetResult();
+        await client.ConnectAsync();
         return client;
     }
 }

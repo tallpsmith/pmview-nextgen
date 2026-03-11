@@ -4,6 +4,10 @@ namespace PcpClient;
 /// Converts cumulative PCP counter metrics into per-second rates.
 /// Instant and discrete metrics pass through unchanged.
 /// Mirrors the rate conversion that PCP tools (pmval, pmrep) do client-side.
+/// <para>
+/// This class is NOT thread-safe. All calls to <see cref="Convert"/> must be
+/// serialised by the caller (e.g., from a single timer callback or behind a lock).
+/// </para>
 /// </summary>
 public class MetricRateConverter
 {
@@ -52,7 +56,7 @@ public class MetricRateConverter
         // Build current instance map (using sentinel key for null InstanceId)
         var currentInstances = new Dictionary<int, double>();
         foreach (var iv in current.InstanceValues)
-            currentInstances[InstanceKey(iv.InstanceId)] = iv.Value is double d ? d : System.Convert.ToDouble(iv.Value);
+            currentInstances[InstanceKey(iv.InstanceId)] = iv.Value;
 
         if (!_previousValues.TryGetValue(current.Name, out var previous))
         {

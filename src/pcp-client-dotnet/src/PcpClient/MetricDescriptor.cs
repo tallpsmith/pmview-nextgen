@@ -29,7 +29,8 @@ public enum MetricType
     U64,
     I32,
     I64,
-    String
+    String,
+    Unknown
 }
 
 /// <summary>
@@ -39,7 +40,8 @@ public enum MetricSemantics
 {
     Instant,
     Counter,
-    Discrete
+    Discrete,
+    Unknown
 }
 
 /// <summary>
