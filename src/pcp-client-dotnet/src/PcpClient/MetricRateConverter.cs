@@ -24,6 +24,9 @@ public class MetricRateConverter
             _semantics[desc.Name] = desc.Semantics;
     }
 
+    public bool IsCounter(string metricName) =>
+        _semantics.TryGetValue(metricName, out var sem) && sem == MetricSemantics.Counter;
+
     /// <summary>
     /// Convert a batch of fetched metric values.
     /// Counter metrics are rate-converted (per second), others pass through.

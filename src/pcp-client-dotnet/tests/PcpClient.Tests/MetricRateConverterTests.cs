@@ -233,4 +233,30 @@ public class MetricRateConverterTests
 
         Assert.Empty(result);
     }
+
+    // ── IsCounter — exposes semantic knowledge for archive playback ──
+
+    [Fact]
+    public void IsCounter_CounterMetric_ReturnsTrue()
+    {
+        var converter = new MetricRateConverter(new[] { CounterMetric("disk.dev.read") });
+
+        Assert.True(converter.IsCounter("disk.dev.read"));
+    }
+
+    [Fact]
+    public void IsCounter_InstantMetric_ReturnsFalse()
+    {
+        var converter = new MetricRateConverter(new[] { InstantMetric("kernel.all.load") });
+
+        Assert.False(converter.IsCounter("kernel.all.load"));
+    }
+
+    [Fact]
+    public void IsCounter_UnknownMetric_ReturnsFalse()
+    {
+        var converter = new MetricRateConverter(new[] { InstantMetric("known") });
+
+        Assert.False(converter.IsCounter("unknown.metric"));
+    }
 }

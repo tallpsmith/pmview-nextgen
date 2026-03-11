@@ -136,10 +136,34 @@ public sealed class PcpClientConnection : IPcpClient
         }
     }
 
-    public Task<MetricNamespace> GetChildrenAsync(string prefix = "",
-                                                   CancellationToken cancellationToken = default)
+    public async Task<MetricNamespace> GetChildrenAsync(string prefix = "",
+                                                         CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException("GetChildrenAsync will be implemented in Phase 6 (T039)");
+        if (State != ConnectionState.Connected)
+            throw new PcpConnectionException(
+                $"Not connected to pmproxy at {BaseUrl}. Call ConnectAsync first.");
+
+        try
+        {
+            var url = PcpNamespaceTraverser.BuildChildrenUrl(BaseUrl, prefix);
+            var response = await _httpClient.GetAsync(url, cancellationToken);
+
+            if (response.StatusCode == HttpStatusCode.BadRequest)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                // Non-existent prefix returns empty namespace rather than throwing
+                return new MetricNamespace(prefix, Array.Empty<string>(), Array.Empty<string>());
+            }
+
+            response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
+            return PcpNamespaceTraverser.ParseChildrenResponse(json, prefix);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new PcpConnectionException(
+                $"Failed to get children from pmproxy at {BaseUrl}: {ex.Message}", ex);
+        }
     }
 
     public async Task<IReadOnlyList<MetricDescriptor>> DescribeMetricsAsync(
@@ -150,13 +174,31 @@ public sealed class PcpClientConnection : IPcpClient
             throw new PcpConnectionException(
                 $"Not connected to pmproxy at {BaseUrl}. Call ConnectAsync first.");
 
+        var namesList = metricNames.ToList();
+
         try
         {
-            var url = PcpMetricDescriber.BuildDescribeUrl(BaseUrl, metricNames);
+            var url = PcpMetricDescriber.BuildDescribeUrl(BaseUrl, namesList);
             var response = await _httpClient.GetAsync(url, cancellationToken);
+
+            if (response.StatusCode == HttpStatusCode.BadRequest)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                if (PcpMetricDescriber.IsUnknownMetricResponse(errorBody))
+                {
+                    var metricName = PcpMetricDescriber.ExtractUnknownMetricName(errorBody)
+                                     ?? namesList.FirstOrDefault() ?? "unknown";
+                    throw new PcpMetricNotFoundException(metricName);
+                }
+            }
+
             response.EnsureSuccessStatusCode();
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
             return PcpMetricDescriber.ParseDescribeResponse(json);
+        }
+        catch (PcpMetricNotFoundException)
+        {
+            throw;
         }
         catch (HttpRequestException ex)
         {
@@ -165,10 +207,34 @@ public sealed class PcpClientConnection : IPcpClient
         }
     }
 
-    public Task<InstanceDomain> GetInstanceDomainAsync(string metricName,
-                                                        CancellationToken cancellationToken = default)
+    public async Task<InstanceDomain> GetInstanceDomainAsync(string metricName,
+                                                              CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException("GetInstanceDomainAsync will be implemented in Phase 6 (T039)");
+        if (State != ConnectionState.Connected)
+            throw new PcpConnectionException(
+                $"Not connected to pmproxy at {BaseUrl}. Call ConnectAsync first.");
+
+        try
+        {
+            var url = PcpInstanceDomainFetcher.BuildIndomUrl(BaseUrl, metricName);
+            var response = await _httpClient.GetAsync(url, cancellationToken);
+
+            if (response.StatusCode == HttpStatusCode.BadRequest)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                if (PcpInstanceDomainFetcher.IsNoIndomResponse(errorBody))
+                    return new InstanceDomain("", Array.Empty<Instance>());
+            }
+
+            response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
+            return PcpInstanceDomainFetcher.ParseIndomResponse(json);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new PcpConnectionException(
+                $"Failed to get instance domain from pmproxy at {BaseUrl}: {ex.Message}", ex);
+        }
     }
 
     public async ValueTask DisposeAsync()

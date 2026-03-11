@@ -65,6 +65,45 @@ internal static class PcpMetricDescriber
             _ => MetricSemantics.Unknown
         };
 
+    public static bool IsUnknownMetricResponse(string responseBody)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(responseBody);
+            if (doc.RootElement.TryGetProperty("message", out var msg))
+            {
+                var message = msg.GetString() ?? "";
+                return message.Contains("Unknown metric name", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+        catch (JsonException)
+        {
+        }
+
+        return false;
+    }
+
+    public static string? ExtractUnknownMetricName(string responseBody)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(responseBody);
+            if (doc.RootElement.TryGetProperty("message", out var msg))
+            {
+                var message = msg.GetString() ?? "";
+                const string prefix = "Unknown metric name - ";
+                var idx = message.IndexOf(prefix, StringComparison.OrdinalIgnoreCase);
+                if (idx >= 0)
+                    return message[(idx + prefix.Length)..].Trim();
+            }
+        }
+        catch (JsonException)
+        {
+        }
+
+        return null;
+    }
+
     private static string? GetOptionalString(JsonElement element, string propertyName)
     {
         if (element.TryGetProperty(propertyName, out var prop) &&
