@@ -41,7 +41,11 @@ public partial class SceneBinder : Node
         UnloadCurrentScene();
 
         // Phase 1: Config validation (pure .NET)
-        var configResult = BindingConfigLoader.LoadFromFile(configPath);
+        // Resolve Godot res:// paths to filesystem paths for .NET File I/O
+        var resolvedPath = configPath.StartsWith("res://")
+            ? ProjectSettings.GlobalizePath(configPath)
+            : configPath;
+        var configResult = BindingConfigLoader.LoadFromFile(resolvedPath);
         LogConfigResult(configResult);
 
         if (!configResult.IsValid)

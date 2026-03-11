@@ -1,11 +1,13 @@
-extends Control
+extends Node
 
 ## Main scene controller: wires MetricPoller signals to SceneBinder.
-## Displays connection status overlay. Intentionally thin.
+## Displays connection status overlay. Auto-loads default config on start.
+
+@export var default_config: String = "res://bindings/test_bars.toml"
 
 @onready var metric_poller: Node = $MetricPoller
 @onready var scene_binder: Node = $SceneBinder
-@onready var status_label: Label = $StatusOverlay/StatusLabel
+@onready var status_label: Label = $UIOverlay/StatusLabel
 
 var _connection_state: String = "Disconnected"
 
@@ -18,28 +20,47 @@ func _ready() -> void:
 
 	_update_status_display()
 
+	# Auto-load the default binding config
+	if default_config != "":
+		print("[MetricSceneController] Auto-loading config: %s" % default_config)
+		load_config(default_config)
+
 func load_config(config_path: String) -> void:
+	print("[MetricSceneController] Loading config: %s" % config_path)
+	metric_poller.call("StopPolling")
 	var metric_names = scene_binder.call("LoadSceneWithBindings", config_path)
+	print("[MetricSceneController] Metrics to poll: %s" % [metric_names])
 	if metric_names.size() > 0:
-		metric_poller.set("MetricNames", metric_names)
-		metric_poller.call("StartPolling")
+		metric_poller.call("UpdateMetricNames", metric_names)
+		var config = scene_binder.get("CurrentConfig")
+		if config != null:
+			var endpoint = config.Endpoint
+			var poll_ms = config.PollIntervalMs
+			if endpoint != null and endpoint != "":
+				print("[MetricSceneController] Using endpoint from config: %s" % endpoint)
+				metric_poller.call("UpdateEndpoint", endpoint, poll_ms)
+			else:
+				metric_poller.call("StartPolling")
+		else:
+			metric_poller.call("StartPolling")
 
 func _on_metrics_updated(metrics: Dictionary) -> void:
 	scene_binder.call("ApplyMetrics", metrics)
 
 func _on_connection_state_changed(state: String) -> void:
 	_connection_state = state
+	print("[MetricSceneController] Connection state: %s" % state)
 	_update_status_display()
 
 func _on_error_occurred(message: String) -> void:
-	push_warning("[MetricSceneController] Error: %s" % message)
+	print("[MetricSceneController] Error: %s" % message)
 	_update_status_display()
 
 func _on_scene_loaded(scene_path: String, config_path: String) -> void:
-	print("[MetricSceneController] Scene loaded: %s with %s" % [scene_path, config_path])
+	print("[MetricSceneController] Scene loaded: %s with config %s" % [scene_path, config_path])
 
 func _on_binding_error(message: String) -> void:
-	push_warning("[MetricSceneController] Binding error: %s" % message)
+	print("[MetricSceneController] Binding error: %s" % message)
 
 func _update_status_display() -> void:
 	if status_label:
