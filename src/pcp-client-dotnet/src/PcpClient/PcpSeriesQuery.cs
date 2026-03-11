@@ -81,7 +81,10 @@ public static class PcpSeriesQuery
 
     /// <summary>
     /// Parses a /series/instances response into a mapping of
-    /// series ID → instance info (numeric ID + human-readable name).
+    /// instance hash → instance info (numeric ID + human-readable name).
+    /// Multiple instances can share the same series hash (e.g. kernel.all.load
+    /// has 3 instances under one series), so we key by the unique instance hash.
+    /// Falls back to series hash when no instance field is present (singular metrics).
     /// </summary>
     public static Dictionary<string, SeriesInstanceInfo> ParseInstancesResponse(string json)
     {
@@ -95,7 +98,14 @@ public static class PcpSeriesQuery
             var name = item.TryGetProperty("name", out var nameProp)
                 ? nameProp.GetString() ?? ""
                 : "";
-            result[seriesId] = new SeriesInstanceInfo(pcpInstanceId, name);
+
+            // Key by instance hash (unique per instance) when available,
+            // fall back to series hash for singular metrics
+            var key = item.TryGetProperty("instance", out var instanceProp)
+                ? instanceProp.GetString() ?? seriesId
+                : seriesId;
+
+            result[key] = new SeriesInstanceInfo(pcpInstanceId, name);
         }
 
         return result;

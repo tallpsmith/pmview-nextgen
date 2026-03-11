@@ -263,7 +263,7 @@ public class SeriesQueryTests
     // ── /series/instances parsing — series-to-PCP-instance-ID mapping ──
 
     [Fact]
-    public void ParseInstancesResponse_MapsSeriesIdToInstanceInfo()
+    public void ParseInstancesResponse_KeysByInstanceHash()
     {
         var json = """
         [
@@ -276,12 +276,12 @@ public class SeriesQueryTests
         var result = PcpSeriesQuery.ParseInstancesResponse(json);
 
         Assert.Equal(3, result.Count);
-        Assert.Equal(0, result["series_aaa"].PcpInstanceId);
-        Assert.Equal("1 minute", result["series_aaa"].Name);
-        Assert.Equal(1, result["series_bbb"].PcpInstanceId);
-        Assert.Equal("5 minute", result["series_bbb"].Name);
-        Assert.Equal(2, result["series_ccc"].PcpInstanceId);
-        Assert.Equal("15 minute", result["series_ccc"].Name);
+        Assert.Equal(0, result["inst_aaa"].PcpInstanceId);
+        Assert.Equal("1 minute", result["inst_aaa"].Name);
+        Assert.Equal(1, result["inst_bbb"].PcpInstanceId);
+        Assert.Equal("5 minute", result["inst_bbb"].Name);
+        Assert.Equal(2, result["inst_ccc"].PcpInstanceId);
+        Assert.Equal("15 minute", result["inst_ccc"].Name);
     }
 
     [Fact]
@@ -293,20 +293,135 @@ public class SeriesQueryTests
     }
 
     [Fact]
-    public void ParseInstancesResponse_DuplicateSeriesId_LastWins()
+    public void ParseInstancesResponse_MultipleInstancesPerSeries_AllPreserved()
     {
+        // Real-world case: kernel.all.load has 3 instances sharing one series hash
         var json = """
         [
-            {"series": "series_aaa", "source": "src1", "instance": "inst_aaa", "id": 0, "name": "1 minute"},
-            {"series": "series_aaa", "source": "src2", "instance": "inst_bbb", "id": 5, "name": "1 minute"}
+            {"series": "series_aaa", "source": "src1", "instance": "inst_1min", "id": 0, "name": "1 minute"},
+            {"series": "series_aaa", "source": "src1", "instance": "inst_5min", "id": 1, "name": "5 minute"},
+            {"series": "series_aaa", "source": "src1", "instance": "inst_15min", "id": 2, "name": "15 minute"}
+        ]
+        """;
+
+        var result = PcpSeriesQuery.ParseInstancesResponse(json);
+
+        Assert.Equal(3, result.Count);
+        Assert.Equal(0, result["inst_1min"].PcpInstanceId);
+        Assert.Equal("1 minute", result["inst_1min"].Name);
+        Assert.Equal(1, result["inst_5min"].PcpInstanceId);
+        Assert.Equal("5 minute", result["inst_5min"].Name);
+        Assert.Equal(2, result["inst_15min"].PcpInstanceId);
+        Assert.Equal("15 minute", result["inst_15min"].Name);
+    }
+
+    [Fact]
+    public void ParseInstancesResponse_NoInstanceField_FallsBackToSeriesKey()
+    {
+        // Singular metrics may not have an instance field
+        var json = """
+        [
+            {"series": "series_aaa", "source": "src1", "id": 0, "name": "singular"}
         ]
         """;
 
         var result = PcpSeriesQuery.ParseInstancesResponse(json);
 
         Assert.Single(result);
-        Assert.Equal(5, result["series_aaa"].PcpInstanceId);
-        Assert.Equal("1 minute", result["series_aaa"].Name);
+        Assert.Equal(0, result["series_aaa"].PcpInstanceId);
+        Assert.Equal("singular", result["series_aaa"].Name);
+    }
+
+    [Fact]
+    public void ParseInstancesResponse_MultiSource_SameNamesDifferentIds_AllPreserved()
+    {
+        // Real-world scenario: two archive sources index the same metric (kernel.all.load)
+        // with different PCP instance ID schemes. Instance hashes are unique across sources.
+        var json = """
+        [
+            {"series": "series_src1", "source": "src1", "instance": "inst_1min_s1", "id": 0, "name": "1 minute"},
+            {"series": "series_src1", "source": "src1", "instance": "inst_5min_s1", "id": 1, "name": "5 minute"},
+            {"series": "series_src1", "source": "src1", "instance": "inst_15min_s1", "id": 2, "name": "15 minute"},
+            {"series": "series_src2", "source": "src2", "instance": "inst_1min_s2", "id": 1, "name": "1 minute"},
+            {"series": "series_src2", "source": "src2", "instance": "inst_5min_s2", "id": 5, "name": "5 minute"},
+            {"series": "series_src2", "source": "src2", "instance": "inst_15min_s2", "id": 15, "name": "15 minute"}
+        ]
+        """;
+
+        var result = PcpSeriesQuery.ParseInstancesResponse(json);
+
+        // All 6 entries preserved — keyed by unique instance hash, not series hash
+        Assert.Equal(6, result.Count);
+
+        // Source 1 instances
+        Assert.Equal(0, result["inst_1min_s1"].PcpInstanceId);
+        Assert.Equal("1 minute", result["inst_1min_s1"].Name);
+        Assert.Equal(1, result["inst_5min_s1"].PcpInstanceId);
+        Assert.Equal(2, result["inst_15min_s1"].PcpInstanceId);
+
+        // Source 2 instances (same names, different PCP IDs)
+        Assert.Equal(1, result["inst_1min_s2"].PcpInstanceId);
+        Assert.Equal("1 minute", result["inst_1min_s2"].Name);
+        Assert.Equal(5, result["inst_5min_s2"].PcpInstanceId);
+        Assert.Equal(15, result["inst_15min_s2"].PcpInstanceId);
+    }
+
+    [Fact]
+    public void ValueInstanceHash_ResolvesCorrectly_ThroughInstanceMap()
+    {
+        // End-to-end: values carry instance hashes that resolve through the instance map.
+        // Only source 1 has actual data — its instance hashes appear in the values.
+        var instancesJson = """
+        [
+            {"series": "series_src1", "source": "src1", "instance": "inst_1min_s1", "id": 0, "name": "1 minute"},
+            {"series": "series_src1", "source": "src1", "instance": "inst_5min_s1", "id": 1, "name": "5 minute"},
+            {"series": "series_src1", "source": "src1", "instance": "inst_15min_s1", "id": 2, "name": "15 minute"},
+            {"series": "series_src2", "source": "src2", "instance": "inst_1min_s2", "id": 1, "name": "1 minute"},
+            {"series": "series_src2", "source": "src2", "instance": "inst_5min_s2", "id": 5, "name": "5 minute"},
+            {"series": "series_src2", "source": "src2", "instance": "inst_15min_s2", "id": 15, "name": "15 minute"}
+        ]
+        """;
+
+        var valuesJson = """
+        [
+            {"series": "series_src1", "instance": "inst_1min_s1", "timestamp": 1000000.0, "value": "0.64"},
+            {"series": "series_src1", "instance": "inst_5min_s1", "timestamp": 1000000.0, "value": "0.65"},
+            {"series": "series_src1", "instance": "inst_15min_s1", "timestamp": 1000000.0, "value": "0.68"}
+        ]
+        """;
+
+        var instanceMap = PcpSeriesQuery.ParseInstancesResponse(instancesJson);
+        var values = PcpSeriesQuery.ParseValuesResponse(valuesJson);
+
+        // Each value's InstanceId (instance hash) should resolve to the correct
+        // PcpInstanceId from source 1 — NOT source 2's conflicting IDs.
+        Assert.Equal(3, values.Count);
+
+        foreach (var sv in values)
+        {
+            Assert.NotNull(sv.InstanceId);
+            Assert.True(instanceMap.ContainsKey(sv.InstanceId!),
+                $"Instance hash '{sv.InstanceId}' should be in instance map");
+        }
+
+        // Verify the resolution chain produces distinct PCP instance IDs from source 1
+        var resolvedIds = values
+            .Select(sv => instanceMap[sv.InstanceId!].PcpInstanceId)
+            .ToList();
+
+        Assert.Equal(new[] { 0, 1, 2 }, resolvedIds);  // Source 1's IDs, not source 2's
+
+        // Build name→id only from matched entries (simulating MetricPoller logic)
+        var nameToId = new Dictionary<string, int>();
+        foreach (var sv in values)
+        {
+            var info = instanceMap[sv.InstanceId!];
+            nameToId[info.Name] = info.PcpInstanceId;
+        }
+
+        Assert.Equal(0, nameToId["1 minute"]);   // NOT 1 (source 2's ID)
+        Assert.Equal(1, nameToId["5 minute"]);   // NOT 5 (source 2's ID)
+        Assert.Equal(2, nameToId["15 minute"]);  // NOT 15 (source 2's ID)
     }
 
     [Fact]
