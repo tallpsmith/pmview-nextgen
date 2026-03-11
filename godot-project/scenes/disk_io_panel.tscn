@@ -1,23 +1,29 @@
-[gd_scene load_steps=3 format=3 uid="uid://disk_io_panel_scene"]
-
-[sub_resource type="BoxMesh" id="BoxMesh_flat"]
-size = Vector3(1.5, 0.5, 1.5)
+[gd_scene format=3 uid="uid://dmcj0flhs8dss"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_spinner"]
 size = Vector3(0.8, 0.8, 0.8)
 
-[node name="DiskIOPanel" type="Node3D"]
+[sub_resource type="BoxMesh" id="BoxMesh_flat"]
+size = Vector3(1.5, 0.5, 1.5)
 
-[node name="Camera3D" type="Camera3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0.866, 0.5, 0, -0.5, 0.866, 0, 4, 6)
+[node name="DiskIOPanel" type="Node3D" unique_id=636609156]
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+[node name="Camera3D" type="Camera3D" parent="." unique_id=1407204787]
+transform = Transform3D(1, 0, 0, 0, 0.86601907, 0.500011, 0, -0.500011, 0.86601907, 0.2538805, 2.501054, 3.6705794)
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1561823162]
 transform = Transform3D(1, 0, 0, 0, 0.707, -0.707, 0, 0.707, 0.707, 0, 5, 5)
 
-[node name="ReadSpinner" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0.5, 0)
+[node name="Disk0Read" type="MeshInstance3D" parent="." unique_id=1366231156]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0.5, 0)
 mesh = SubResource("BoxMesh_spinner")
 
-[node name="WriteBar" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0.25, 0)
-mesh = SubResource("BoxMesh_flat")
+[node name="Disk0ReadLabel" type="Label3D" parent="." unique_id=1757779577]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 1.5, 0)
+modulate = Color(0.4, 1, 0.4, 1)
+text = "disk0 read"
+outline_size = 4
+
+[node name="Disk0Write" type="MeshInstance3D" parent="." unique_id=898219611]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0.25, 0)
+mesh = SubRes
