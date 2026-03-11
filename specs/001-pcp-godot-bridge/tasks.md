@@ -126,16 +126,16 @@
 
 ### Tests for US2 (write FIRST, confirm FAILING)
 
-- [ ] T036 [P] [US2] Write failing tests for metric namespace traversal (GetChildrenAsync parses /pmapi/children response, handles leaf and non-leaf nodes) with mocked HTTP in src/pcp-client-dotnet/tests/PcpClient.Tests/MetricDiscoveryTests.cs
-- [ ] T037 [P] [US2] Write failing tests for metric description (DescribeMetricsAsync parses /pmapi/metric response including type, semantics, units, help text; PcpMetricNotFoundException for unknown metrics) in src/pcp-client-dotnet/tests/PcpClient.Tests/MetricDiscoveryTests.cs
-- [ ] T038 [P] [US2] Write failing tests for instance domain enumeration (GetInstanceDomainAsync parses /pmapi/indom response, returns empty for singular metrics) in src/pcp-client-dotnet/tests/PcpClient.Tests/MetricDiscoveryTests.cs
+- [x] T036 [P] [US2] Write failing tests for metric namespace traversal (GetChildrenAsync parses /pmapi/children response, handles leaf and non-leaf nodes) with mocked HTTP in src/pcp-client-dotnet/tests/PcpClient.Tests/MetricDiscoveryTests.cs
+- [x] T037 [P] [US2] Write failing tests for metric description (DescribeMetricsAsync parses /pmapi/metric response including type, semantics, units, help text; PcpMetricNotFoundException for unknown metrics) in src/pcp-client-dotnet/tests/PcpClient.Tests/MetricDiscoveryTests.cs
+- [x] T038 [P] [US2] Write failing tests for instance domain enumeration (GetInstanceDomainAsync parses /pmapi/indom response, returns empty for singular metrics) in src/pcp-client-dotnet/tests/PcpClient.Tests/MetricDiscoveryTests.cs
 
 ### Implementation for US2
 
-- [ ] T039 [US2] Implement PcpMetricDiscovery: GetChildrenAsync (PMNS tree walk), DescribeMetricsAsync (metadata fetch), GetInstanceDomainAsync (indom enumeration) in src/pcp-client-dotnet/src/PcpClient/PcpMetricDiscovery.cs
-- [ ] T040 [US2] Wire discovery methods into PcpClient class (IPcpClient implementation) in src/pcp-client-dotnet/src/PcpClient/PcpClient.cs
-- [ ] T041 [US2] Create metric browser UI: tree view of metric namespace, metric details panel (description, type, instances), select-to-visualise action in godot-project/scripts/scenes/metric_browser.gd and godot-project/scenes/metric_browser.tscn
-- [ ] T042 [US2] Display per-instance visual elements: when a metric with instance domains is selected, create distinct 3D objects for each instance (e.g., one bar per CPU) in godot-project/scripts/bridge/SceneBinder.cs
+- [x] T039 [US2] Implement PcpMetricDiscovery: GetChildrenAsync (PMNS tree walk), DescribeMetricsAsync (metadata fetch), GetInstanceDomainAsync (indom enumeration) in src/pcp-client-dotnet/src/PcpClient/PcpNamespaceTraverser.cs, PcpInstanceDomainFetcher.cs
+- [x] T040 [US2] Wire discovery methods into PcpClient class (IPcpClient implementation) in src/pcp-client-dotnet/src/PcpClient/PcpClientConnection.cs
+- [x] T041 [US2] Create metric browser UI: tree view of metric namespace, metric details panel (description, type, instances), select-to-visualise action in godot-project/scripts/scenes/metric_browser.gd and godot-project/scenes/metric_browser.tscn
+- [x] T042 [US2] Display per-instance visual elements: when a metric with instance domains is selected, create distinct 3D objects for each instance (e.g., one bar per CPU) in godot-project/scripts/bridge/SceneBinder.cs
 
 **Checkpoint**: Browse all metrics from dev-environment, see descriptions and instance domains, select a metric and see it visualised with per-instance elements. US2 acceptance scenarios 1-3 validated.
 
@@ -149,15 +149,15 @@
 
 ### Tests for US5 (write FIRST, confirm FAILING)
 
-- [ ] T043 [P] [US5] Write failing tests for TimeCursor state machine (Live/Playback/Paused transitions, PlaybackSpeed clamping 0.1-100.0, Position advancement per speed multiplier) in src/pcp-client-dotnet/tests/PcpClient.Tests/TimeCursorTests.cs
-- [ ] T044 [P] [US5] Write failing tests for historical series queries (query /series/query and /series/values endpoints, parse response with series identifiers and timestamped values) with mocked HTTP in src/pcp-client-dotnet/tests/PcpClient.Tests/SeriesQueryTests.cs
+- [x] T043 [P] [US5] Write failing tests for TimeCursor state machine (Live/Playback/Paused transitions, PlaybackSpeed clamping 0.1-100.0, Position advancement per speed multiplier) in src/pcp-client-dotnet/tests/PcpClient.Tests/TimeCursorTests.cs
+- [x] T044 [P] [US5] Write failing tests for historical series queries (query /series/query and /series/values endpoints, parse response with series identifiers and timestamped values) with mocked HTTP in src/pcp-client-dotnet/tests/PcpClient.Tests/SeriesQueryTests.cs
 
 ### Implementation for US5
 
-- [ ] T045 [US5] Implement TimeCursor model: mode transitions, position tracking, speed-adjusted advancement per data-model.md in src/pcp-client-dotnet/src/PcpClient/TimeCursor.cs
-- [ ] T046 [US5] Implement series query support: /series/query for historical data, /series/values for fetching timestamped values from Valkey backend in src/pcp-client-dotnet/src/PcpClient/PcpSeriesQuery.cs
-- [ ] T047 [US5] Integrate TimeCursor with MetricPoller: switch between live fetch (FetchAsync) and historical replay (series queries) based on cursor mode in godot-project/scripts/bridge/MetricPoller.cs
-- [ ] T048 [US5] Create playback control UI: start time picker, play/pause/resume buttons, speed slider, current position display, reset-to-live button in godot-project/scripts/scenes/playback_controls.gd and godot-project/scenes/playback_controls.tscn
+- [x] T045 [US5] Implement TimeCursor model: mode transitions, position tracking, speed-adjusted advancement per data-model.md in src/pcp-client-dotnet/src/PcpClient/TimeCursor.cs
+- [x] T046 [US5] Implement series query support: /series/query for historical data, /series/values for fetching timestamped values from Valkey backend in src/pcp-client-dotnet/src/PcpClient/PcpSeriesQuery.cs
+- [x] T047 [US5] Integrate TimeCursor with MetricPoller: switch between live fetch (FetchAsync) and historical replay (series queries) based on cursor mode in godot-project/scripts/bridge/MetricPoller.cs
+- [x] T048 [US5] Create playback control UI: start time picker, play/pause/resume buttons, speed slider, current position display, reset-to-live button in godot-project/scripts/scenes/playback_controls.gd and godot-project/scenes/playback_controls.tscn
 
 **Checkpoint**: Set cursor to past time, scene replays synthetic data. Speed adjustment works. Pause freezes scene. Default is live mode. US5 acceptance scenarios 1-4 validated.
 
