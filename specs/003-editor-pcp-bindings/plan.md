@@ -65,10 +65,12 @@ src/pcp-godot-bridge/
 │   ├── MetricBinding.cs              # existing — add InitialValue field
 │   ├── BindingConfigLoader.cs        # existing — validation logic reused
 │   ├── BindingValidator.cs           # NEW — extracted validation rules (offline tier)
+│   ├── PcpBindingConverter.cs        # NEW — maps primitive binding fields to MetricBinding
 │   └── PropertyVocabulary.cs         # existing — reused as-is
 └── tests/PcpGodotBridge.Tests/
     ├── BindingConfigLoaderTests.cs    # existing
-    └── BindingValidatorTests.cs      # NEW — offline validation tests
+    ├── BindingValidatorTests.cs      # NEW — offline validation tests
+    └── PcpBindingConverterTests.cs   # NEW — converter mapping tests
 
 # Godot addon (bridge nodes + editor plugin)
 godot-project/addons/pmview-bridge/
@@ -99,3 +101,4 @@ godot-project/
 | Separate PcpBindingResource + MetricBinding | Two representations of the same data (Godot Resource vs pure .NET record) | MetricBinding lives in Godot-free library (xUnit testable). PcpBindingResource needs Godot's Resource base class for serialization. Thin conversion method bridges them. The alternative (single class) would force Godot dependency into PcpGodotBridge, violating the architectural boundary. |
 | EditorInspectorPlugin for validation | Custom UI layer on top of built-in array editor | Without it, validation feedback (FR-010) and metric browsing (FR-004) have no home. The built-in array editor shows fields but can't display warnings or launch browse dialogs. |
 | BindingValidator extraction | New class extracted from BindingConfigLoader | BindingConfigLoader mixes TOML parsing with validation. Extracting validation rules lets us test them independently and reuse them from both the TOML path (legacy) and the Resource path (new). |
+| Godot UI code without automated tests | xUnit cannot test classes that depend on GodotSharp (no headless editor runner) | Manual editor testing covers acceptance scenarios for EditorInspectorPlugin, MetricBrowserDialog, PcpBindingResource, and PcpBindable. Constitution Principle II exempts prototypes; this is a justified extension — the alternative (a full Godot test harness) adds significant complexity for low-risk UI wiring code. Pure .NET validation logic retains full TDD coverage. |
