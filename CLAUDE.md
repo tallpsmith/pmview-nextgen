@@ -3,6 +3,8 @@
 Auto-generated from all feature plans. Last updated: 2026-03-05
 
 ## Active Technologies
+- C# (.NET 8.0 LTS) for EditorPlugin + bridge nodes; GDScript for scene controller integration + Godot 4.4+ (Godot.NET.Sdk), existing PcpClient + PcpGodotBridge libraries (002-editor-launch-config)
+- Godot ProjectSettings (`project.godot` file — automatic persistence) (002-editor-launch-config)
 
 - C# (.NET 8.0 LTS) for PcpClient library and Godot bridge; GDScript for scene logic + Godot 4.4+ (Godot.NET.Sdk), System.Net.Http.HttpClient, System.Text.Json, Tomlyn (TOML parser) (001-pcp-godot-bridge)
 
@@ -37,6 +39,7 @@ dotnet build godot-project/pmview-nextgen.sln
 C# (.NET 8.0 LTS) for PcpClient library and Godot bridge; GDScript for scene logic: Follow standard conventions
 
 ## Recent Changes
+- 002-editor-launch-config: Added C# (.NET 8.0 LTS) for EditorPlugin + bridge nodes; GDScript for scene controller integration + Godot 4.4+ (Godot.NET.Sdk), existing PcpClient + PcpGodotBridge libraries
 
 - 001-pcp-godot-bridge: Added C# (.NET 8.0 LTS) for PcpClient library and Godot bridge; GDScript for scene logic + Godot 4.4+ (Godot.NET.Sdk), System.Net.Http.HttpClient, System.Text.Json, Tomlyn (TOML parser)
 

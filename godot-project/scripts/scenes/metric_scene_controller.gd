@@ -17,7 +17,15 @@ var _configs: Array[String] = []
 var _current_config_index: int = -1
 var _connection_state: String = "Disconnected"
 
+# World configuration from ProjectSettings (set by pmview-bridge plugin)
+var _launch_endpoint: String = "http://localhost:44322"
+var _launch_mode: int = 0  # 0=Archive, 1=Live
+var _launch_timestamp: String = ""
+var _launch_speed: float = 10.0
+var _launch_loop: bool = false
+
 func _ready() -> void:
+	_read_launch_settings()
 	metric_poller.connect("MetricsUpdated", _on_metrics_updated)
 	metric_poller.connect("ConnectionStateChanged", _on_connection_state_changed)
 	metric_poller.connect("ErrorOccurred", _on_error_occurred)
@@ -42,6 +50,8 @@ func _ready() -> void:
 		print("[MetricSceneController] Auto-loading config: %s" % default_config)
 		_current_config_index = _configs.find(default_config)
 		load_config(default_config)
+
+	_apply_launch_settings()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -143,6 +153,41 @@ func _toggle_playback_controls() -> void:
 		playback_controls_ui.visible = not playback_controls_ui.visible
 		print("[MetricSceneController] Playback controls: %s" % (
 			"shown" if playback_controls_ui.visible else "hidden"))
+
+func _read_launch_settings() -> void:
+	_launch_endpoint = ProjectSettings.get_setting("pmview/endpoint", "http://localhost:44322")
+	_launch_mode = ProjectSettings.get_setting("pmview/mode", 0)
+	_launch_timestamp = ProjectSettings.get_setting("pmview/archive_start_timestamp", "")
+	_launch_speed = ProjectSettings.get_setting("pmview/archive_speed", 10.0)
+	_launch_loop = ProjectSettings.get_setting("pmview/archive_loop", false)
+	print("[MetricSceneController] Launch settings: mode=%d endpoint=%s speed=%.1f loop=%s" % [
+		_launch_mode, _launch_endpoint, _launch_speed, _launch_loop])
+
+func _apply_launch_settings() -> void:
+	# Override endpoint if it differs from the default
+	if _launch_endpoint != "http://localhost:44322":
+		print("[MetricSceneController] Overriding endpoint from ProjectSettings: %s" % _launch_endpoint)
+		metric_poller.set("Endpoint", _launch_endpoint)
+
+	if _launch_mode == 0:  # Archive
+		var timestamp = _launch_timestamp
+		if timestamp == "":
+			# Empty timestamp → 24 hours before now
+			var now = Time.get_unix_time_from_system()
+			var day_ago = now - 86400.0
+			timestamp = Time.get_datetime_string_from_unix_time(int(day_ago)) + "Z"
+			print("[MetricSceneController] Empty timestamp, using 24h ago: %s" % timestamp)
+
+		# Set speed/loop before StartPlayback — StartPlayback is async and discovers
+		# EndBound from the server. Loop + EndBound are checked together at AdvanceBy() time.
+		metric_poller.call("SetPlaybackSpeed", _launch_speed)
+		metric_poller.call("SetLoop", _launch_loop)
+		metric_poller.call("StartPlayback", timestamp)
+		print("[MetricSceneController] Archive mode: timestamp=%s speed=%.1f loop=%s" % [
+			timestamp, _launch_speed, _launch_loop])
+	elif _launch_mode == 1:  # Live
+		metric_poller.call("ResetToLive")
+		print("[MetricSceneController] Live mode: archive settings ignored")
 
 func _update_status_display() -> void:
 	if status_label:
