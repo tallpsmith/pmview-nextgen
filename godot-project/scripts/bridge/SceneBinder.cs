@@ -20,6 +20,7 @@ public partial class SceneBinder : Node
     private string? _currentConfigPath;
     private BindingConfig? _currentConfig;
     private readonly List<ActiveBinding> _activeBindings = new();
+    private readonly Dictionary<Node3D, float> _rotationSpeeds = new();
 
     /// <summary>
     /// A validated, resolved binding with a cached node reference.
@@ -31,6 +32,15 @@ public partial class SceneBinder : Node
 
     public BindingConfig? CurrentConfig => _currentConfig;
     public int ActiveBindingCount => _activeBindings.Count;
+
+    public override void _Process(double delta)
+    {
+        foreach (var (node, degreesPerSecond) in _rotationSpeeds)
+        {
+            if (IsInstanceValid(node))
+                node.RotateY(Mathf.DegToRad(degreesPerSecond) * (float)delta);
+        }
+    }
 
     /// <summary>
     /// Load a scene and its binding config. Replaces any currently loaded scene.
@@ -110,6 +120,7 @@ public partial class SceneBinder : Node
     public void UnloadCurrentScene()
     {
         _activeBindings.Clear();
+        _rotationSpeeds.Clear();
 
         if (_currentScene != null)
         {
@@ -219,7 +230,7 @@ public partial class SceneBinder : Node
         return null;
     }
 
-    private static void ApplyProperty(ActiveBinding active, float value)
+    private void ApplyProperty(ActiveBinding active, float value)
     {
         switch (active.Resolved.Kind)
         {
@@ -232,7 +243,7 @@ public partial class SceneBinder : Node
         }
     }
 
-    private static void ApplyBuiltInProperty(Node node, string property, float value)
+    private void ApplyBuiltInProperty(Node node, string property, float value)
     {
         if (node is not Node3D node3D)
         {
@@ -256,7 +267,7 @@ public partial class SceneBinder : Node
                 node3D.Scale = new Vector3(value, value, value);
                 break;
             case "rotation_speed":
-                node3D.RotateY(Mathf.DegToRad(value * (float)Engine.GetProcessFrames()));
+                _rotationSpeeds[node3D] = value;
                 break;
             case "position_y":
                 node3D.Position = new Vector3(node3D.Position.X, value, node3D.Position.Z);

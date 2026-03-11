@@ -3,10 +3,8 @@
 [sub_resource type="BoxMesh" id="BoxMesh_flat"]
 size = Vector3(1.5, 0.5, 1.5)
 
-[sub_resource type="CylinderMesh" id="CylinderMesh_spinner"]
-top_radius = 0.4
-bottom_radius = 0.4
-height = 0.3
+[sub_resource type="BoxMesh" id="BoxMesh_spinner"]
+size = Vector3(0.8, 0.8, 0.8)
 
 [node name="DiskIOPanel" type="Node3D"]
 
@@ -18,7 +16,7 @@ transform = Transform3D(1, 0, 0, 0, 0.707, -0.707, 0, 0.707, 0.707, 0, 5, 5)
 
 [node name="ReadSpinner" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0.5, 0)
-mesh = SubResource("CylinderMesh_spinner")
+mesh = SubResource("BoxMesh_spinner")
 
 [node name="WriteBar" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0.25, 0)

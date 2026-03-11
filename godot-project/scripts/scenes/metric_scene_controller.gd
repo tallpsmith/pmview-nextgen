@@ -9,6 +9,8 @@ extends Node
 @onready var scene_binder: Node = $SceneBinder
 @onready var status_label: Label = $UIOverlay/StatusLabel
 
+var _configs: Array[String] = []
+var _current_config_index: int = -1
 var _connection_state: String = "Disconnected"
 
 func _ready() -> void:
@@ -19,11 +21,41 @@ func _ready() -> void:
 	scene_binder.connect("BindingError", _on_binding_error)
 
 	_update_status_display()
+	_scan_configs()
 
 	# Auto-load the default binding config
 	if default_config != "":
 		print("[MetricSceneController] Auto-loading config: %s" % default_config)
+		_current_config_index = _configs.find(default_config)
 		load_config(default_config)
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_TAB:
+			_cycle_config()
+
+func _scan_configs() -> void:
+	_configs.clear()
+	var dir = DirAccess.open("res://bindings")
+	if dir == null:
+		return
+	dir.list_dir_begin()
+	var file_name = dir.get_next()
+	while file_name != "":
+		if file_name.ends_with(".toml"):
+			_configs.append("res://bindings/%s" % file_name)
+		file_name = dir.get_next()
+	dir.list_dir_end()
+	_configs.sort()
+	print("[MetricSceneController] Found %d configs: %s" % [_configs.size(), _configs])
+
+func _cycle_config() -> void:
+	if _configs.is_empty():
+		return
+	_current_config_index = (_current_config_index + 1) % _configs.size()
+	var path = _configs[_current_config_index]
+	print("[MetricSceneController] Switching to config: %s" % path)
+	load_config(path)
 
 func load_config(config_path: String) -> void:
 	print("[MetricSceneController] Loading config: %s" % config_path)
