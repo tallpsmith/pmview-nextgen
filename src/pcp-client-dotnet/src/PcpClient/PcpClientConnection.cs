@@ -141,11 +141,15 @@ public sealed class PcpClientConnection : IPcpClient
         throw new NotImplementedException("GetChildrenAsync will be implemented in Phase 6 (T039)");
     }
 
-    public Task<IReadOnlyList<MetricDescriptor>> DescribeMetricsAsync(
+    public async Task<IReadOnlyList<MetricDescriptor>> DescribeMetricsAsync(
         IEnumerable<string> metricNames,
         CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException("DescribeMetricsAsync will be implemented in Phase 6 (T039)");
+        var url = PcpMetricDescriber.BuildDescribeUrl(BaseUrl, metricNames);
+        var response = await _httpClient.GetAsync(url, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        return PcpMetricDescriber.ParseDescribeResponse(json);
     }
 
     public Task<InstanceDomain> GetInstanceDomainAsync(string metricName,
