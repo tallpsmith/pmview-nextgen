@@ -1,0 +1,26 @@
+# Synthetic network metrics for development
+# Generates step patterns for network traffic
+
+[[metrics]]
+name = "network.interface.in.bytes"
+semantics = "counter"
+type = "u64"
+
+[[metrics.instances]]
+name = "eth0"
+pattern = "sine"
+min = 100000
+max = 10000000
+period_seconds = 180
+
+[[metrics]]
+name = "network.interface.out.bytes"
+semantics = "counter"
+type = "u64"
+
+[[metrics.instances]]
+name = "eth0"
+pattern = "sine"
+min = 50000
+max = 5000000
+period_seconds = 240

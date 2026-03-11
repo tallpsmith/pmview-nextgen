@@ -1,0 +1,36 @@
+# pmview-nextgen development stack
+# Modelled after https://github.com/tallpsmith/pmmcp/blob/main/docker-compose.yml
+#
+# The PCP container runs ALL PCP services (pmcd, pmproxy, pmlogger, etc.)
+# via init.d — no need for separate containers.
+#
+# Usage:
+#   podman compose up -d
+#   podman compose down
+
+volumes:
+  valkey-data:
+
+services:
+  valkey:
+    image: docker.io/valkey/valkey:8-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - valkey-data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  pcp:
+    image: quay.io/performancecopilot/pcp:latest
+    privileged: true
+    ports:
+      - "44322:44322"
+    environment:
+      KEY_SERVERS: valkey:6379
+    depends_on:
+      valkey:
+        condition: service_healthy

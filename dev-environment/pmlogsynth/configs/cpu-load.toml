@@ -1,0 +1,28 @@
+# Synthetic CPU load data for development
+# Generates a repeating sine-wave pattern for kernel.all.load
+
+[[metrics]]
+name = "kernel.all.load"
+semantics = "instant"
+type = "float"
+
+[[metrics.instances]]
+name = "1 minute"
+pattern = "sine"
+min = 0.5
+max = 8.0
+period_seconds = 120
+
+[[metrics.instances]]
+name = "5 minute"
+pattern = "sine"
+min = 1.0
+max = 6.0
+period_seconds = 300
+
+[[metrics.instances]]
+name = "15 minute"
+pattern = "sine"
+min = 1.5
+max = 4.0
+period_seconds = 900

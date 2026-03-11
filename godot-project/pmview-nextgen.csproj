@@ -1,0 +1,14 @@
+<Project Sdk="Godot.NET.Sdk/4.6.1">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>PmviewNextgen</RootNamespace>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\src\pcp-client-dotnet\src\PcpClient\PcpClient.csproj" />
+    <ProjectReference Include="..\src\pcp-godot-bridge\src\PcpGodotBridge\PcpGodotBridge.csproj" />
+  </ItemGroup>
+</Project>
