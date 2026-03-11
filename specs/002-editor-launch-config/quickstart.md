@@ -23,7 +23,8 @@ Adds a Godot editor plugin that lets you configure PCP world settings (endpoint,
 ### Configure World Settings
 
 1. Go to **Project > Project Settings > General**
-2. Scroll to (or search for) the **pmview/** category
+2. Enable **Advanced Settings** (toggle in the top-right of the Project Settings dialog) — custom plugin settings are hidden by default
+3. Scroll to (or search for) the **pmview/** category
 3. Set your preferences:
    - **Endpoint**: pmproxy URL (default: `http://localhost:44322`)
    - **Mode**: Archive (default) or Live

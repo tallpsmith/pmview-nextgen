@@ -19,7 +19,7 @@ public partial class PmviewBridgePlugin : EditorPlugin
         ("pmview/mode", 0,
             Variant.Type.Int, PropertyHint.Enum, "Archive:0,Live:1"),
         ("pmview/archive_start_timestamp", "",
-            Variant.Type.String, PropertyHint.None, ""),
+            Variant.Type.String, PropertyHint.PlaceholderText, "Leave empty for 24h ago"),
         ("pmview/archive_speed", 10.0f,
             Variant.Type.Float, PropertyHint.Range, "0.1,100.0,0.1"),
         ("pmview/archive_loop", false,

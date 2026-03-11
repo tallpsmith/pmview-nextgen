@@ -12,7 +12,7 @@ The pmview-bridge plugin exposes world configuration via Godot's `ProjectSetting
 |-----|------|---------|------|-------------|
 | `pmview/endpoint` | `String` | `"http://localhost:44322"` | None | pmproxy base URL |
 | `pmview/mode` | `int` | `0` | `PROPERTY_HINT_ENUM, "Archive:0,Live:1"` | Playback mode |
-| `pmview/archive_start_timestamp` | `String` | `""` | None | ISO 8601 start time; empty = 24h before current time |
+| `pmview/archive_start_timestamp` | `String` | `""` | `PROPERTY_HINT_PLACEHOLDER_TEXT, "Leave empty for 24h ago"` | ISO 8601 start time; empty = 24h before current time |
 | `pmview/archive_speed` | `float` | `10.0` | `PROPERTY_HINT_RANGE, "0.1,100.0,0.1"` | Archive time multiplier |
 | `pmview/archive_loop` | `bool` | `false` | None | Restart from start timestamp when archive data ends |
 
