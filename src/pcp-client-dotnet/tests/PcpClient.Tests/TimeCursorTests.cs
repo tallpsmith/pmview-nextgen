@@ -244,4 +244,76 @@ public class TimeCursorTests
         // No exception, position is not tracked in Live mode
         Assert.Equal(CursorMode.Live, cursor.Mode);
     }
+
+    // ── Loop property defaults ──
+
+    [Fact]
+    public void NewTimeCursor_Loop_DefaultsToFalse()
+    {
+        var cursor = new TimeCursor();
+
+        Assert.False(cursor.Loop);
+    }
+
+    [Fact]
+    public void NewTimeCursor_EndBound_DefaultsToNull()
+    {
+        var cursor = new TimeCursor();
+
+        Assert.Null(cursor.EndBound);
+    }
+
+    // ── Loop wrap-around behaviour ──
+
+    [Fact]
+    public void AdvanceBy_LoopTrue_PastEndBound_WrapsToStartTime()
+    {
+        var cursor = new TimeCursor();
+        var start = new DateTime(2026, 3, 10, 14, 0, 0, DateTimeKind.Utc);
+        var end = new DateTime(2026, 3, 10, 14, 1, 0, DateTimeKind.Utc);
+
+        cursor.StartPlayback(start);
+        cursor.EndBound = end;
+        cursor.Loop = true;
+
+        // Advance 90 seconds at 1x — well past the 60-second window
+        cursor.AdvanceBy(TimeSpan.FromSeconds(90));
+
+        Assert.Equal(start, cursor.Position);
+    }
+
+    [Fact]
+    public void AdvanceBy_LoopFalse_PastEndBound_ContinuesAdvancing()
+    {
+        var cursor = new TimeCursor();
+        var start = new DateTime(2026, 3, 10, 14, 0, 0, DateTimeKind.Utc);
+        var end = new DateTime(2026, 3, 10, 14, 1, 0, DateTimeKind.Utc);
+
+        cursor.StartPlayback(start);
+        cursor.EndBound = end;
+        cursor.Loop = false;
+
+        cursor.AdvanceBy(TimeSpan.FromSeconds(90));
+
+        // Should be 90 seconds past start — no wrapping
+        var expected = start.AddSeconds(90);
+        Assert.Equal(expected, cursor.Position);
+    }
+
+    [Fact]
+    public void AdvanceBy_LoopTrue_NoEndBound_DoesNotWrap()
+    {
+        var cursor = new TimeCursor();
+        var start = new DateTime(2026, 3, 10, 14, 0, 0, DateTimeKind.Utc);
+
+        cursor.StartPlayback(start);
+        cursor.Loop = true;
+        // No EndBound set — can't know where to wrap
+
+        cursor.AdvanceBy(TimeSpan.FromSeconds(90));
+
+        // Should advance normally — no wrapping without known bounds
+        var expected = start.AddSeconds(90);
+        Assert.Equal(expected, cursor.Position);
+    }
 }

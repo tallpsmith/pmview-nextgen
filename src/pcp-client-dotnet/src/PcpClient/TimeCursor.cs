@@ -15,6 +15,10 @@ public class TimeCursor
 
     public DateTime? StartTime { get; private set; }
 
+    public DateTime? EndBound { get; set; }
+
+    public bool Loop { get; set; }
+
     public double PlaybackSpeed
     {
         get => _playbackSpeed;
@@ -58,7 +62,12 @@ public class TimeCursor
             return;
 
         var scaledTicks = (long)(elapsed.Ticks * _playbackSpeed);
-        Position = Position.Add(TimeSpan.FromTicks(scaledTicks));
+        var newPosition = Position.Add(TimeSpan.FromTicks(scaledTicks));
+
+        if (Loop && EndBound.HasValue && newPosition > EndBound.Value && StartTime.HasValue)
+            Position = StartTime.Value;
+        else
+            Position = newPosition;
     }
 }
 
