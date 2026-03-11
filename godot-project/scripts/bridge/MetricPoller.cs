@@ -25,7 +25,7 @@ public partial class MetricPoller : Node
     [Export] public string[] MetricNames { get; set; } = [];
 
     private PcpClientConnection? _client;
-    private Timer? _pollTimer;
+    private Godot.Timer? _pollTimer;
     private bool _polling;
 
     public ConnectionState CurrentState => _client?.State ?? ConnectionState.Disconnected;
@@ -87,7 +87,7 @@ public partial class MetricPoller : Node
     private void StartPollTimer()
     {
         _pollTimer?.QueueFree();
-        _pollTimer = new Timer();
+        _pollTimer = new Godot.Timer();
         _pollTimer.WaitTime = PollIntervalMs / 1000.0;
         _pollTimer.Autostart = true;
         _pollTimer.Timeout += OnPollTimerTimeout;
