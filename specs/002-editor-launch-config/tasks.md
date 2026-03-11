@@ -31,17 +31,17 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete. The EditorPlugin must live under `addons/<name>/`.
 
-- [ ] T001 Create addon directory `godot-project/addons/pmview-bridge/`
-- [ ] T002 Create `plugin.cfg` manifest in `godot-project/addons/pmview-bridge/plugin.cfg` (name: "pmview-bridge", script: PmviewBridgePlugin.cs, per R5 in research.md)
-- [ ] T003 Move `godot-project/scripts/bridge/MetricPoller.cs` to `godot-project/addons/pmview-bridge/MetricPoller.cs`
-- [ ] T004 [P] Move `godot-project/scripts/bridge/SceneBinder.cs` to `godot-project/addons/pmview-bridge/SceneBinder.cs`
-- [ ] T005 [P] Move `godot-project/scripts/bridge/MetricBrowser.cs` to `godot-project/addons/pmview-bridge/MetricBrowser.cs`
-- [ ] T006 Update C# namespace declarations in moved files if they reference `scripts.bridge` or similar path-based namespaces
-- [ ] T007 Update all `.tscn` `[ext_resource]` paths from `res://scripts/bridge/` to `res://addons/pmview-bridge/` in `godot-project/scenes/main.tscn` and any other `.tscn` files
-- [ ] T008 Update any GDScript `preload()` or string path references to bridge scripts in `godot-project/scripts/scenes/metric_scene_controller.gd`
-- [ ] T009 Update `godot-project/pmview-nextgen.csproj` if it has explicit file includes referencing old paths
-- [ ] T010 Delete `godot-project/scripts/bridge/` directory after confirming all files moved
-- [ ] T011 Create placeholder `godot-project/addons/pmview-bridge/PmviewBridgePlugin.cs` — empty `EditorPlugin` subclass with `[Tool]` attribute (skeleton only, implemented in US1)
+- [x] T001 Create addon directory `godot-project/addons/pmview-bridge/`
+- [x] T002 Create `plugin.cfg` manifest in `godot-project/addons/pmview-bridge/plugin.cfg` (name: "pmview-bridge", script: PmviewBridgePlugin.cs, per R5 in research.md)
+- [x] T003 Move `godot-project/scripts/bridge/MetricPoller.cs` to `godot-project/addons/pmview-bridge/MetricPoller.cs`
+- [x] T004 [P] Move `godot-project/scripts/bridge/SceneBinder.cs` to `godot-project/addons/pmview-bridge/SceneBinder.cs`
+- [x] T005 [P] Move `godot-project/scripts/bridge/MetricBrowser.cs` to `godot-project/addons/pmview-bridge/MetricBrowser.cs`
+- [x] T006 Update C# namespace declarations in moved files if they reference `scripts.bridge` or similar path-based namespaces
+- [x] T007 Update all `.tscn` `[ext_resource]` paths from `res://scripts/bridge/` to `res://addons/pmview-bridge/` in `godot-project/scenes/main.tscn` and any other `.tscn` files
+- [x] T008 Update any GDScript `preload()` or string path references to bridge scripts in `godot-project/scripts/scenes/metric_scene_controller.gd`
+- [x] T009 Update `godot-project/pmview-nextgen.csproj` if it has explicit file includes referencing old paths
+- [x] T010 Delete `godot-project/scripts/bridge/` directory after confirming all files moved
+- [x] T011 Create placeholder `godot-project/addons/pmview-bridge/PmviewBridgePlugin.cs` — empty `EditorPlugin` subclass with `[Tool]` attribute (skeleton only, implemented in US1)
 
 **Checkpoint**: User loads project in Godot, enables plugin in Plugin Manager, runs existing scenes — everything works as before. `scripts/bridge/` no longer exists.
 
@@ -57,26 +57,26 @@
 
 > **Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T012 [P] [US1] Write xUnit test: `TimeCursor.Loop` defaults to `false` in `src/pcp-client-dotnet/tests/PcpClient.Tests/TimeCursorTests.cs`
-- [ ] T013 [P] [US1] Write xUnit test: `Loop=true` + position past `EndBound` → wraps `Position` to `StartTime` in `src/pcp-client-dotnet/tests/PcpClient.Tests/TimeCursorTests.cs`
-- [ ] T014 [P] [US1] Write xUnit test: `Loop=false` + position past `EndBound` → position continues advancing (no wrap) in `src/pcp-client-dotnet/tests/PcpClient.Tests/TimeCursorTests.cs`
-- [ ] T015 [P] [US1] Write xUnit test: `Loop=true` + no `EndBound` set → no wrap (can't loop without known bounds) in `src/pcp-client-dotnet/tests/PcpClient.Tests/TimeCursorTests.cs`
-- [ ] T016 [US1] Run tests, confirm all 4 new tests FAIL (red phase)
+- [x] T012 [P] [US1] Write xUnit test: `TimeCursor.Loop` defaults to `false` in `src/pcp-client-dotnet/tests/PcpClient.Tests/TimeCursorTests.cs`
+- [x] T013 [P] [US1] Write xUnit test: `Loop=true` + position past `EndBound` → wraps `Position` to `StartTime` in `src/pcp-client-dotnet/tests/PcpClient.Tests/TimeCursorTests.cs`
+- [x] T014 [P] [US1] Write xUnit test: `Loop=false` + position past `EndBound` → position continues advancing (no wrap) in `src/pcp-client-dotnet/tests/PcpClient.Tests/TimeCursorTests.cs`
+- [x] T015 [P] [US1] Write xUnit test: `Loop=true` + no `EndBound` set → no wrap (can't loop without known bounds) in `src/pcp-client-dotnet/tests/PcpClient.Tests/TimeCursorTests.cs`
+- [x] T016 [US1] Run tests, confirm all 4 new tests FAIL (red phase)
 
 ### Implementation for User Story 1
 
-- [ ] T017 [US1] Add `Loop` bool property to `TimeCursor` in `src/pcp-client-dotnet/src/PcpClient/TimeCursor.cs` (default: `false`)
-- [ ] T018 [US1] Add `EndBound` property to `TimeCursor` in `src/pcp-client-dotnet/src/PcpClient/TimeCursor.cs` (set from ArchiveDiscovery results)
-- [ ] T019 [US1] Add wrap-around logic in `TimeCursor.AdvanceBy()` — if `Loop && newPosition > EndBound` → reset `Position` to `StartTime` in `src/pcp-client-dotnet/src/PcpClient/TimeCursor.cs`
-- [ ] T020 [US1] Run tests, confirm all 4 new tests PASS (green phase)
-- [ ] T021 [US1] Implement `PmviewBridgePlugin._EnterTree()` — register all 5 `pmview/*` ProjectSettings with defaults and `AddPropertyInfo()` hints per `contracts/project-settings-schema.md` in `godot-project/addons/pmview-bridge/PmviewBridgePlugin.cs`
-- [ ] T022 [US1] Implement `PmviewBridgePlugin._ExitTree()` — optional cleanup in `godot-project/addons/pmview-bridge/PmviewBridgePlugin.cs`
-- [ ] T023 [US1] Add ProjectSettings reads at top of `_ready()` in `godot-project/scripts/scenes/metric_scene_controller.gd` — read all 5 `pmview/*` settings with defaults
-- [ ] T024 [US1] Apply archive mode logic in `_ready()`: if `mode == 0` (Archive), call `MetricPoller.StartPlayback(timestamp)` and `MetricPoller.SetPlaybackSpeed(speed)` in `godot-project/scripts/scenes/metric_scene_controller.gd`
-- [ ] T025 [US1] Handle empty timestamp: if `archive_start_timestamp` is empty, compute 24h before current time in `godot-project/scripts/scenes/metric_scene_controller.gd`
-- [ ] T026 [US1] Add `SetLoop(bool)` method to `MetricPoller` in `godot-project/addons/pmview-bridge/MetricPoller.cs` that sets `TimeCursor.Loop`
-- [ ] T027 [US1] Pass loop setting from scene controller to `MetricPoller.SetLoop()` in `godot-project/scripts/scenes/metric_scene_controller.gd`
-- [ ] T028 [US1] Wire `ArchiveDiscovery.DetectTimeBounds()` result to `TimeCursor.EndBound` in `godot-project/addons/pmview-bridge/MetricPoller.cs`
+- [x] T017 [US1] Add `Loop` bool property to `TimeCursor` in `src/pcp-client-dotnet/src/PcpClient/TimeCursor.cs` (default: `false`)
+- [x] T018 [US1] Add `EndBound` property to `TimeCursor` in `src/pcp-client-dotnet/src/PcpClient/TimeCursor.cs` (set from ArchiveDiscovery results)
+- [x] T019 [US1] Add wrap-around logic in `TimeCursor.AdvanceBy()` — if `Loop && newPosition > EndBound` → reset `Position` to `StartTime` in `src/pcp-client-dotnet/src/PcpClient/TimeCursor.cs`
+- [x] T020 [US1] Run tests, confirm all 4 new tests PASS (green phase)
+- [x] T021 [US1] Implement `PmviewBridgePlugin._EnterTree()` — register all 5 `pmview/*` ProjectSettings with defaults and `AddPropertyInfo()` hints per `contracts/project-settings-schema.md` in `godot-project/addons/pmview-bridge/PmviewBridgePlugin.cs`
+- [x] T022 [US1] Implement `PmviewBridgePlugin._ExitTree()` — optional cleanup in `godot-project/addons/pmview-bridge/PmviewBridgePlugin.cs`
+- [x] T023 [US1] Add ProjectSettings reads at top of `_ready()` in `godot-project/scripts/scenes/metric_scene_controller.gd` — read all 5 `pmview/*` settings with defaults
+- [x] T024 [US1] Apply archive mode logic in `_ready()`: if `mode == 0` (Archive), call `MetricPoller.StartPlayback(timestamp)` and `MetricPoller.SetPlaybackSpeed(speed)` in `godot-project/scripts/scenes/metric_scene_controller.gd`
+- [x] T025 [US1] Handle empty timestamp: if `archive_start_timestamp` is empty, compute 24h before current time in `godot-project/scripts/scenes/metric_scene_controller.gd`
+- [x] T026 [US1] Add `SetLoop(bool)` method to `MetricPoller` in `godot-project/addons/pmview-bridge/MetricPoller.cs` that sets `TimeCursor.Loop`
+- [x] T027 [US1] Pass loop setting from scene controller to `MetricPoller.SetLoop()` in `godot-project/scripts/scenes/metric_scene_controller.gd`
+- [x] T028 [US1] Wire `ArchiveDiscovery.DetectTimeBounds()` result to `TimeCursor.EndBound` in `godot-project/addons/pmview-bridge/MetricPoller.cs`
 
 **Checkpoint**: User sets archive mode + timestamp + speed + loop in Project Settings, presses Play, scene immediately replays archive data. Loop wraps around when enabled. All TimeCursor tests pass.
 

@@ -134,6 +134,11 @@ public partial class MetricPoller : Node
 		_timeCursor.PlaybackSpeed = speed;
 	}
 
+	public void SetLoop(bool loop)
+	{
+		_timeCursor.Loop = loop;
+	}
+
 	public void UpdateEndpoint(string endpoint, int pollIntervalMs)
 	{
 		StopPolling();
@@ -323,6 +328,7 @@ public partial class MetricPoller : Node
 				var bounds = ArchiveDiscovery.DetectTimeBounds(sampleValues);
 				if (bounds.HasValue)
 				{
+					_timeCursor.EndBound = bounds.Value.End;
 					GD.Print($"[MetricPoller] Archive discovery: " +
 						$"sampling interval = {_archiveSamplingIntervalSeconds:F1}s, " +
 						$"sample bounds = {bounds.Value.Start:o} to {bounds.Value.End:o}");
