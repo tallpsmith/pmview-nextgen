@@ -26,4 +26,30 @@ outline_size = 4
 
 [node name="Disk0Write" type="MeshInstance3D" parent="." unique_id=898219611]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0.25, 0)
-mesh = SubRes
+mesh = SubResource("BoxMesh_flat")
+
+[node name="Disk0WriteLabel" type="Label3D" parent="." unique_id=567253328]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 1.2, 0)
+modulate = Color(0.4, 0.7, 1, 1)
+text = "disk0 write"
+outline_size = 4
+
+[node name="Disk1Read" type="MeshInstance3D" parent="." unique_id=707580220]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0.5, 0)
+mesh = SubResource("BoxMesh_spinner")
+
+[node name="Disk1ReadLabel" type="Label3D" parent="." unique_id=1938654017]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1.5, 0)
+modulate = Color(0.4, 1, 0.4, 1)
+text = "disk1 read"
+outline_size = 4
+
+[node name="Disk1Write" type="MeshInstance3D" parent="." unique_id=1086741793]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0.25, 0)
+mesh = SubResource("BoxMesh_flat")
+
+[node name="Disk1WriteLabel" type="Label3D" parent="." unique_id=1350673750]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.2, 0)
+modulate = Color(0.4, 0.7, 1, 1)
+text = "disk1 write"
+outline_size = 4
