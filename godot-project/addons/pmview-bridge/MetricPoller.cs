@@ -492,25 +492,31 @@ public partial class MetricPoller : Node
 
 				var instanceMap = _seriesInstanceMap.GetValueOrDefault(metricName);
 				var instances = new Godot.Collections.Dictionary();
+				// Track which instance map entries were actually matched to values,
+				// so we only build nameToId from entries with real data (not from
+				// other archive sources with different PCP instance ID schemes).
+				var matchedInstanceInfos = new List<SeriesInstanceInfo>();
 				foreach (var sv in resolvedValues)
 				{
+					// Instance map is keyed by instance hash (unique per instance).
+					// Try instance hash first, fall back to series hash for singular metrics.
 					var lookupKey = sv.InstanceId ?? sv.SeriesId;
+					SeriesInstanceInfo? matched = null;
 					int instanceKey = instanceMap != null
-						&& instanceMap.TryGetValue(lookupKey, out var info)
-						? info.PcpInstanceId
+						&& instanceMap.TryGetValue(lookupKey, out matched)
+						? matched.PcpInstanceId
 						: -1;  // singular metric fallback
 					instances[instanceKey] = sv.NumericValue;
+					if (matched != null)
+						matchedInstanceInfos.Add(matched);
 					GD.Print($"[MetricPoller] {metricName}: instance {instanceKey} " +
 						$"= {sv.NumericValue:F4}");
 				}
 
-				// Build name→id lookup for SceneBinder
+				// Build name→id from only the instance entries that matched actual values.
 				var nameToId = new Godot.Collections.Dictionary();
-				if (instanceMap != null)
-				{
-					foreach (var kv in instanceMap.Values)
-						nameToId[kv.Name] = kv.PcpInstanceId;
-				}
+				foreach (var matched in matchedInstanceInfos)
+					nameToId[matched.Name] = matched.PcpInstanceId;
 
 				if (instances.Count > 0)
 				{
