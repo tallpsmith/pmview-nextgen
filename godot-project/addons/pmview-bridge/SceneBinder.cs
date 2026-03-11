@@ -112,8 +112,11 @@ public partial class SceneBinder : Node
             double? rawValue = ExtractValue(binding, instances, nameToId);
             if (rawValue == null)
             {
+                var instanceLabel = binding.InstanceName != null
+                    ? $"name='{binding.InstanceName}'"
+                    : $"id={binding.InstanceId}";
                 GD.Print($"[SceneBinder] {binding.SceneNode}: no value for " +
-                    $"{binding.Metric}[instance={binding.InstanceId}] " +
+                    $"{binding.Metric}[{instanceLabel}] " +
                     $"(available keys: {string.Join(",", instances.Keys)})");
                 continue;
             }

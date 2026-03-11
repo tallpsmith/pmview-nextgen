@@ -130,6 +130,9 @@ public partial class MetricPoller : Node
 	{
 		_timeCursor.ResetToLive();
 		_lastEmittedTimestamp.Clear();
+		_seriesInstanceMap.Clear();
+		_liveInstanceNames.Clear();
+		_liveInstanceNamesPopulated.Clear();
 		EmitSignal(SignalName.PlaybackPositionChanged, "", "Live");
 	}
 
