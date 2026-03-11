@@ -19,8 +19,8 @@
 
 **Purpose**: Prepare the pure .NET and Godot layers for the new binding data model.
 
-- [ ] T001 Add `InitialValue` field (double, default 0) to MetricBinding record in `src/pcp-godot-bridge/src/PcpGodotBridge/MetricBinding.cs` — update all existing callers to pass the new parameter
-- [ ] T002 Run existing test suite to confirm T001 doesn't break anything: `dotnet test src/pcp-godot-bridge/PcpGodotBridge.sln`
+- [x] T001 Add `InitialValue` field (double, default 0) to MetricBinding record in `src/pcp-godot-bridge/src/PcpGodotBridge/MetricBinding.cs` — update all existing callers to pass the new parameter
+- [x] T002 Run existing test suite to confirm T001 doesn't break anything: `dotnet test src/pcp-godot-bridge/PcpGodotBridge.sln`
 
 ---
 
