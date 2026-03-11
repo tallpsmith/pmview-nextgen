@@ -1,16 +1,17 @@
 # CPU load bar visualisation
 # Maps kernel.all.load instances to vertical bar height
+# Source ranges tuned for container workloads (typically 0.0-0.5)
 
 [meta]
 scene = "res://scenes/test_bars.tscn"
-poll_interval_ms = 1000
-description = "CPU load averages as vertical bars"
+poll_interval_ms = 250
+description = "CPU load averages as vertical bars (container-tuned)"
 
 [[bindings]]
 scene_node = "LoadBar1Min"
 metric = "kernel.all.load"
 property = "height"
-source_range = [0.0, 10.0]
+source_range = [0.0, 0.5]
 target_range = [0.2, 5.0]
 instance_id = 0
 
@@ -18,7 +19,7 @@ instance_id = 0
 scene_node = "LoadBar5Min"
 metric = "kernel.all.load"
 property = "height"
-source_range = [0.0, 10.0]
+source_range = [0.0, 0.5]
 target_range = [0.2, 5.0]
 instance_id = 1
 
@@ -26,6 +27,6 @@ instance_id = 1
 scene_node = "LoadBar15Min"
 metric = "kernel.all.load"
 property = "height"
-source_range = [0.0, 10.0]
+source_range = [0.0, 0.5]
 target_range = [0.2, 5.0]
 instance_id = 2
