@@ -10,7 +10,7 @@ description = "CPU load averages as vertical bars"
 scene_node = "LoadBar1Min"
 metric = "kernel.all.load"
 property = "height"
-source_range = [0.0, 10.0]
+source_range = [0.6, 0.7]
 target_range = [0.2, 5.0]
 instance_name = "1 minute"
 
@@ -18,7 +18,7 @@ instance_name = "1 minute"
 scene_node = "LoadBar5Min"
 metric = "kernel.all.load"
 property = "height"
-source_range = [0.0, 10.0]
+source_range = [0.6, 0.7]
 target_range = [0.2, 5.0]
 instance_name = "5 minute"
 
@@ -26,6 +26,6 @@ instance_name = "5 minute"
 scene_node = "LoadBar15Min"
 metric = "kernel.all.load"
 property = "height"
-source_range = [0.0, 10.0]
+source_range = [0.6, 0.7]
 target_range = [0.2, 5.0]
 instance_name = "15 minute"

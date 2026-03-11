@@ -18,3 +18,11 @@ config/features=PackedStringArray("4.6", "C#", "Forward Plus")
 [dotnet]
 
 project/assembly_name="pmview-nextgen"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/pmview-bridge/plugin.cfg")
+
+[pmview]
+
+archive_start_timestamp="2026-03-10 14:00"

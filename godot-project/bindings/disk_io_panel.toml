@@ -12,7 +12,7 @@ metric = "disk.dev.read"
 property = "rotation_speed"
 source_range = [0.0, 1000.0]
 target_range = [0.0, 3600.0]
-instance_id = 0
+instance_name = "nvme0n1"
 
 [[bindings]]
 scene_node = "Disk0Write"
@@ -20,7 +20,7 @@ metric = "disk.dev.write"
 property = "rotation_speed"
 source_range = [0.0, 1000.0]
 target_range = [0.0, 3600.0]
-instance_id = 0
+instance_name = "nvme0n1"
 
 [[bindings]]
 scene_node = "Disk1Read"
@@ -28,7 +28,7 @@ metric = "disk.dev.read"
 property = "rotation_speed"
 source_range = [0.0, 1000.0]
 target_range = [0.0, 3600.0]
-instance_id = 1
+instance_name = "nvme1n1"
 
 [[bindings]]
 scene_node = "Disk1Write"
@@ -36,4 +36,4 @@ metric = "disk.dev.write"
 property = "rotation_speed"
 source_range = [0.0, 1000.0]
 target_range = [0.0, 3600.0]
-instance_id = 1
+instance_name = "nvme1n1"
