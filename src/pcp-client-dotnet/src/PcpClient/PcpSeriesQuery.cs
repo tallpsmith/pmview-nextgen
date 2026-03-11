@@ -81,18 +81,21 @@ public static class PcpSeriesQuery
 
     /// <summary>
     /// Parses a /series/instances response into a mapping of
-    /// series ID → PCP instance ID (the numeric instance identifier).
+    /// series ID → instance info (numeric ID + human-readable name).
     /// </summary>
-    public static Dictionary<string, int> ParseInstancesResponse(string json)
+    public static Dictionary<string, SeriesInstanceInfo> ParseInstancesResponse(string json)
     {
         using var doc = JsonDocument.Parse(json);
-        var result = new Dictionary<string, int>();
+        var result = new Dictionary<string, SeriesInstanceInfo>();
 
         foreach (var item in doc.RootElement.EnumerateArray())
         {
             var seriesId = item.GetProperty("series").GetString()!;
             var pcpInstanceId = item.GetProperty("id").GetInt32();
-            result[seriesId] = pcpInstanceId;
+            var name = item.TryGetProperty("name", out var nameProp)
+                ? nameProp.GetString() ?? ""
+                : "";
+            result[seriesId] = new SeriesInstanceInfo(pcpInstanceId, name);
         }
 
         return result;
@@ -156,6 +159,12 @@ public static class PcpSeriesQuery
         return ((DateTimeOffset)utcTime).ToUnixTimeMilliseconds() / 1000.0;
     }
 }
+
+/// <summary>
+/// Instance metadata from a /series/instances response:
+/// the numeric PCP instance ID and its human-readable name.
+/// </summary>
+public record SeriesInstanceInfo(int PcpInstanceId, string Name);
 
 /// <summary>
 /// A single timestamped value from a historical series query.

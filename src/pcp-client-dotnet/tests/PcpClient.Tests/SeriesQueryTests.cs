@@ -263,7 +263,7 @@ public class SeriesQueryTests
     // ── /series/instances parsing — series-to-PCP-instance-ID mapping ──
 
     [Fact]
-    public void ParseInstancesResponse_MapsSeriesIdToPcpInstanceId()
+    public void ParseInstancesResponse_MapsSeriesIdToInstanceInfo()
     {
         var json = """
         [
@@ -276,9 +276,12 @@ public class SeriesQueryTests
         var result = PcpSeriesQuery.ParseInstancesResponse(json);
 
         Assert.Equal(3, result.Count);
-        Assert.Equal(0, result["series_aaa"]);
-        Assert.Equal(1, result["series_bbb"]);
-        Assert.Equal(2, result["series_ccc"]);
+        Assert.Equal(0, result["series_aaa"].PcpInstanceId);
+        Assert.Equal("1 minute", result["series_aaa"].Name);
+        Assert.Equal(1, result["series_bbb"].PcpInstanceId);
+        Assert.Equal("5 minute", result["series_bbb"].Name);
+        Assert.Equal(2, result["series_ccc"].PcpInstanceId);
+        Assert.Equal("15 minute", result["series_ccc"].Name);
     }
 
     [Fact]
@@ -302,7 +305,8 @@ public class SeriesQueryTests
         var result = PcpSeriesQuery.ParseInstancesResponse(json);
 
         Assert.Single(result);
-        Assert.Equal(5, result["series_aaa"]);
+        Assert.Equal(5, result["series_aaa"].PcpInstanceId);
+        Assert.Equal("1 minute", result["series_aaa"].Name);
     }
 
     [Fact]
