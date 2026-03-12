@@ -35,9 +35,11 @@ internal static class PcpMetricFetcher
 
         foreach (var inst in instancesArray.EnumerateArray())
         {
-            var instanceId = inst.GetProperty("instance").GetInt32();
-            // pmproxy uses -1 for singular metrics (no instance domain)
-            int? parsedId = instanceId == -1 ? null : instanceId;
+            var instanceElement = inst.GetProperty("instance");
+            // pmproxy returns null or -1 for singular metrics (no instance domain)
+            int? parsedId = instanceElement.ValueKind == JsonValueKind.Null
+                ? null
+                : instanceElement.GetInt32() == -1 ? null : instanceElement.GetInt32();
 
             var valueElement = inst.GetProperty("value");
             if (valueElement.ValueKind == JsonValueKind.String)
