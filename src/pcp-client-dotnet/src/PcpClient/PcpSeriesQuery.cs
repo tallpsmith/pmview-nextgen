@@ -164,6 +164,25 @@ public static class PcpSeriesQuery
         return results;
     }
 
+    public static IReadOnlyList<SeriesMetricName> ParseMetricsResponse(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var results = new List<SeriesMetricName>();
+        foreach (var item in doc.RootElement.EnumerateArray())
+        {
+            var seriesId = item.GetProperty("series").GetString()!;
+            var name = item.GetProperty("name").GetString()!;
+            results.Add(new SeriesMetricName(seriesId, name));
+        }
+        return results;
+    }
+
+    public static Uri BuildMetricsUrl(Uri baseUrl, IEnumerable<string> seriesIds)
+    {
+        var ids = string.Join(",", seriesIds);
+        return new Uri(baseUrl, $"/series/metrics?series={Uri.EscapeDataString(ids)}");
+    }
+
     public static IReadOnlyList<string> ParseLabelsResponse(string json, string labelName)
     {
         using var doc = JsonDocument.Parse(json);
@@ -196,6 +215,11 @@ public static class PcpSeriesQuery
 /// the numeric PCP instance ID and its human-readable name.
 /// </summary>
 public record SeriesInstanceInfo(int PcpInstanceId, string Name);
+
+/// <summary>
+/// Maps a series ID to its PCP metric name from a /series/metrics response.
+/// </summary>
+public record SeriesMetricName(string SeriesId, string Name);
 
 /// <summary>
 /// A single timestamped value from a historical series query.
