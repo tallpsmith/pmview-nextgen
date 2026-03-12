@@ -1,6 +1,9 @@
 # Claude Code temporary files
 .claude/
 
+# Git worktrees
+.worktrees/
+
 # BMAD user memory
 .bmad-user-memory/
 
