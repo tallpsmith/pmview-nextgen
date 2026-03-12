@@ -295,7 +295,14 @@ public partial class MetricBrowserDialog : Window
 		if (firstChild != null && firstChild.GetText(0) == "Loading...")
 		{
 			firstChild.Free();
-			await LoadChildren(path);
+			try
+			{
+				await LoadChildren(path);
+			}
+			catch (Exception ex)
+			{
+				ShowError($"Browse error: {ex.Message}");
+			}
 		}
 	}
 
@@ -325,9 +332,9 @@ public partial class MetricBrowserDialog : Window
 
 	private async Task DescribeMetricFromArchive(string metricName)
 	{
-		if (_discoverer == null) return;
+		if (_discoverer == null || _hostDropdown == null || _hostDropdown.Selected < 0) return;
 
-		var hostname = _hostDropdown!.GetItemText(_hostDropdown.Selected);
+		var hostname = _hostDropdown.GetItemText(_hostDropdown.Selected);
 
 		try
 		{
