@@ -1,0 +1,44 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  e2e-tests:
+    name: E2E Tests (Tier 3)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start PCP stack
+        working-directory: dev-environment
+        run: docker compose up -d
+
+      - name: Wait for PCP to be ready
+        run: |
+          echo "Waiting for pmproxy on port 44322..."
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:44322/pmapi/context > /dev/null 2>&1; then
+              echo "pmproxy is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "pmproxy failed to become ready"
+          docker compose -f dev-environment/docker-compose.yml logs
+          exit 1
+
+      - uses: godot-gdunit-labs/gdUnit4-action@v4
+        with:
+          godot-version: '4.6.1'
+          godot-net: true
+          dotnet-version: net8.0
+          paths: godot-project/test/e2e/
+          timeout: 15
+
+      - name: Tear down PCP stack
+        if: always()
+        working-directory: dev-environment
+        run: docker compose down

@@ -28,7 +28,7 @@ public partial class MetricPoller : Node
 	public delegate void PlaybackPositionChangedEventHandler(string position, string mode);
 
 	private readonly System.Net.Http.HttpClient _sharedHttpClient = new();
-	private PcpClientConnection? _client;
+	private IPcpClient? _client;
 	private MetricRateConverter? _rateConverter;
 	private Godot.Timer? _pollTimer;
 	private bool _polling;
@@ -42,7 +42,16 @@ public partial class MetricPoller : Node
 	private Godot.Collections.Dictionary? _lastEmittedMetrics;
 
 	public ConnectionState CurrentState => _client?.State ?? ConnectionState.Disconnected;
-	internal PcpClientConnection? Client => _client;
+	internal IPcpClient? Client => _client;
+
+	/// <summary>
+	/// Factory method for creating PCP client instances.
+	/// Override in tests to inject a mock client.
+	/// </summary>
+	protected virtual IPcpClient CreateClient(Uri endpoint, System.Net.Http.HttpClient http)
+	{
+		return new PcpClientConnection(endpoint, http);
+	}
 
 	public override void _Ready()
 	{
@@ -167,7 +176,7 @@ public partial class MetricPoller : Node
 		try
 		{
 			_client?.Dispose();
-			_client = new PcpClientConnection(new Uri(Endpoint), _sharedHttpClient);
+			_client = CreateClient(new Uri(Endpoint), _sharedHttpClient);
 			EmitConnectionState("Connecting");
 
 			await _client.ConnectAsync();
