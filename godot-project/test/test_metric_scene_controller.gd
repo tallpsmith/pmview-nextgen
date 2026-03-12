@@ -1,7 +1,7 @@
 extends GdUnitTestSuite
 
-## Tests for metric_scene_controller.gd: config scanning, input handling,
-## and signal wiring between MetricPoller and SceneBinder.
+## Tests for metric_scene_controller.gd: signal wiring between
+## MetricPoller and SceneBinder.
 
 # ── Config scanning ──────────────────────────────────────────────────
 
@@ -56,32 +56,6 @@ func test_tab_with_empty_configs_is_noop() -> void:
 	if configs.is_empty():
 		assert_bool(true).is_true()
 
-
-# ── F2 toggles metric browser visibility ────────────────────────────
-
-func test_f2_toggles_visibility() -> void:
-	# Simulate the toggle logic from _toggle_metric_browser
-	var visible := false  # starts hidden
-
-	# First F2 press
-	visible = not visible
-	assert_bool(visible).is_true()
-
-	# Second F2 press
-	visible = not visible
-	assert_bool(visible).is_false()
-
-
-# ── F3 toggles playback controls visibility ─────────────────────────
-
-func test_f3_toggles_visibility() -> void:
-	var visible := false  # starts hidden
-
-	visible = not visible
-	assert_bool(visible).is_true()
-
-	visible = not visible
-	assert_bool(visible).is_false()
 
 
 # ── Signal wiring: MetricsUpdated → ApplyMetrics ────────────────────
