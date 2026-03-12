@@ -1,7 +1,49 @@
-[gd_scene load_steps=2 format=3 uid="uid://test_bars_scene"]
+[gd_scene load_steps=6 format=3 uid="uid://test_bars_scene"]
+
+[ext_resource type="Script" path="res://addons/pmview-bridge/PcpBindable.cs" id="bindable_script"]
+[ext_resource type="Script" path="res://addons/pmview-bridge/PcpBindingResource.cs" id="binding_res_script"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_bar"]
 size = Vector3(0.8, 1, 0.8)
+
+[sub_resource type="Resource" id="PcpBindingResource_1min"]
+script = ExtResource("binding_res_script")
+resource_local_to_scene = true
+MetricName = "kernel.all.load"
+TargetProperty = "height"
+SourceRangeMin = 0.6
+SourceRangeMax = 0.7
+TargetRangeMin = 0.2
+TargetRangeMax = 5.0
+InstanceName = "1 minute"
+InstanceId = -1
+InitialValue = 0.0
+
+[sub_resource type="Resource" id="PcpBindingResource_5min"]
+script = ExtResource("binding_res_script")
+resource_local_to_scene = true
+MetricName = "kernel.all.load"
+TargetProperty = "height"
+SourceRangeMin = 0.6
+SourceRangeMax = 0.7
+TargetRangeMin = 0.2
+TargetRangeMax = 5.0
+InstanceName = "5 minute"
+InstanceId = -1
+InitialValue = 0.0
+
+[sub_resource type="Resource" id="PcpBindingResource_15min"]
+script = ExtResource("binding_res_script")
+resource_local_to_scene = true
+MetricName = "kernel.all.load"
+TargetProperty = "height"
+SourceRangeMin = 0.6
+SourceRangeMax = 0.7
+TargetRangeMin = 0.2
+TargetRangeMax = 5.0
+InstanceName = "15 minute"
+InstanceId = -1
+InitialValue = 0.0
 
 [node name="TestBars" type="Node3D"]
 
@@ -15,10 +57,22 @@ transform = Transform3D(1, 0, 0, 0, 0.707, -0.707, 0, 0.707, 0.707, 0, 5, 5)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0.5, 0)
 mesh = SubResource("BoxMesh_bar")
 
+[node name="PcpBindable" type="Node" parent="LoadBar1Min"]
+script = ExtResource("bindable_script")
+PcpBindings = [SubResource("PcpBindingResource_1min")]
+
 [node name="LoadBar5Min" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 mesh = SubResource("BoxMesh_bar")
 
+[node name="PcpBindable" type="Node" parent="LoadBar5Min"]
+script = ExtResource("bindable_script")
+PcpBindings = [SubResource("PcpBindingResource_5min")]
+
 [node name="LoadBar15Min" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.5, 0)
 mesh = SubResource("BoxMesh_bar")
+
+[node name="PcpBindable" type="Node" parent="LoadBar15Min"]
+script = ExtResource("bindable_script")
+PcpBindings = [SubResource("PcpBindingResource_15min")]

@@ -129,11 +129,11 @@
 
 ### Implementation
 
-- [ ] T027 [P] [US4] Migrate `test_bars.tscn` — attach PcpBindable script to each bound node (LoadBar1Min, LoadBar5Min, LoadBar15Min), create PcpBindingResource entries matching the values in `godot-project/bindings/test_bars.toml`. File: `godot-project/scenes/test_bars.tscn`
-- [ ] T028 [P] [US4] Migrate `disk_io_panel.tscn` — attach PcpBindable script to each bound node (Disk0Read, Disk0Write, Disk1Read, Disk1Write), create PcpBindingResource entries matching the values in `godot-project/bindings/disk_io_panel.toml`. File: `godot-project/scenes/disk_io_panel.tscn`
-- [ ] T029 [US4] Update `metric_scene_controller.gd` to remove TOML config scanning fallback — the controller now exclusively uses `SceneBinder.BindFromSceneProperties()`. Remove the `res://bindings/` directory scanning, config cycling (TAB key), and `LoadSceneWithBindings(configPath)` calls. Scene loading switches to loading `.tscn` files directly. File: `godot-project/scripts/scenes/metric_scene_controller.gd`
-- [ ] T030 [US4] Remove `LoadSceneWithBindings(string configPath)` and TOML-related code from `SceneBinder` in `godot-project/addons/pmview-bridge/SceneBinder.cs` — the method, `LogConfigResult()`, and `_currentConfigPath` field are no longer needed. Keep `ApplyMetrics()`, `UnloadCurrentScene()`, `BindFromSceneProperties()`, and all property application logic.
-- [ ] T031 [US4] Delete the TOML binding files: `godot-project/bindings/test_bars.toml` and `godot-project/bindings/disk_io_panel.toml`. Remove the `godot-project/bindings/` directory.
+- [x] T027 [P] [US4] Migrate `test_bars.tscn` — attach PcpBindable script to each bound node (LoadBar1Min, LoadBar5Min, LoadBar15Min), create PcpBindingResource entries matching the values in `godot-project/bindings/test_bars.toml`. File: `godot-project/scenes/test_bars.tscn`
+- [x] T028 [P] [US4] Migrate `disk_io_panel.tscn` — attach PcpBindable script to each bound node (Disk0Read, Disk0Write, Disk1Read, Disk1Write), create PcpBindingResource entries matching the values in `godot-project/bindings/disk_io_panel.toml`. File: `godot-project/scenes/disk_io_panel.tscn`
+- [x] T029 [US4] Update `metric_scene_controller.gd` to remove TOML config scanning fallback — the controller now exclusively uses `SceneBinder.BindFromSceneProperties()`. Remove the `res://bindings/` directory scanning, config cycling (TAB key), and `LoadSceneWithBindings(configPath)` calls. Scene loading switches to loading `.tscn` files directly. File: `godot-project/scripts/scenes/metric_scene_controller.gd`
+- [x] T030 [US4] Remove `LoadSceneWithBindings(string configPath)` and TOML-related code from `SceneBinder` in `godot-project/addons/pmview-bridge/SceneBinder.cs` — the method, `LogConfigResult()`, and `_currentConfigPath` field are no longer needed. Keep `ApplyMetrics()`, `UnloadCurrentScene()`, `BindFromSceneProperties()`, and all property application logic.
+- [x] T031 [US4] Delete the TOML binding files: `godot-project/bindings/test_bars.toml` and `godot-project/bindings/disk_io_panel.toml`. Remove the `godot-project/bindings/` directory.
 
 **Checkpoint**: Both demo scenes run identically using editor-integrated bindings. No TOML files remain. TOML loading code removed from runtime. SC-005 and SC-006 met.
 

@@ -1,10 +1,9 @@
 extends Node
 
 ## Main scene controller: wires MetricPoller signals to SceneBinder.
-## Displays connection status overlay. Auto-loads default config on start.
+## Displays connection status overlay. Loads scenes with editor-integrated bindings.
 ## Toggle metric browser with F2, playback controls with F3.
 
-@export var default_config: String = "res://bindings/test_bars.toml"
 @export var default_scene: String = "res://scenes/test_bars.tscn"
 
 @onready var metric_poller: Node = $MetricPoller
@@ -14,8 +13,6 @@ extends Node
 @onready var metric_browser_ui: Control = $UIOverlay/MetricBrowser
 @onready var playback_controls_ui: Control = $UIOverlay/PlaybackControls
 
-var _configs: Array[String] = []
-var _current_config_index: int = -1
 var _connection_state: String = "Disconnected"
 
 # World configuration from ProjectSettings (set by pmview-bridge plugin)
@@ -44,76 +41,25 @@ func _ready() -> void:
 		playback_controls_ui.visible = false
 
 	_update_status_display()
-	_scan_configs()
 
-	# Try scene-property bindings first (editor-integrated)
+	# Load scene with editor-integrated bindings
 	if default_scene != "":
-		print("[MetricSceneController] Trying scene-property bindings: %s" % default_scene)
+		print("[MetricSceneController] Loading scene: %s" % default_scene)
 		var metric_names = _load_scene_with_properties(default_scene)
 		if metric_names.size() > 0:
 			print("[MetricSceneController] Found %d metrics from scene properties" % metric_names.size())
 			_start_polling_metrics(metric_names)
-			_apply_launch_settings()
-			return
-
-	# Fall back to TOML config
-	if default_config != "":
-		print("[MetricSceneController] Falling back to TOML config: %s" % default_config)
-		_current_config_index = _configs.find(default_config)
-		load_config(default_config)
+		else:
+			print("[MetricSceneController] No bindings found in scene: %s" % default_scene)
 
 	_apply_launch_settings()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_TAB:
-			_cycle_config()
-		elif event.keycode == KEY_F2:
+		if event.keycode == KEY_F2:
 			_toggle_metric_browser()
 		elif event.keycode == KEY_F3:
 			_toggle_playback_controls()
-
-func _scan_configs() -> void:
-	_configs.clear()
-	var dir = DirAccess.open("res://bindings")
-	if dir == null:
-		return
-	dir.list_dir_begin()
-	var file_name = dir.get_next()
-	while file_name != "":
-		if file_name.ends_with(".toml"):
-			_configs.append("res://bindings/%s" % file_name)
-		file_name = dir.get_next()
-	dir.list_dir_end()
-	_configs.sort()
-	print("[MetricSceneController] Found %d configs: %s" % [_configs.size(), _configs])
-
-func _cycle_config() -> void:
-	if _configs.is_empty():
-		return
-	_current_config_index = (_current_config_index + 1) % _configs.size()
-	var path = _configs[_current_config_index]
-	print("[MetricSceneController] Switching to config: %s" % path)
-	load_config(path)
-
-func load_config(config_path: String) -> void:
-	print("[MetricSceneController] Loading config: %s" % config_path)
-	metric_poller.call("StopPolling")
-	var metric_names = scene_binder.call("LoadSceneWithBindings", config_path)
-	print("[MetricSceneController] Metrics to poll: %s" % [metric_names])
-	if metric_names.size() > 0:
-		metric_poller.call("UpdateMetricNames", metric_names)
-		var config = scene_binder.get("CurrentConfig")
-		if config != null:
-			var endpoint = config.Endpoint
-			var poll_ms = config.PollIntervalMs
-			if endpoint != null and endpoint != "":
-				print("[MetricSceneController] Using endpoint from config: %s" % endpoint)
-				metric_poller.call("UpdateEndpoint", endpoint, poll_ms)
-			else:
-				metric_poller.call("StartPolling")
-		else:
-			metric_poller.call("StartPolling")
 
 func _load_scene_with_properties(scene_path: String) -> PackedStringArray:
 	var packed = load(scene_path) as PackedScene
@@ -198,7 +144,7 @@ func _apply_launch_settings() -> void:
 	if _launch_mode == 0:  # Archive
 		var timestamp = _launch_timestamp
 		if timestamp == "":
-			# Empty timestamp → 24 hours before now
+			# Empty timestamp -> 24 hours before now
 			var now = Time.get_unix_time_from_system()
 			var day_ago = now - 86400.0
 			timestamp = Time.get_datetime_string_from_unix_time(int(day_ago)) + "Z"
