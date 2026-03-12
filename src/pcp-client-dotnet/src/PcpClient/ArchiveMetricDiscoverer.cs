@@ -36,7 +36,7 @@ public sealed class ArchiveMetricDiscoverer
     public async Task<IReadOnlyList<string>> DiscoverMetricsForHostAsync(
         string hostname, CancellationToken cancellationToken = default)
     {
-        var expression = $$"""*{hostname=="{{hostname}}"}""";
+        var expression = $$"""{hostname=="{{hostname}}"}""";
         var seriesIds = await _client.QuerySeriesAsync(expression, cancellationToken);
 
         if (seriesIds.Count == 0)

@@ -78,6 +78,45 @@ public class ArchiveMetricDiscovererTests
     }
 
     [Fact]
+    public async Task DiscoverMetricsForHostAsync_UsesLabelOnlyQueryWithoutGlob()
+    {
+        string? capturedExpr = null;
+        var handler = new MockHttpHandler(req =>
+        {
+            var url = req.RequestUri!.PathAndQuery;
+            if (url.Contains("/series/query"))
+            {
+                // Capture the expr parameter to verify no glob prefix
+                var uri = req.RequestUri;
+                var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+                capturedExpr = query["expr"];
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        """["series1"]""",
+                        System.Text.Encoding.UTF8, "application/json")
+                };
+            }
+            if (url.Contains("/series/metrics"))
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        """[{"series": "series1", "name": "disk.dev.read"}]""",
+                        System.Text.Encoding.UTF8, "application/json")
+                };
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+        var discoverer = new ArchiveMetricDiscoverer(
+            BaseUrl, new HttpClient(handler));
+
+        await discoverer.DiscoverMetricsForHostAsync("myhost");
+
+        Assert.NotNull(capturedExpr);
+        // Label-only filter — no glob prefix like * which pmproxy rejects
+        Assert.Equal("""{hostname=="myhost"}""", capturedExpr);
+    }
+
+    [Fact]
     public async Task DiscoverMetricsForHostAsync_NoSeries_ReturnsEmpty()
     {
         var handler = CreateHandler(new()
