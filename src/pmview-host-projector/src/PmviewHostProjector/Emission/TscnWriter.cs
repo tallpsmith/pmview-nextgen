@@ -170,6 +170,7 @@ public static class TscnWriter
         if (pos.X != 0f || pos.Y != 0f || pos.Z != 0f)
             sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, {F(pos.X)}, {F(pos.Y)}, {F(pos.Z)})");
 
+        sb.AppendLine($"colour = Color({F(shape.Colour.R)}, {F(shape.Colour.G)}, {F(shape.Colour.B)}, 1)");
         sb.AppendLine();
 
         var subResId = SubResourceId(shape.NodeName);

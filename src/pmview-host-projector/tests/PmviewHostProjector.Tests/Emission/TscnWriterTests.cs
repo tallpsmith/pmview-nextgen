@@ -157,4 +157,18 @@ public class TscnWriterTests
         var tscn = TscnWriter.Write(layout);
         Assert.Contains("Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, 0)", tscn);
     }
+
+    [Fact]
+    public void Write_ShapeNode_EmitsColourProperty()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("CPU", "CPU", Vec3.Zero, null, null, null,
+                [new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
+                    "kernel.all.cpu.user", null, null,
+                    new RgbColour(0.976f, 0.451f, 0.086f),
+                    0f, 100f, 0.2f, 5.0f)])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("colour = Color(0.976, 0.451, 0.086, 1)", tscn);
+    }
 }
