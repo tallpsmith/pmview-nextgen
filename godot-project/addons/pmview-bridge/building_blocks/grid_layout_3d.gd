@@ -31,7 +31,7 @@ func _on_child_changed(_node: Node) -> void:
 func _arrange() -> void:
 	var idx := 0
 	for child in get_children():
-		if child is Node3D:
+		if child is Node3D and not child is Label3D:
 			var col := idx % columns
 			var row := idx / columns
 			child.position = Vector3(
