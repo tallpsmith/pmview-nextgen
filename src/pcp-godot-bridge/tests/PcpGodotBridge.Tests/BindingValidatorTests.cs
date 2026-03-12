@@ -222,3 +222,86 @@ public class BindingValidatorValidatePropertyTests
         Assert.Null(result);
     }
 }
+
+/// <summary>
+/// Tests for BindingValidator.ValidateBindingSet() — validates a complete
+/// set of bindings for cross-binding issues like duplicate node+property targets.
+/// </summary>
+public class BindingValidatorValidateBindingSetTests
+{
+    private static MetricBinding MakeValid(
+        string sceneNode = "Bar",
+        string metric = "kernel.all.load",
+        string property = "height",
+        double srcMin = 0.0, double srcMax = 10.0,
+        double tgtMin = 0.0, double tgtMax = 5.0)
+    {
+        return new MetricBinding(sceneNode, metric, property,
+            srcMin, srcMax, tgtMin, tgtMax, null, null, 0.0);
+    }
+
+    [Fact]
+    public void EmptySet_ReturnsNoErrors()
+    {
+        var messages = BindingValidator.ValidateBindingSet(Array.Empty<MetricBinding>());
+
+        Assert.DoesNotContain(messages, m => m.Severity == ValidationSeverity.Error);
+    }
+
+    [Fact]
+    public void SingleValidBinding_ReturnsNoErrors()
+    {
+        var bindings = new[] { MakeValid() };
+
+        var messages = BindingValidator.ValidateBindingSet(bindings);
+
+        Assert.DoesNotContain(messages, m => m.Severity == ValidationSeverity.Error);
+    }
+
+    [Fact]
+    public void TwoBindingsSamePropertySameNode_ReturnsError()
+    {
+        var bindings = new[]
+        {
+            MakeValid(sceneNode: "Bar", property: "height", metric: "kernel.all.load"),
+            MakeValid(sceneNode: "Bar", property: "height", metric: "disk.dev.read"),
+        };
+
+        var messages = BindingValidator.ValidateBindingSet(bindings);
+
+        Assert.Contains(messages, m =>
+            m.Severity == ValidationSeverity.Error &&
+            m.Message.Contains("Duplicate"));
+    }
+
+    [Fact]
+    public void MultipleBindingsDifferentProperties_ReturnsNoErrors()
+    {
+        var bindings = new[]
+        {
+            MakeValid(sceneNode: "Bar", property: "height"),
+            MakeValid(sceneNode: "Bar", property: "width", metric: "disk.dev.read"),
+            MakeValid(sceneNode: "Spinner", property: "rotation_speed", metric: "disk.dev.write"),
+        };
+
+        var messages = BindingValidator.ValidateBindingSet(bindings);
+
+        Assert.DoesNotContain(messages, m => m.Severity == ValidationSeverity.Error);
+    }
+
+    [Fact]
+    public void InvalidBinding_InSet_ReturnsError()
+    {
+        var bindings = new[]
+        {
+            MakeValid(),
+            new MetricBinding("Bar2", "", "height", 0, 10, 0, 5, null, null, 0.0),
+        };
+
+        var messages = BindingValidator.ValidateBindingSet(bindings);
+
+        Assert.Contains(messages, m =>
+            m.Severity == ValidationSeverity.Error &&
+            m.Message.Contains("metric", StringComparison.OrdinalIgnoreCase));
+    }
+}

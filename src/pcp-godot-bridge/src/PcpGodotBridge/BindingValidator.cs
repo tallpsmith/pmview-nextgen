@@ -51,6 +51,23 @@ public static class BindingValidator
     }
 
     /// <summary>
+    /// Validates a complete set of bindings, including cross-binding checks like duplicate
+    /// node+property targets. Calls ValidateBinding for each individual binding.
+    /// </summary>
+    public static List<ValidationMessage> ValidateBindingSet(IReadOnlyList<MetricBinding> bindings)
+    {
+        var messages = new List<ValidationMessage>();
+        var seenNodeProperties = new HashSet<string>();
+
+        foreach (var binding in bindings)
+        {
+            messages.AddRange(ValidateBinding(binding, seenNodeProperties));
+        }
+
+        return messages;
+    }
+
+    /// <summary>
     /// Classifies a single property name: built-in (no message), custom (info), or empty (null — handled elsewhere).
     /// </summary>
     public static ValidationMessage? ValidateProperty(string property)
