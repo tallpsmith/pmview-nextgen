@@ -11,6 +11,8 @@ namespace PmviewNextgen.Bridge;
 [Tool]
 public partial class PmviewBridgePlugin : EditorPlugin
 {
+	private PcpBindingInspectorPlugin? _inspectorPlugin;
+
 	private static readonly (string Key, Variant Default, Variant.Type Type,
 		PropertyHint Hint, string HintString)[] Settings =
 	[
@@ -43,11 +45,18 @@ public partial class PmviewBridgePlugin : EditorPlugin
 				{ "hint_string", hintString },
 			});
 		}
+
+		_inspectorPlugin = new PcpBindingInspectorPlugin();
+		AddInspectorPlugin(_inspectorPlugin);
 	}
 
 	public override void _ExitTree()
 	{
-		// Settings persist in project.godot — no cleanup needed.
+		if (_inspectorPlugin != null)
+		{
+			RemoveInspectorPlugin(_inspectorPlugin);
+			_inspectorPlugin = null;
+		}
 	}
 }
 #endif
