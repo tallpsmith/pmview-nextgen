@@ -21,6 +21,7 @@ public partial class MetricBrowserDialog : Window
 	private Button? _retryButton;
 	private Label? _statusLabel;
 
+	private System.Net.Http.HttpClient? _httpClient;
 	private PcpClientConnection? _client;
 	private PcpBindingResource? _targetBinding;
 	private string _selectedMetric = "";
@@ -111,9 +112,10 @@ public partial class MetricBrowserDialog : Window
 			_statusLabel!.Text = "Connecting...";
 			_retryButton!.Visible = false;
 
+			_httpClient?.Dispose();
 			_client?.Dispose();
-			_client = new PcpClientConnection(
-				new Uri(endpoint), new System.Net.Http.HttpClient());
+			_httpClient = new System.Net.Http.HttpClient();
+			_client = new PcpClientConnection(new Uri(endpoint), _httpClient);
 			await _client.ConnectAsync();
 
 			_statusLabel.Text = $"Connected to {endpoint}";
@@ -237,9 +239,9 @@ public partial class MetricBrowserDialog : Window
 							_instanceList.AddItem($"{inst.Name} (id: {inst.Id})");
 					}
 				}
-				catch
+				catch (PcpException)
 				{
-					// No instance domain — singular metric, that's fine
+					// No instance domain — singular metric
 				}
 			}
 		}
@@ -283,6 +285,8 @@ public partial class MetricBrowserDialog : Window
 	{
 		_client?.Dispose();
 		_client = null;
+		_httpClient?.Dispose();
+		_httpClient = null;
 		Hide();
 	}
 
@@ -297,6 +301,8 @@ public partial class MetricBrowserDialog : Window
 	{
 		_client?.Dispose();
 		_client = null;
+		_httpClient?.Dispose();
+		_httpClient = null;
 	}
 }
 #endif

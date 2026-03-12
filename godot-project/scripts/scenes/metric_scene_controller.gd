@@ -28,7 +28,6 @@ func _ready() -> void:
 	metric_poller.connect("ConnectionStateChanged", _on_connection_state_changed)
 	metric_poller.connect("ErrorOccurred", _on_error_occurred)
 	metric_poller.connect("PlaybackPositionChanged", _on_playback_position_changed)
-	scene_binder.connect("SceneLoaded", _on_scene_loaded)
 	scene_binder.connect("BindingError", _on_binding_error)
 
 	# Wire metric browser: when a metric is chosen, add it to the poller
@@ -91,11 +90,6 @@ func _on_connection_state_changed(state: String) -> void:
 func _on_error_occurred(message: String) -> void:
 	print("[MetricSceneController] Error: %s" % message)
 	_update_status_display()
-
-func _on_scene_loaded(scene_path: String, config_path: String) -> void:
-	print("[MetricSceneController] Scene loaded: %s with config %s" % [scene_path, config_path])
-	# Replay cached values so new bindings get data immediately (no stale defaults)
-	metric_poller.call("ReplayLastMetrics")
 
 func _on_binding_error(message: String) -> void:
 	print("[MetricSceneController] Binding error: %s" % message)

@@ -141,11 +141,12 @@ public partial class PcpBindingInspectorPlugin : EditorInspectorPlugin
 			return;
 		}
 
+		System.Net.Http.HttpClient? httpClient = null;
 		PcpClientConnection? client = null;
 		try
 		{
-			client = new PcpClientConnection(
-				new Uri(endpoint), new System.Net.Http.HttpClient());
+			httpClient = new System.Net.Http.HttpClient();
+			client = new PcpClientConnection(new Uri(endpoint), httpClient);
 			await client.ConnectAsync();
 
 			foreach (var child in container.GetChildren())
@@ -197,7 +198,7 @@ public partial class PcpBindingInspectorPlugin : EditorInspectorPlugin
 								allValid = false;
 							}
 						}
-						catch
+						catch (PcpException)
 						{
 							// No instance domain — singular metric but instance specified
 							AddValidationLabel(container,
@@ -246,6 +247,7 @@ public partial class PcpBindingInspectorPlugin : EditorInspectorPlugin
 		finally
 		{
 			client?.Dispose();
+			httpClient?.Dispose();
 		}
 	}
 

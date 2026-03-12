@@ -34,8 +34,7 @@ public partial class PcpBindingResource : Resource
 			nodeName, MetricName, TargetProperty,
 			SourceRangeMin, SourceRangeMax,
 			TargetRangeMin, TargetRangeMax,
-			InstanceId,
-			string.IsNullOrEmpty(InstanceName) ? null : InstanceName,
+			InstanceId, InstanceName,
 			InitialValue);
 	}
 }

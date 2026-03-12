@@ -11,9 +11,6 @@ namespace PmviewNextgen.Bridge;
 public partial class SceneBinder : Node
 {
 	[Signal]
-	public delegate void SceneLoadedEventHandler(string scenePath, string configPath);
-
-	[Signal]
 	public delegate void BindingErrorEventHandler(string message);
 
 	private Node? _currentScene;
@@ -74,8 +71,7 @@ public partial class SceneBinder : Node
 				_activeBindings.Add(new ActiveBinding(resolved, ownerNode));
 				metricNames.Add(metricBinding.Metric);
 
-				if (metricBinding.InitialValue != 0.0)
-					ApplyProperty(new ActiveBinding(resolved, ownerNode), (float)metricBinding.InitialValue);
+				ApplyProperty(new ActiveBinding(resolved, ownerNode), (float)metricBinding.InitialValue);
 
 				GD.Print($"[SceneBinder] Bound from scene: {ownerNode.Name}.{metricBinding.Property} <- {metricBinding.Metric}");
 			}
