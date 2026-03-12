@@ -135,6 +135,7 @@ public static class BindingConfigLoader
     private static MetricBinding? ValidateBinding(TomlTable binding, int index, string context,
         HashSet<string> seenNodeProperties, List<ValidationMessage> messages)
     {
+        // Phase 1: TOML field extraction (format-specific)
         var sceneNode = GetRequiredString(binding, "scene_node", context, messages);
         var metric = GetRequiredString(binding, "metric", context, messages);
         var property = GetRequiredString(binding, "property", context, messages);
@@ -148,40 +149,27 @@ public static class BindingConfigLoader
         if (sourceRange == null || targetRange == null)
             return null;
 
-        if (!PropertyVocabulary.IsBuiltIn(property))
-        {
-            messages.Add(new ValidationMessage(ValidationSeverity.Info,
-                $"Property '{property}' is a custom pass-through — will validate against scene node at load time",
-                context));
-        }
+        string? instanceName = binding.TryGetValue("instance_name", out var nameObj)
+            ? nameObj?.ToString() : null;
+        int? instanceId = binding.TryGetValue("instance_id", out var idObj)
+            ? Convert.ToInt32(idObj) : null;
 
-        var hasName = binding.TryGetValue("instance_name", out var nameObj);
-        var hasId = binding.TryGetValue("instance_id", out var idObj);
-
-        if (hasName && hasId)
-        {
-            messages.Add(new ValidationMessage(ValidationSeverity.Error,
-                "instance_name and instance_id are mutually exclusive",
-                context));
-            return null;
-        }
-
-        string? instanceName = hasName ? nameObj?.ToString() : null;
-        int? instanceId = hasId ? Convert.ToInt32(idObj) : null;
-
-        var nodePropertyKey = $"{sceneNode}+{property}";
-        if (!seenNodeProperties.Add(nodePropertyKey))
-        {
-            messages.Add(new ValidationMessage(ValidationSeverity.Error,
-                $"Duplicate binding for {sceneNode}+{property} — keeping first, skipping this one",
-                context));
-            return null;
-        }
-
-        return new MetricBinding(sceneNode, metric, property,
+        var metricBinding = new MetricBinding(sceneNode, metric, property,
             sourceRange.Value.min, sourceRange.Value.max,
             targetRange.Value.min, targetRange.Value.max,
             instanceId, instanceName);
+
+        // Phase 2: Semantic validation (format-independent, delegates to BindingValidator)
+        var validationMessages = BindingValidator.ValidateBinding(metricBinding, seenNodeProperties);
+
+        // Rewrite contexts to use TOML-specific context string
+        foreach (var msg in validationMessages)
+        {
+            messages.Add(new ValidationMessage(msg.Severity, msg.Message, context));
+        }
+
+        var hasErrors = validationMessages.Any(m => m.Severity == ValidationSeverity.Error);
+        return hasErrors ? null : metricBinding;
     }
 
     private static string? GetRequiredString(TomlTable table, string key, string context,

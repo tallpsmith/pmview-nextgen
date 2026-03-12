@@ -34,14 +34,14 @@
 
 > **Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T003 [P] Write xUnit tests for `BindingValidator.ValidateBinding()` — cover: missing metric name, missing target property, source range min >= max, target range min >= max, instance_name + instance_id both set, duplicate property targets on same node. File: `src/pcp-godot-bridge/tests/PcpGodotBridge.Tests/BindingValidatorTests.cs`
-- [ ] T004 [P] Write xUnit tests for `BindingValidator.ValidateProperty()` — cover: built-in property recognised, custom property pass-through, unknown property returns info message. File: `src/pcp-godot-bridge/tests/PcpGodotBridge.Tests/BindingValidatorTests.cs` (same file, separate test class)
+- [x] T003 [P] Write xUnit tests for `BindingValidator.ValidateBinding()` — cover: missing metric name, missing target property, source range min >= max, target range min >= max, instance_name + instance_id both set, duplicate property targets on same node. File: `src/pcp-godot-bridge/tests/PcpGodotBridge.Tests/BindingValidatorTests.cs`
+- [x] T004 [P] Write xUnit tests for `BindingValidator.ValidateProperty()` — cover: built-in property recognised, custom property pass-through, unknown property returns info message. File: `src/pcp-godot-bridge/tests/PcpGodotBridge.Tests/BindingValidatorTests.cs` (same file, separate test class)
 
 ### Implementation
 
-- [ ] T005 Extract offline validation rules from `BindingConfigLoader.ValidateBinding()` into a new static `BindingValidator` class in `src/pcp-godot-bridge/src/PcpGodotBridge/BindingValidator.cs` — methods: `ValidateBinding(MetricBinding, HashSet<string> seenNodeProperties)`, `ValidateProperty(string property)`. Returns `List<ValidationMessage>`.
-- [ ] T006 Refactor `BindingConfigLoader.ValidateBinding()` in `src/pcp-godot-bridge/src/PcpGodotBridge/BindingConfigLoader.cs` to delegate to `BindingValidator` — existing BindingConfigLoaderTests must still pass.
-- [ ] T007 Run full test suite to confirm refactoring is green: `dotnet test src/pcp-godot-bridge/PcpGodotBridge.sln`
+- [x] T005 Extract offline validation rules from `BindingConfigLoader.ValidateBinding()` into a new static `BindingValidator` class in `src/pcp-godot-bridge/src/PcpGodotBridge/BindingValidator.cs` — methods: `ValidateBinding(MetricBinding, HashSet<string> seenNodeProperties)`, `ValidateProperty(string property)`. Returns `List<ValidationMessage>`.
+- [x] T006 Refactor `BindingConfigLoader.ValidateBinding()` in `src/pcp-godot-bridge/src/PcpGodotBridge/BindingConfigLoader.cs` to delegate to `BindingValidator` — existing BindingConfigLoaderTests must still pass.
+- [x] T007 Run full test suite to confirm refactoring is green: `dotnet test src/pcp-godot-bridge/PcpGodotBridge.sln`
 
 **Checkpoint**: BindingValidator extracted and tested. All existing tests pass. Foundation ready for user stories.
 
