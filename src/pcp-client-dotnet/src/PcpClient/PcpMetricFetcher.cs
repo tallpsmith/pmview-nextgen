@@ -37,9 +37,8 @@ internal static class PcpMetricFetcher
         {
             var instanceElement = inst.GetProperty("instance");
             // pmproxy returns null or -1 for singular metrics (no instance domain)
-            int? parsedId = instanceElement.ValueKind == JsonValueKind.Null
-                ? null
-                : instanceElement.GetInt32() == -1 ? null : instanceElement.GetInt32();
+            int? parsedId = instanceElement.ValueKind == JsonValueKind.Null ? null
+                : instanceElement.GetInt32() is var raw && raw == -1 ? null : raw;
 
             var valueElement = inst.GetProperty("value");
             if (valueElement.ValueKind == JsonValueKind.String)
