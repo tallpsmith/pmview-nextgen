@@ -265,6 +265,33 @@ public class MetricDiscoveryTests
     }
 
     [Fact]
+    public async Task GetInstanceDomainAsync_NullIndomMessageVariant_ReturnsEmptyInstances()
+    {
+        // pmproxy also returns "metric has null indom" for some singular metrics (e.g. hinv.ncpu).
+        // Before fix: only "no InDom" was handled; "null indom" fell through and threw.
+        var handler = new MockHttpHandler(request =>
+        {
+            if (request.RequestUri!.PathAndQuery.Contains("/pmapi/context"))
+                return JsonResponse(ContextResponse);
+
+            if (request.RequestUri!.PathAndQuery.Contains("/pmapi/indom"))
+                return new HttpResponseMessage(HttpStatusCode.BadRequest)
+                {
+                    Content = new StringContent(
+                        """{"message":"metric has null indom"}""",
+                        Encoding.UTF8, "application/json")
+                };
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        var client = await ConnectClient(handler);
+        var result = await client.GetInstanceDomainAsync("hinv.ncpu");
+
+        Assert.Empty(result.Instances);
+    }
+
+    [Fact]
     public async Task GetInstanceDomainAsync_NotConnected_ThrowsPcpConnectionException()
     {
         var handler = new MockHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
