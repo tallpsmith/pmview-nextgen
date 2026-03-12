@@ -38,6 +38,12 @@ public partial class MetricBrowserDialog : Window
 
 		var vbox = new VBoxContainer();
 		AddChild(vbox);
+		vbox.AnchorRight = 1;
+		vbox.AnchorBottom = 1;
+		vbox.OffsetLeft = 8;
+		vbox.OffsetTop = 8;
+		vbox.OffsetRight = -8;
+		vbox.OffsetBottom = -8;
 
 		_statusLabel = new Label { Text = "Connecting..." };
 		vbox.AddChild(_statusLabel);
@@ -53,10 +59,14 @@ public partial class MetricBrowserDialog : Window
 
 		var split = new HSplitContainer();
 		split.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+#pragma warning disable CS0618 // SplitOffset deprecated but SplitOffsets API not yet available
+		split.SplitOffset = 250;
+#pragma warning restore CS0618
 		vbox.AddChild(split);
 
 		_tree = new Tree();
 		_tree.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		_tree.CustomMinimumSize = new Vector2(200, 0);
 		_tree.ItemActivated += OnTreeItemActivated;
 		_tree.ItemSelected += OnTreeItemSelected;
 		split.AddChild(_tree);
@@ -103,14 +113,15 @@ public partial class MetricBrowserDialog : Window
 		var endpoint = ProjectSettings.GetSetting(
 			"pmview/endpoint", "http://localhost:44322").AsString();
 
+		_isArchiveMode = ProjectSettings.GetSetting("pmview/mode", 0).AsInt32() == 0;
+		GD.Print($"[MetricBrowser] Opening — endpoint={endpoint}, mode={(_isArchiveMode ? "archive" : "live")}");
+
 		if (string.IsNullOrEmpty(endpoint))
 		{
 			ShowError("Configure pmproxy endpoint in Project Settings > PCP");
 			PopupCentered();
 			return;
 		}
-
-		_isArchiveMode = ProjectSettings.GetSetting("pmview/mode", 0).AsInt32() == 0;
 
 		PopupCentered();
 
@@ -124,6 +135,7 @@ public partial class MetricBrowserDialog : Window
 	{
 		try
 		{
+			GD.Print($"[MetricBrowser] Live: connecting to {endpoint}...");
 			_statusLabel!.Text = "Connecting...";
 			_retryButton!.Visible = false;
 
@@ -133,15 +145,18 @@ public partial class MetricBrowserDialog : Window
 			_client = new PcpClientConnection(new Uri(endpoint), _httpClient);
 			await _client.ConnectAsync();
 
+			GD.Print("[MetricBrowser] Live: connected, loading root namespace...");
 			_statusLabel.Text = $"Connected to {endpoint}";
 			await LoadChildren("");
 		}
 		catch (PcpConnectionException ex)
 		{
+			GD.PushWarning($"[MetricBrowser] Live: connection failed — {ex.Message}");
 			ShowError($"Connection failed: {ex.Message}");
 		}
 		catch (Exception ex)
 		{
+			GD.PushWarning($"[MetricBrowser] Live: error — {ex.Message}");
 			ShowError($"Error: {ex.Message}");
 		}
 	}
@@ -150,6 +165,7 @@ public partial class MetricBrowserDialog : Window
 	{
 		try
 		{
+			GD.Print($"[MetricBrowser] Archive: discovering hosts at {endpoint}...");
 			_statusLabel!.Text = "Discovering hosts...";
 			_retryButton!.Visible = false;
 			_hostDropdown!.Visible = true;
@@ -161,6 +177,7 @@ public partial class MetricBrowserDialog : Window
 			_discoverer = new ArchiveMetricDiscoverer(new Uri(endpoint), _httpClient);
 
 			var hosts = await _discoverer.GetHostnamesAsync();
+			GD.Print($"[MetricBrowser] Archive: found {hosts.Count} hosts: {string.Join(", ", hosts)}");
 
 			if (hosts.Count == 0)
 			{
@@ -175,6 +192,7 @@ public partial class MetricBrowserDialog : Window
 		}
 		catch (Exception ex)
 		{
+			GD.PushWarning($"[MetricBrowser] Archive: host discovery failed — {ex.Message}");
 			ShowError($"Host discovery failed: {ex.Message}");
 		}
 	}
@@ -182,12 +200,14 @@ public partial class MetricBrowserDialog : Window
 	private async void OnHostSelected(long index)
 	{
 		var hostname = _hostDropdown!.GetItemText((int)index);
+		GD.Print($"[MetricBrowser] Archive: host selected — {hostname}");
 		_statusLabel!.Text = $"Archive: {hostname} — loading metrics...";
 		_tree!.Clear();
 
 		try
 		{
 			var metricNames = await _discoverer!.DiscoverMetricsForHostAsync(hostname);
+			GD.Print($"[MetricBrowser] Archive: discovered {metricNames.Count} metrics for {hostname}");
 
 			if (metricNames.Count == 0)
 			{
@@ -205,6 +225,7 @@ public partial class MetricBrowserDialog : Window
 		}
 		catch (Exception ex)
 		{
+			GD.PushWarning($"[MetricBrowser] Archive: metric discovery failed — {ex.Message}");
 			ShowError($"Metric discovery failed: {ex.Message}");
 		}
 	}
@@ -240,6 +261,7 @@ public partial class MetricBrowserDialog : Window
 
 		try
 		{
+			GD.Print($"[MetricBrowser] Live: loading children for prefix='{prefix}'");
 			var ns = await _client.GetChildrenAsync(prefix);
 
 			TreeItem parent;
@@ -319,6 +341,7 @@ public partial class MetricBrowserDialog : Window
 
 		_selectedMetric = path;
 		_confirmButton!.Disabled = false;
+		GD.Print($"[MetricBrowser] Leaf selected: {path}");
 
 		if (_isArchiveMode)
 		{
@@ -339,6 +362,7 @@ public partial class MetricBrowserDialog : Window
 		try
 		{
 			var detail = await _discoverer.DescribeMetricAsync(metricName, hostname);
+			GD.Print($"[MetricBrowser] Archive describe: {detail.Name} — type={detail.Type}, semantics={detail.Semantics}, instances={detail.Instances.Count}");
 
 			_descriptionLabel!.Text = $"{detail.Name}";
 			if (detail.Semantics != null)
@@ -368,6 +392,7 @@ public partial class MetricBrowserDialog : Window
 		try
 		{
 			var descriptors = await _client.DescribeMetricsAsync(new[] { metricName });
+			GD.Print($"[MetricBrowser] Live describe: got {descriptors.Count} descriptors for {metricName}");
 			if (descriptors.Count > 0)
 			{
 				var desc = descriptors[0];
@@ -405,6 +430,7 @@ public partial class MetricBrowserDialog : Window
 	{
 		if (_targetBinding != null && !string.IsNullOrEmpty(_selectedMetric))
 		{
+			GD.Print($"[MetricBrowser] Confirmed: metric={_selectedMetric}");
 			_targetBinding.MetricName = _selectedMetric;
 
 			var selectedIdx = _instanceList?.GetSelectedItems();

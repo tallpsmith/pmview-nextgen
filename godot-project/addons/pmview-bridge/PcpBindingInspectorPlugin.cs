@@ -60,7 +60,8 @@ public partial class PcpBindingInspectorPlugin : EditorInspectorPlugin
 		// Re-validate when bindings change
 		foreach (var binding in bindable.PcpBindings)
 		{
-			binding?.Changed += () => RunOfflineValidation(bindable, node, validationContainer);
+			if (binding != null)
+				binding.Changed += () => RunOfflineValidation(bindable, node, validationContainer);
 		}
 
 		// Connected validation button

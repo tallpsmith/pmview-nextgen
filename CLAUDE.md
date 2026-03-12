@@ -19,7 +19,7 @@ tests/
 
 ## Environment
 
-- **dotnet**: `export PATH="/opt/homebrew/opt/dotnet@8/bin:$PATH"` and `export DOTNET_ROOT="/opt/homebrew/opt/dotnet@8/libexec"`
+- **dotnet**: if `dotnet` is NOT on the path, you need to `export PATH="/opt/homebrew/opt/dotnet@8/bin:$PATH"` and `export DOTNET_ROOT="/opt/homebrew/opt/dotnet@8/libexec"`
 - **Godot**: NOT installed in Claude Code VM (no UI). Write `.tscn`, `.gd`, and `.cs` files directly. User tests scenes in their host Godot editor.
 - Always include `/usr/bin:/bin:/usr/sbin:/sbin` in PATH when running shell commands (VM quirk).
 

@@ -1325,6 +1325,7 @@ git commit -m "add DescribeMetricAsync with series ID caching"
 - Delete: `godot-project/scenes/metric_browser.tscn`
 - Delete: `godot-project/scripts/scenes/playback_controls.gd`
 - Delete: `godot-project/scenes/playback_controls.tscn`
+- Delete: `godot-project/test/MetricBrowserTests.cs` (gdUnit4 tests for removed MetricBrowser)
 - Modify: `godot-project/scripts/scenes/metric_scene_controller.gd`
 - Modify: `godot-project/scenes/main.tscn`
 
@@ -1337,6 +1338,7 @@ rm godot-project/scripts/scenes/metric_browser.gd
 rm godot-project/scenes/metric_browser.tscn
 rm godot-project/scripts/scenes/playback_controls.gd
 rm godot-project/scenes/playback_controls.tscn
+rm godot-project/test/MetricBrowserTests.cs
 ```
 
 - [ ] **Step 2: Update `main.tscn` — remove MetricBrowser and PlaybackControls nodes**
