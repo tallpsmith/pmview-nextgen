@@ -272,7 +272,7 @@ public partial class SceneBinder : Node
 		return false;
 	}
 
-	private static double? ExtractValue(MetricBinding binding,
+	internal static double? ExtractValue(MetricBinding binding,
 		Godot.Collections.Dictionary instances,
 		Godot.Collections.Dictionary nameToId)
 	{
@@ -320,7 +320,7 @@ public partial class SceneBinder : Node
 		}
 	}
 
-	private void ApplyBuiltInProperty(Node node, string property, float value)
+	internal void ApplyBuiltInProperty(Node node, string property, float value)
 	{
 		if (node is not Node3D node3D)
 		{
@@ -376,7 +376,7 @@ public partial class SceneBinder : Node
 		}
 	}
 
-	private static double Normalise(double value,
+	internal static double Normalise(double value,
 		double srcMin, double srcMax, double tgtMin, double tgtMax)
 	{
 		var range = srcMax - srcMin;

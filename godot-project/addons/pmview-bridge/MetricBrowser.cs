@@ -29,7 +29,7 @@ public partial class MetricBrowser : Node
 	public delegate void MetricSelectedEventHandler(
 		string metricName, Godot.Collections.Dictionary descriptor);
 
-	private PcpClientConnection? _client;
+	private IPcpClient? _client;
 
 	/// <summary>
 	/// Grabs the PcpClientConnection from a MetricPoller node.
