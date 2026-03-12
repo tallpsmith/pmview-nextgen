@@ -214,6 +214,62 @@ public partial class SceneBinder : Node
 		_instanceNodes.Remove(metricName);
 	}
 
+	/// <summary>
+	/// Discovers PcpBindable nodes in the scene tree, reads their binding resources,
+	/// resolves and validates against real nodes, applies initial values.
+	/// Returns distinct metric names needed for polling.
+	/// </summary>
+	public string[] BindFromSceneProperties(Node sceneRoot)
+	{
+		_activeBindings.Clear();
+		_rotationSpeeds.Clear();
+		_currentScene = sceneRoot;
+
+		var metricNames = new HashSet<string>();
+		var bindableNodes = new List<PcpBindable>();
+
+		FindBindableNodes(sceneRoot, bindableNodes);
+
+		foreach (var bindable in bindableNodes)
+		{
+			var ownerNode = bindable.GetParent();
+			if (ownerNode == null) continue;
+
+			foreach (var bindingResource in bindable.PcpBindings)
+			{
+				if (bindingResource == null) continue;
+
+				var metricBinding = bindingResource.ToMetricBinding(ownerNode.Name);
+				var resolved = PropertyVocabulary.Resolve(metricBinding);
+
+				if (!ValidatePropertyExists(ownerNode, resolved))
+					continue;
+
+				_activeBindings.Add(new ActiveBinding(resolved, ownerNode));
+				metricNames.Add(metricBinding.Metric);
+
+				if (metricBinding.InitialValue != 0.0)
+					ApplyProperty(new ActiveBinding(resolved, ownerNode), (float)metricBinding.InitialValue);
+
+				GD.Print($"[SceneBinder] Bound from scene: {ownerNode.Name}.{metricBinding.Property} <- {metricBinding.Metric}");
+			}
+		}
+
+		GD.Print($"[SceneBinder] {_activeBindings.Count} bindings from scene properties");
+		return metricNames.ToArray();
+	}
+
+	private static void FindBindableNodes(Node root, List<PcpBindable> results)
+	{
+		foreach (var child in root.GetChildren())
+		{
+			if (child is PcpBindable bindable)
+				results.Add(bindable);
+
+			FindBindableNodes(child, results);
+		}
+	}
+
 	public void UnloadCurrentScene()
 	{
 		_activeBindings.Clear();

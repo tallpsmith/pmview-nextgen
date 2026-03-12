@@ -5,6 +5,7 @@ extends Node
 ## Toggle metric browser with F2, playback controls with F3.
 
 @export var default_config: String = "res://bindings/test_bars.toml"
+@export var default_scene: String = "res://scenes/test_bars.tscn"
 
 @onready var metric_poller: Node = $MetricPoller
 @onready var scene_binder: Node = $SceneBinder
@@ -45,9 +46,19 @@ func _ready() -> void:
 	_update_status_display()
 	_scan_configs()
 
-	# Auto-load the default binding config
+	# Try scene-property bindings first (editor-integrated)
+	if default_scene != "":
+		print("[MetricSceneController] Trying scene-property bindings: %s" % default_scene)
+		var metric_names = _load_scene_with_properties(default_scene)
+		if metric_names.size() > 0:
+			print("[MetricSceneController] Found %d metrics from scene properties" % metric_names.size())
+			_start_polling_metrics(metric_names)
+			_apply_launch_settings()
+			return
+
+	# Fall back to TOML config
 	if default_config != "":
-		print("[MetricSceneController] Auto-loading config: %s" % default_config)
+		print("[MetricSceneController] Falling back to TOML config: %s" % default_config)
 		_current_config_index = _configs.find(default_config)
 		load_config(default_config)
 
@@ -103,6 +114,21 @@ func load_config(config_path: String) -> void:
 				metric_poller.call("StartPolling")
 		else:
 			metric_poller.call("StartPolling")
+
+func _load_scene_with_properties(scene_path: String) -> PackedStringArray:
+	var packed = load(scene_path) as PackedScene
+	if packed == null:
+		print("[MetricSceneController] Cannot load scene: %s" % scene_path)
+		return PackedStringArray()
+	var scene_instance = packed.instantiate()
+	scene_binder.add_child(scene_instance)
+	var metric_names = scene_binder.call("BindFromSceneProperties", scene_instance)
+	return metric_names
+
+func _start_polling_metrics(metric_names: PackedStringArray) -> void:
+	if metric_names.size() > 0:
+		metric_poller.call("UpdateMetricNames", metric_names)
+		metric_poller.call("StartPolling")
 
 func _on_metrics_updated(metrics: Dictionary) -> void:
 	scene_binder.call("ApplyMetrics", metrics)
