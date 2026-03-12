@@ -30,12 +30,13 @@ jobs:
           docker compose -f dev-environment/docker-compose.yml logs
           exit 1
 
-      - uses: godot-gdunit-labs/gdUnit4-action@v4
+      - uses: godot-gdunit-labs/gdUnit4-action@v1
         with:
           godot-version: '4.6.1'
           godot-net: true
           dotnet-version: net8.0
-          paths: godot-project/test/e2e/
+          paths: test/e2e/
+          project_dir: 'godot-project/'
           timeout: 15
 
       - name: Tear down PCP stack
