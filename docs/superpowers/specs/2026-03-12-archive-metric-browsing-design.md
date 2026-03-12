@@ -116,10 +116,11 @@ The editor dialog becomes mode-aware based on `ProjectSettings.GetSetting("pmvie
 child of the `VBoxContainer`, hidden by default. In archive mode it becomes visible; in
 live mode it stays hidden. This avoids conditional layout logic.
 
-**Resource lifecycle:** New fields `_seriesClient` and `_discoverer` are stored alongside
-the existing `_client`/`_httpClient`. All four are disposed in both `CleanupAndClose()` and
-`_ExitTree()`. `PcpSeriesClient` borrows the caller-owned `_httpClient` (same pattern as
-`PcpClientConnection`).
+**Resource lifecycle:** New field `_discoverer` (`ArchiveMetricDiscoverer`) is stored alongside
+the existing `_client`/`_httpClient`. `ArchiveMetricDiscoverer` wraps `PcpSeriesClient`
+internally — no separate `_seriesClient` field needed on the dialog. `_discoverer` is nulled
+in both `CleanupAndClose()` and `_ExitTree()`. The shared `_httpClient` is disposed in both
+paths (same pattern as live mode).
 
 ### Prototype Cleanup
 
@@ -183,3 +184,4 @@ Query expression syntax supports label qualifiers: `metric.name{hostname=="value
 - **Option A** for tree building: fetch all metrics upfront, build tree client-side (archive data is finite, hundreds not thousands of metrics)
 - **Host selection first** in archive mode — user picks host, then browses that host's metric namespace
 - Runtime MetricBrowser and PlaybackControls removed — superseded by editor bindings + ProjectSettings
+- No URL batching for `/series/metrics` queries — assumes hundreds not thousands of series per host (per user confirmation). If archives grow very large, batching can be added later
