@@ -164,6 +164,29 @@ public static class PcpSeriesQuery
         return results;
     }
 
+    public static IReadOnlyList<SeriesDescriptor> ParseDescsResponse(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var results = new List<SeriesDescriptor>();
+        foreach (var item in doc.RootElement.EnumerateArray())
+        {
+            var seriesId = item.GetProperty("series").GetString()!;
+            var pmid = item.TryGetProperty("pmid", out var p) ? p.GetString() : null;
+            var indom = item.TryGetProperty("indom", out var i) ? i.GetString() : null;
+            var semantics = item.TryGetProperty("semantics", out var s) ? s.GetString() : null;
+            var type = item.TryGetProperty("type", out var t) ? t.GetString() : null;
+            var units = item.TryGetProperty("units", out var u) ? u.GetString() : null;
+            results.Add(new SeriesDescriptor(seriesId, pmid, indom, semantics, type, units));
+        }
+        return results;
+    }
+
+    public static Uri BuildDescsUrl(Uri baseUrl, IEnumerable<string> seriesIds)
+    {
+        var ids = string.Join(",", seriesIds);
+        return new Uri(baseUrl, $"/series/descs?series={Uri.EscapeDataString(ids)}");
+    }
+
     public static IReadOnlyList<SeriesMetricName> ParseMetricsResponse(string json)
     {
         using var doc = JsonDocument.Parse(json);
@@ -220,6 +243,19 @@ public record SeriesInstanceInfo(int PcpInstanceId, string Name);
 /// Maps a series ID to its PCP metric name from a /series/metrics response.
 /// </summary>
 public record SeriesMetricName(string SeriesId, string Name);
+
+/// <summary>
+/// Metric descriptor from a /series/descs response: PMID, instance domain,
+/// semantics, value type, and units. All fields except SeriesId are optional
+/// — pmproxy may omit them for metrics without instances or units.
+/// </summary>
+public record SeriesDescriptor(
+    string SeriesId,
+    string? Pmid,
+    string? Indom,
+    string? Semantics,
+    string? Type,
+    string? Units);
 
 /// <summary>
 /// A single timestamped value from a historical series query.
