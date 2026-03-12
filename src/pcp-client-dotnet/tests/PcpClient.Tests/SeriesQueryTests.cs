@@ -576,4 +576,33 @@ public class SeriesQueryTests
         // (337467969 - 337462033) / 60 = 5936 / 60 = 98.93/sec
         Assert.Equal(98.9, rates[0].NumericValue, precision: 0);
     }
+
+    // ── PcpSeriesQuery.ParseLabelsResponse — label value extraction ──
+
+    [Fact]
+    public void ParseLabelsResponse_ReturnsLabelValues()
+    {
+        var json = """{"hostname": ["app", "nas", "webserver01"]}""";
+        var result = PcpSeriesQuery.ParseLabelsResponse(json, "hostname");
+        Assert.Equal(3, result.Count);
+        Assert.Contains("app", result);
+        Assert.Contains("nas", result);
+        Assert.Contains("webserver01", result);
+    }
+
+    [Fact]
+    public void ParseLabelsResponse_EmptyValues_ReturnsEmpty()
+    {
+        var json = """{"hostname": []}""";
+        var result = PcpSeriesQuery.ParseLabelsResponse(json, "hostname");
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void ParseLabelsResponse_MissingLabel_ReturnsEmpty()
+    {
+        var json = """{"otherlabel": ["value1"]}""";
+        var result = PcpSeriesQuery.ParseLabelsResponse(json, "hostname");
+        Assert.Empty(result);
+    }
 }

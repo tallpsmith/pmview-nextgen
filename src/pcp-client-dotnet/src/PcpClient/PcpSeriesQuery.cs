@@ -164,6 +164,27 @@ public static class PcpSeriesQuery
         return results;
     }
 
+    public static IReadOnlyList<string> ParseLabelsResponse(string json, string labelName)
+    {
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty(labelName, out var values))
+            return Array.Empty<string>();
+
+        var results = new List<string>();
+        foreach (var item in values.EnumerateArray())
+        {
+            var val = item.GetString();
+            if (val != null)
+                results.Add(val);
+        }
+        return results;
+    }
+
+    public static Uri BuildLabelsUrl(Uri baseUrl, string labelName)
+    {
+        return new Uri(baseUrl, $"/series/labels?names={Uri.EscapeDataString(labelName)}");
+    }
+
     private static double ToEpochSeconds(DateTime utcTime)
     {
         return ((DateTimeOffset)utcTime).ToUnixTimeMilliseconds() / 1000.0;
