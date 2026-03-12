@@ -91,7 +91,20 @@ public sealed class PcpClientConnection : IPcpClient
 
         response.EnsureSuccessStatusCode();
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
-        return PcpMetricFetcher.ParseFetchResponse(json);
+        var values = PcpMetricFetcher.ParseFetchResponse(json);
+
+        ThrowIfMetricsMissing(namesList, values);
+
+        return values;
+    }
+
+    private static void ThrowIfMetricsMissing(
+        List<string> requested, IReadOnlyList<MetricValue> returned)
+    {
+        var returnedNames = returned.Select(v => v.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var missing = requested.FirstOrDefault(name => !returnedNames.Contains(name));
+        if (missing is not null)
+            throw new PcpMetricNotFoundException(missing);
     }
 
     private async Task<IReadOnlyList<MetricValue>> ReconnectAndRetryFetch(
