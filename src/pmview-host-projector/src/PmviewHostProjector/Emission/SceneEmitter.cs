@@ -23,7 +23,6 @@ public static class SceneEmitter
     {
         var bounds = SceneBounds.FromLayout(layout);
         var setup = WorldSetup.ComputeCamera(bounds);
-        var p = setup.Position;
         var transform = BuildLookAtTransform(setup.Position, setup.LookAtTarget);
 
         var sb = new StringBuilder();
