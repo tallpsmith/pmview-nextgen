@@ -84,7 +84,8 @@ public partial class SceneBinderTests
 		var nameToId = new Godot.Collections.Dictionary();
 
 		var result = SceneBinder.ExtractValue(binding, instances, nameToId);
-		AssertThat(result).IsEqual(42.0);
+		AssertThat(result).IsNotNull();
+		AssertThat(result!.Value).IsEqual(42.0);
 	}
 
 	[TestCase]
@@ -96,7 +97,8 @@ public partial class SceneBinderTests
 		var nameToId = new Godot.Collections.Dictionary();
 
 		var result = SceneBinder.ExtractValue(binding, instances, nameToId);
-		AssertThat(result).IsEqual(99.0);
+		AssertThat(result).IsNotNull();
+		AssertThat(result!.Value).IsEqual(99.0);
 	}
 
 	[TestCase]
@@ -108,7 +110,8 @@ public partial class SceneBinderTests
 		var nameToId = new Godot.Collections.Dictionary { ["cpu0"] = 7 };
 
 		var result = SceneBinder.ExtractValue(binding, instances, nameToId);
-		AssertThat(result).IsEqual(77.0);
+		AssertThat(result).IsNotNull();
+		AssertThat(result!.Value).IsEqual(77.0);
 	}
 
 	[TestCase]
