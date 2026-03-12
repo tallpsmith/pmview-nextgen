@@ -63,6 +63,8 @@ public sealed class ArchiveMetricDiscoverer
         var descs = await _client.GetDescriptorsAsync(seriesIds, cancellationToken);
         var instances = await _client.GetInstancesAsync(seriesIds, cancellationToken);
 
+        // PCP descriptors are metric-level metadata (type, semantics, units) —
+        // identical across all instances/series of the same metric. First is sufficient.
         var desc = descs.Count > 0 ? descs[0] : null;
 
         return new MetricDetail(

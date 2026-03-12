@@ -2,16 +2,12 @@ extends Node
 
 ## Main scene controller: wires MetricPoller signals to SceneBinder.
 ## Displays connection status overlay. Loads scenes with editor-integrated bindings.
-## Toggle metric browser with F2, playback controls with F3.
 
 @export var default_scene: String = "res://scenes/test_bars.tscn"
 
 @onready var metric_poller: Node = $MetricPoller
 @onready var scene_binder: Node = $SceneBinder
-@onready var metric_browser_bridge: Node = $MetricBrowser
 @onready var status_label: Label = $UIOverlay/StatusLabel
-@onready var metric_browser_ui: Control = $UIOverlay/MetricBrowser
-@onready var playback_controls_ui: Control = $UIOverlay/PlaybackControls
 
 var _connection_state: String = "Disconnected"
 
@@ -27,17 +23,7 @@ func _ready() -> void:
 	metric_poller.connect("MetricsUpdated", _on_metrics_updated)
 	metric_poller.connect("ConnectionStateChanged", _on_connection_state_changed)
 	metric_poller.connect("ErrorOccurred", _on_error_occurred)
-	metric_poller.connect("PlaybackPositionChanged", _on_playback_position_changed)
 	scene_binder.connect("BindingError", _on_binding_error)
-
-	# Wire metric browser: when a metric is chosen, add it to the poller
-	if metric_browser_ui:
-		metric_browser_ui.connect("metric_chosen", _on_metric_chosen)
-		metric_browser_ui.visible = false
-
-	# Hide playback controls by default
-	if playback_controls_ui:
-		playback_controls_ui.visible = false
 
 	_update_status_display()
 
@@ -52,13 +38,6 @@ func _ready() -> void:
 			print("[MetricSceneController] No bindings found in scene: %s" % default_scene)
 
 	_apply_launch_settings()
-
-func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_F2:
-			_toggle_metric_browser()
-		elif event.keycode == KEY_F3:
-			_toggle_playback_controls()
 
 func _load_scene_with_properties(scene_path: String) -> PackedStringArray:
 	var packed = load(scene_path) as PackedScene
@@ -83,42 +62,12 @@ func _on_connection_state_changed(state: String) -> void:
 	print("[MetricSceneController] Connection state: %s" % state)
 	_update_status_display()
 
-	# Tell the C# MetricBrowser to grab the client from MetricPoller
-	if state == "Connected" and metric_browser_bridge:
-		metric_browser_bridge.call("ConnectToPoller", metric_poller)
-
 func _on_error_occurred(message: String) -> void:
 	print("[MetricSceneController] Error: %s" % message)
 	_update_status_display()
 
 func _on_binding_error(message: String) -> void:
 	print("[MetricSceneController] Binding error: %s" % message)
-
-func _on_metric_chosen(metric_name: String) -> void:
-	print("[MetricSceneController] Metric chosen from browser: %s" % metric_name)
-	# Add the chosen metric to the current polling set
-	var current_names: Array = Array(metric_poller.get("MetricNames"))
-	if metric_name not in current_names:
-		current_names.append(metric_name)
-		metric_poller.call("UpdateMetricNames", PackedStringArray(current_names))
-		print("[MetricSceneController] Now polling: %s" % [current_names])
-
-func _on_playback_position_changed(position: String, mode: String) -> void:
-	if playback_controls_ui:
-		playback_controls_ui.call("update_position", position)
-		playback_controls_ui.call("update_mode", mode)
-
-func _toggle_metric_browser() -> void:
-	if metric_browser_ui:
-		metric_browser_ui.visible = not metric_browser_ui.visible
-		print("[MetricSceneController] Metric browser: %s" % (
-			"shown" if metric_browser_ui.visible else "hidden"))
-
-func _toggle_playback_controls() -> void:
-	if playback_controls_ui:
-		playback_controls_ui.visible = not playback_controls_ui.visible
-		print("[MetricSceneController] Playback controls: %s" % (
-			"shown" if playback_controls_ui.visible else "hidden"))
 
 func _read_launch_settings() -> void:
 	_launch_endpoint = ProjectSettings.get_setting("pmview/endpoint", "http://localhost:44322")
