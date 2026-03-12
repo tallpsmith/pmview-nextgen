@@ -71,7 +71,10 @@ public partial class SceneBinder : Node
 				_activeBindings.Add(new ActiveBinding(resolved, ownerNode));
 				metricNames.Add(metricBinding.Metric);
 
-				ApplyProperty(new ActiveBinding(resolved, ownerNode), (float)metricBinding.InitialValue);
+				var normalisedInitial = Normalise(metricBinding.InitialValue,
+					metricBinding.SourceRangeMin, metricBinding.SourceRangeMax,
+					metricBinding.TargetRangeMin, metricBinding.TargetRangeMax);
+				ApplyProperty(new ActiveBinding(resolved, ownerNode), (float)normalisedInitial);
 
 				GD.Print($"[SceneBinder] Bound from scene: {ownerNode.Name}.{metricBinding.Property} <- {metricBinding.Metric}");
 			}
