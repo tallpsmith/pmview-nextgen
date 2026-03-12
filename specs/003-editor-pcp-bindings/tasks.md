@@ -143,8 +143,8 @@
 
 **Purpose**: Cleanup and verification across all user stories.
 
-- [ ] T032 Verify Tomlyn NuGet dependency scope — Tomlyn lives in `src/pcp-godot-bridge/src/PcpGodotBridge/PcpGodotBridge.csproj` (used by BindingConfigLoader, which remains in the library). Confirm no Godot runtime code directly imports Tomlyn. The dependency stays in the library but is no longer exercised at runtime since SceneBinder no longer calls BindingConfigLoader.
-- [ ] T033 Run full test suite: `dotnet test src/pcp-godot-bridge/PcpGodotBridge.sln` and `dotnet build godot-project/pmview-nextgen.sln` — confirm everything builds and passes
+- [x] T032 Verify Tomlyn NuGet dependency scope — Tomlyn lives in `src/pcp-godot-bridge/src/PcpGodotBridge/PcpGodotBridge.csproj` (used by BindingConfigLoader, which remains in the library). Confirm no Godot runtime code directly imports Tomlyn. The dependency stays in the library but is no longer exercised at runtime since SceneBinder no longer calls BindingConfigLoader.
+- [x] T033 Run full test suite: `dotnet test src/pcp-godot-bridge/PcpGodotBridge.sln` and `dotnet build godot-project/pmview-nextgen.sln` — confirm everything builds and passes
 - [ ] T034 Validate quickstart.md workflow end-to-end in the Godot editor (manual): attach PcpBindable, add binding, browse metrics, validate, save/reload, run scene
 
 ---
