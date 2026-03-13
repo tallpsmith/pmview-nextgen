@@ -312,7 +312,7 @@ public static class TscnWriter
     private static void WriteGridRowHeaders(StringBuilder sb, PlacedZone zone)
     {
         if (zone.InstanceLabels is null || zone.InstanceLabels.Count == 0) return;
-        var rowSpacing = zone.GridRowSpacing ?? 2.0f;
+        var rowSpacing = zone.GridRowSpacing ?? 2.5f;
         for (var i = 0; i < zone.InstanceLabels.Count; i++)
         {
             var z = -(i * rowSpacing);

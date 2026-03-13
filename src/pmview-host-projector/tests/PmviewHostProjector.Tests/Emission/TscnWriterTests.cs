@@ -339,9 +339,9 @@ public class TscnWriterTests
         var tscn = TscnWriter.Write(layout);
 
         // X=0, Z=-3 for User; X=1.5, Z=-3 for Sys; X=3, Z=-3 for Nice
-        Assert.Contains("0, 0.01, -3", tscn);
-        Assert.Contains("1.5, 0.01, -3", tscn);
-        Assert.Contains("3, 0.01, -3", tscn);
+        Assert.Contains("0, 0.01, -3)", tscn);
+        Assert.Contains("1.5, 0.01, -3)", tscn);
+        Assert.Contains("3, 0.01, -3)", tscn);
         // Confirm old inside-bezel position is gone
         Assert.DoesNotContain("0.01, -0.8)", tscn);
     }
