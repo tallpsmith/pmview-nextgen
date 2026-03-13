@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 9.0.x
       - name: Run all .NET unit tests (integration tests run in E2E workflow with pmproxy)
         run: dotnet test pmview-nextgen.sln --filter 'FullyQualifiedName!~Integration'
 

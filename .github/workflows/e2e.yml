@@ -36,7 +36,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 9.0.x
 
       - name: PcpClient integration tests
         run: dotnet test src/pcp-client-dotnet/PcpClient.sln --filter 'Category=Integration'
@@ -45,7 +45,7 @@ jobs:
         with:
           godot-version: '4.6.1'
           godot-net: true
-          dotnet-version: net8.0
+          dotnet-version: net9.0
           paths: test/e2e/
           project_dir: 'godot-project/'
           timeout: 15

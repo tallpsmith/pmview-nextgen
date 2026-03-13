@@ -53,8 +53,8 @@ graph TD
 
 ## Prerequisites
 
-- [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- [Godot 4.4+](https://godotengine.org/download) with .NET support (the Mono/C# flavour)
+- [.NET 9.0+ SDK](https://dotnet.microsoft.com/download/dotnet/9.0) (the .NET 9 SDK builds our net8.0-targeted projects; Godot 4.6 requires it)
+- [Godot 4.6+](https://godotengine.org/download) with .NET support (the Mono/C# flavour)
 - [Performance Co-Pilot (PCP)](https://pcp.io/) with pmproxy running (for live data)
 - Docker or Podman (for dev-environment stack)
 

@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup>
+    <!-- Libraries target net8.0 for Godot compatibility, but allow execution
+         on any installed runtime (9, 10, etc.) so developers don't need to
+         install a specific .NET version alongside the SDK. -->
+    <RollForward>LatestMajor</RollForward>
+  </PropertyGroup>
+</Project>
