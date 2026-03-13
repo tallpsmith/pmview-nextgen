@@ -20,6 +20,7 @@ public record SceneBounds(float MinX, float MaxX, float MinZ, float MaxZ)
 
     private static float ZoneWidth(PlacedZone zone)
     {
+        if (zone.GroundWidth > 0f) return zone.GroundWidth;
         if (zone.Shapes.Count == 0) return 0f;
         return zone.Shapes.Max(s => s.LocalPosition.X);
     }
@@ -32,9 +33,9 @@ public static class WorldSetup
     public static CameraSetup ComputeCamera(SceneBounds bounds)
     {
         var extent = Math.Max(bounds.Width, Math.Abs(bounds.Depth));
-        var height = extent * 0.6f;
-        var distance = extent * 0.8f;
-        var target = new Vec3(bounds.CentreX, 0, bounds.CentreZ);
+        var height = extent * 0.35f;
+        var distance = extent * 0.35f;
+        var target = new Vec3(bounds.CentreX, 1.5f, bounds.CentreZ);
         var position = new Vec3(bounds.CentreX, height, bounds.MaxZ + distance);
         return new CameraSetup(position, target);
     }
