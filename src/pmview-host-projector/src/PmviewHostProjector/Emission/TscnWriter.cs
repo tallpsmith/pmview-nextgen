@@ -152,7 +152,12 @@ public static class TscnWriter
         WriteGroundBezel(sb, zone, bezelResources);
 
         foreach (var shape in zone.Shapes)
+        {
             WriteShape(sb, shape, zone, registry, subResources);
+
+            if (!zone.GridColumns.HasValue && shape.DisplayLabel is not null)
+                WriteShapeLabel(sb, shape, zone.Name);
+        }
     }
 
     private static void WriteZoneContainerNode(StringBuilder sb, PlacedZone zone, ExtResourceRegistry registry)
@@ -231,6 +236,18 @@ public static class TscnWriter
         sb.AppendLine("script = ExtResource(\"bindable_script\")");
         sb.AppendLine($"PcpBindings = Array[ExtResource(\"binding_res_script\")]([SubResource(\"{subResId}\")])");
 
+        sb.AppendLine();
+    }
+
+    private static void WriteShapeLabel(StringBuilder sb, PlacedShape shape, string zoneName)
+    {
+        var pos = shape.LocalPosition;
+        sb.AppendLine($"[node name=\"{shape.NodeName}Label\" type=\"Label3D\" parent=\"{zoneName}\"]");
+        sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, {F(pos.X)}, 0.01, 0.6)");
+        sb.AppendLine("pixel_size = 0.008");
+        sb.AppendLine("font_size = 24");
+        sb.AppendLine($"text = \"{shape.DisplayLabel}\"");
+        sb.AppendLine("horizontal_alignment = 1");
         sb.AppendLine();
     }
 

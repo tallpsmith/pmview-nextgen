@@ -237,4 +237,19 @@ public class TscnWriterTests
         var tscn = TscnWriter.Write(layout);
         Assert.DoesNotContain("Ground", tscn);
     }
+
+    [Fact]
+    public void Write_ForegroundShape_EmitsMetricLabel()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("Load", "Load", Vec3.Zero, null, null, null,
+                [new PlacedShape("Load_1m", ShapeType.Bar, new Vec3(0, 0, 0),
+                    "kernel.all.load", "1 minute", "1m",
+                    new RgbColour(0.388f, 0.400f, 0.945f),
+                    0f, 10f, 0.2f, 5.0f)])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("[node name=\"Load_1mLabel\" type=\"Label3D\" parent=\"Load\"]", tscn);
+        Assert.Contains("text = \"1m\"", tscn);
+    }
 }
