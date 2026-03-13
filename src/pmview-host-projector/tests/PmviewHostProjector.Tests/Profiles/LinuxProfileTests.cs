@@ -1,0 +1,126 @@
+using Xunit;
+using PmviewHostProjector.Models;
+using PmviewHostProjector.Profiles;
+
+namespace PmviewHostProjector.Tests.Profiles;
+
+public class LinuxProfileTests
+{
+    private readonly IReadOnlyList<ZoneDefinition> _zones = LinuxProfile.GetZones();
+
+    [Fact]
+    public void GetZones_ReturnsFourForegroundZones()
+    {
+        var foreground = _zones.Where(z => z.Row == ZoneRow.Foreground).ToList();
+        Assert.Equal(4, foreground.Count);
+    }
+
+    [Fact]
+    public void GetZones_ReturnsFourBackgroundZones()
+    {
+        var background = _zones.Where(z => z.Row == ZoneRow.Background).ToList();
+        Assert.Equal(4, background.Count);
+    }
+
+    [Fact]
+    public void GetZones_ForegroundOrder_IsDiskLoadMemoryCpu()
+    {
+        var names = _zones.Where(z => z.Row == ZoneRow.Foreground).Select(z => z.Name).ToList();
+        Assert.Equal(new[] { "Disk", "Load", "Memory", "CPU" }, names);
+    }
+
+    [Fact]
+    public void GetZones_BackgroundOrder_IsPerCpuPerDiskNetInNetOut()
+    {
+        var names = _zones.Where(z => z.Row == ZoneRow.Background).Select(z => z.Name).ToList();
+        Assert.Equal(new[] { "Per-CPU", "Per-Disk", "Network In", "Network Out" }, names);
+    }
+
+    [Fact]
+    public void CpuZone_HasThreeBarsWithCorrectMetrics()
+    {
+        var cpu = _zones.Single(z => z.Name == "CPU");
+        Assert.Equal(3, cpu.Metrics.Count);
+        Assert.All(cpu.Metrics, m => Assert.Equal(ShapeType.Bar, m.Shape));
+        var names = cpu.Metrics.Select(m => m.MetricName).ToList();
+        Assert.Contains("kernel.all.cpu.user", names);
+        Assert.Contains("kernel.all.cpu.sys", names);
+        Assert.Contains("kernel.all.cpu.nice", names);
+    }
+
+    [Fact]
+    public void CpuZone_SourceRange_IsZeroToHundred()
+    {
+        var cpu = _zones.Single(z => z.Name == "CPU");
+        Assert.All(cpu.Metrics, m => { Assert.Equal(0f, m.SourceRangeMin); Assert.Equal(100f, m.SourceRangeMax); });
+    }
+
+    [Fact]
+    public void CpuZone_TargetRange_IsPointTwoToFive()
+    {
+        var cpu = _zones.Single(z => z.Name == "CPU");
+        Assert.All(cpu.Metrics, m => { Assert.Equal(0.2f, m.TargetRangeMin); Assert.Equal(5.0f, m.TargetRangeMax); });
+    }
+
+    [Fact]
+    public void LoadZone_HasThreeBarsWithInstanceNames()
+    {
+        var load = _zones.Single(z => z.Name == "Load");
+        Assert.Equal(3, load.Metrics.Count);
+        var instanceNames = load.Metrics.Select(m => m.InstanceName).ToList();
+        Assert.Equal(new[] { "1 minute", "5 minute", "15 minute" }, instanceNames);
+    }
+
+    [Fact]
+    public void DiskTotalsZone_HasTwoCylinders()
+    {
+        var disk = _zones.Single(z => z.Name == "Disk");
+        Assert.Equal(2, disk.Metrics.Count);
+        Assert.All(disk.Metrics, m => Assert.Equal(ShapeType.Cylinder, m.Shape));
+    }
+
+    [Fact]
+    public void MemoryZone_HasZeroSourceRangeMax_AutoDetectedAtRuntime()
+    {
+        var mem = _zones.Single(z => z.Name == "Memory");
+        Assert.All(mem.Metrics, m => Assert.Equal(0f, m.SourceRangeMax));
+    }
+
+    [Fact]
+    public void BackgroundZones_HaveInstanceMetricSource()
+    {
+        var background = _zones.Where(z => z.Row == ZoneRow.Background);
+        Assert.All(background, z => Assert.NotNull(z.InstanceMetricSource));
+    }
+
+    [Fact]
+    public void ForegroundZones_HaveNoInstanceMetricSource()
+    {
+        var foreground = _zones.Where(z => z.Row == ZoneRow.Foreground);
+        Assert.All(foreground, z => Assert.Null(z.InstanceMetricSource));
+    }
+
+    [Fact]
+    public void PerCpuZone_InstanceSource_IsKernelPercpuCpuUser()
+    {
+        var perCpu = _zones.Single(z => z.Name == "Per-CPU");
+        Assert.Equal("kernel.percpu.cpu.user", perCpu.InstanceMetricSource);
+    }
+
+    [Fact]
+    public void NetworkInZone_HasThreeMetrics_BytesPktsErrors()
+    {
+        var netIn = _zones.Single(z => z.Name == "Network In");
+        Assert.Equal(3, netIn.Metrics.Count);
+        Assert.Equal("network.interface.in.bytes", netIn.InstanceMetricSource);
+    }
+
+    [Fact]
+    public void NetworkOutZone_ErrorMetric_IsRed()
+    {
+        var netOut = _zones.Single(z => z.Name == "Network Out");
+        var errors = netOut.Metrics.Single(m => m.MetricName.Contains("errors"));
+        var red = RgbColour.FromHex("#ef4444");
+        Assert.Equal(red.R, errors.DefaultColour.R, 0.01f);
+    }
+}
