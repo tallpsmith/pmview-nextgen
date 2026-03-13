@@ -224,7 +224,36 @@ public class TscnWriterTests
                 GroundWidth: 2.0f, GroundDepth: 2.0f)
         ]);
         var tscn = TscnWriter.Write(layout);
-        Assert.Contains("albedo_color = Color(0.15, 0.15, 0.15, 1)", tscn);
+        Assert.Contains("albedo_color = Color(0.3, 0.3, 0.3, 1)", tscn);
+    }
+
+    [Fact]
+    public void Write_ZoneNameWithInvalidIdChars_BezelSubResourceIdsAreSanitised()
+    {
+        // "Per-CPU" and "Network In" are real zone names — hyphens and spaces are invalid in Godot resource IDs.
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("Per-CPU", "Per-CPU", Vec3.Zero, null, null, null,
+                [new PlacedShape("PerCPU_User", ShapeType.Bar, Vec3.Zero,
+                    "kernel.percpu.cpu.user", null, null,
+                    new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f)],
+                GroundWidth: 5f, GroundDepth: 2f),
+            new PlacedZone("Network In", "Network In", Vec3.Zero, null, null, null,
+                [new PlacedShape("NetworkIn_Bytes", ShapeType.Bar, Vec3.Zero,
+                    "network.interface.in.bytes", null, null,
+                    new RgbColour(0.231f, 0.510f, 0.965f), 0f, 125_000_000f, 0.2f, 5.0f)],
+                GroundWidth: 2f, GroundDepth: 2f),
+        ]);
+        var tscn = TscnWriter.Write(layout);
+
+        Assert.DoesNotContain("bezel_mesh_Per-CPU",   tscn);
+        Assert.DoesNotContain("bezel_mat_Per-CPU",    tscn);
+        Assert.DoesNotContain("bezel_mesh_Network In", tscn);
+        Assert.DoesNotContain("bezel_mat_Network In",  tscn);
+
+        Assert.Contains("bezel_mesh_Per_CPU",    tscn);
+        Assert.Contains("bezel_mat_Per_CPU",     tscn);
+        Assert.Contains("bezel_mesh_Network_In", tscn);
+        Assert.Contains("bezel_mat_Network_In",  tscn);
     }
 
     [Fact]
@@ -290,5 +319,30 @@ public class TscnWriterTests
         var tscn = TscnWriter.Write(layout);
         Assert.Contains("text = \"cpu0\"", tscn);
         Assert.Contains("text = \"cpu1\"", tscn);
+    }
+
+    [Fact]
+    public void Write_GridZone_ColumnHeaders_AreAtBackEdge_BeyondLastRow()
+    {
+        // 2 instances, rowSpacing=2.0 → back edge Z = -(2-1)*2.0 - 1.0 = -3.0
+        // 3 metrics, colSpacing=1.5 → columns at X = 0, 1.5, 3.0
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("Per_CPU", "Per-CPU", Vec3.Zero,
+                3, 1.5f, 2.0f,
+                [new PlacedShape("s1", ShapeType.Bar, Vec3.Zero,
+                    "kernel.percpu.cpu.user", "cpu0", "cpu0",
+                    new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f)],
+                GroundWidth: 5f, GroundDepth: 8f,
+                MetricLabels: ["User", "Sys", "Nice"],
+                InstanceLabels: ["cpu0", "cpu1"])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+
+        // X=0, Z=-3 for User; X=1.5, Z=-3 for Sys; X=3, Z=-3 for Nice
+        Assert.Contains("0, 0.01, -3", tscn);
+        Assert.Contains("1.5, 0.01, -3", tscn);
+        Assert.Contains("3, 0.01, -3", tscn);
+        // Confirm old inside-bezel position is gone
+        Assert.DoesNotContain("0.01, -0.8)", tscn);
     }
 }
