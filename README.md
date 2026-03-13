@@ -77,11 +77,14 @@ dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- \
   --pmproxy http://localhost:44322 \
   -o godot-project/scenes/host_view.tscn
 
-# Or generate into your own Godot project (installs the addon automatically)
+# Or generate into your own Godot project:
+# 1. Create the project in Godot, then Project → Tools → C# → Create C# Solution
+# 2. Run the projector (builds + bundles DLLs, installs addon, patches .csproj)
 dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- \
   --pmproxy http://localhost:44322 \
   --install-addon \
   -o /path/to/my-godot-project/scenes/host_view.tscn
+# 3. Open in Godot, Build (Ctrl+B), enable plugin in Project Settings → Plugins
 
 # Open the Godot project, build C# assemblies, and run the scene
 dotnet build godot-project/pmview-nextgen.sln
@@ -126,13 +129,20 @@ At runtime, **SceneBinder** discovers all PcpBindable nodes in the scene and wir
 
 The generated scene references resources from the `pmview-bridge` addon (`addons/pmview-bridge/`), so **the target Godot project must have the addon installed**. Use `--install-addon` to copy it automatically, or generate into `godot-project/` which already has it.
 
+When using `--install-addon` with an external Godot project, the projector:
+1. Builds `PcpClient.dll`, `PcpGodotBridge.dll`, and `Tomlyn.dll` from source
+2. Bundles them into `addons/pmview-bridge/lib/` in the target project
+3. Patches the target `.csproj` with `<Reference>` entries pointing at the bundled DLLs
+
+**Important:** Create the C# solution in Godot first (Project → Tools → C# → Create C# Solution) so there's a `.csproj` to patch.
+
 ```bash
 # Generate into the included Godot project (addon already installed)
 dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- \
   --pmproxy http://localhost:44322 \
   -o godot-project/scenes/host_view.tscn
 
-# Generate into your own Godot project, installing the addon
+# Generate into your own Godot project (builds DLLs, installs addon, patches .csproj)
 dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- \
   --pmproxy http://myserver:44322 \
   --install-addon \
@@ -170,6 +180,7 @@ pmview-nextgen/
 ├── godot-project/                      # Godot 4.4 project
 │   ├── addons/pmview-bridge/           # Self-contained addon (copy this dir to install)
 │   │   ├── *.cs                        # Bridge plugin (Poller, Binder, Bindable, Inspector)
+│   │   ├── lib/                        # Bundled DLLs (built by projector --install-addon)
 │   │   └── building_blocks/            # GroundedBar/Cylinder, GridLayout3D, ZoneLabel
 │   ├── scenes/                         # .tscn scene files
 │   ├── scripts/

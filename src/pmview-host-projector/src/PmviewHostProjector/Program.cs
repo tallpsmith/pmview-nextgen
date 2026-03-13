@@ -35,8 +35,27 @@ public class Program
                     return 1;
                 }
 
-                AddonInstaller.CopyAddonTo(addonSource, godotRoot);
+                // Build library DLLs and stage them in the addon source's lib/ directory
+                var repoRoot = LibraryBuilder.FindRepoRoot(AppContext.BaseDirectory);
+                if (repoRoot == null)
+                {
+                    Console.Error.WriteLine("Error: Cannot find repo root to build libraries.");
+                    return 1;
+                }
+
+                var addonLibDir = Path.Combine(addonSource, "lib");
+                Console.WriteLine("Building PcpClient and PcpGodotBridge libraries...");
+                LibraryBuilder.PublishLibraries(repoRoot, addonLibDir);
+
+                // Copy addon (with DLLs) and patch target .csproj
+                AddonInstaller.InstallAddonWithLibraries(addonSource, godotRoot);
                 Console.WriteLine($"Addon installed to: {Path.Combine(godotRoot, "addons", "pmview-bridge")}");
+
+                var csprojPath = CsprojPatcher.FindTargetCsproj(godotRoot);
+                if (csprojPath != null)
+                    Console.WriteLine($"Patched {Path.GetFileName(csprojPath)} with library references");
+                else
+                    Console.WriteLine("Warning: No .csproj found — create C# solution in Godot first, then re-run with --install-addon");
             }
 
             await using var pcpClient = new PcpClientConnection(new Uri(pmproxyUrl));

@@ -112,4 +112,68 @@ public class AddonInstallerTests : IDisposable
 
         Assert.Equal("version=2", File.ReadAllText(Path.Combine(existingAddon, "plugin.cfg")));
     }
+
+    [Fact]
+    public void InstallAddon_CopiesLibDirectoryWithDlls()
+    {
+        var sourceDir = Path.Combine(_tempDir, "source-addon");
+        Directory.CreateDirectory(sourceDir);
+        File.WriteAllText(Path.Combine(sourceDir, "plugin.cfg"), "[plugin]");
+
+        var libDir = Path.Combine(sourceDir, "lib");
+        Directory.CreateDirectory(libDir);
+        File.WriteAllText(Path.Combine(libDir, "PcpClient.dll"), "fake-dll");
+        File.WriteAllText(Path.Combine(libDir, "PcpGodotBridge.dll"), "fake-dll");
+
+        var targetRoot = Path.Combine(_tempDir, "target-project");
+        Directory.CreateDirectory(targetRoot);
+
+        AddonInstaller.CopyAddonTo(sourceDir, targetRoot);
+
+        var targetLib = Path.Combine(targetRoot, "addons", "pmview-bridge", "lib");
+        Assert.True(File.Exists(Path.Combine(targetLib, "PcpClient.dll")));
+        Assert.True(File.Exists(Path.Combine(targetLib, "PcpGodotBridge.dll")));
+    }
+
+    [Fact]
+    public void InstallAddonWithLibraries_EndToEnd()
+    {
+        // Set up a fake addon source
+        var sourceDir = Path.Combine(_tempDir, "source-addon");
+        Directory.CreateDirectory(sourceDir);
+        File.WriteAllText(Path.Combine(sourceDir, "plugin.cfg"), "[plugin]");
+        File.WriteAllText(Path.Combine(sourceDir, "MetricPoller.cs"), "using PcpClient;");
+
+        // Set up fake pre-built DLLs
+        var libDir = Path.Combine(sourceDir, "lib");
+        Directory.CreateDirectory(libDir);
+        File.WriteAllText(Path.Combine(libDir, "PcpClient.dll"), "fake");
+        File.WriteAllText(Path.Combine(libDir, "PcpGodotBridge.dll"), "fake");
+        File.WriteAllText(Path.Combine(libDir, "Tomlyn.dll"), "fake");
+
+        // Set up a fake Godot project with a csproj
+        var targetRoot = Path.Combine(_tempDir, "target-project");
+        Directory.CreateDirectory(targetRoot);
+        File.WriteAllText(Path.Combine(targetRoot, "project.godot"), "");
+        File.WriteAllText(Path.Combine(targetRoot, "MyProject.csproj"), """
+            <Project Sdk="Godot.NET.Sdk/4.6.1">
+              <PropertyGroup>
+                <TargetFramework>net8.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        AddonInstaller.InstallAddonWithLibraries(sourceDir, targetRoot);
+
+        // Addon files copied
+        Assert.True(File.Exists(Path.Combine(
+            targetRoot, "addons", "pmview-bridge", "plugin.cfg")));
+        // DLLs copied
+        Assert.True(File.Exists(Path.Combine(
+            targetRoot, "addons", "pmview-bridge", "lib", "PcpClient.dll")));
+        // Csproj patched
+        var csprojContent = File.ReadAllText(Path.Combine(targetRoot, "MyProject.csproj"));
+        Assert.Contains("Include=\"PcpClient\"", csprojContent);
+        Assert.Contains("addons/pmview-bridge/lib/PcpClient.dll", csprojContent);
+    }
 }

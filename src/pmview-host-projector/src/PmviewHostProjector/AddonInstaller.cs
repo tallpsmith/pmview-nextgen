@@ -50,6 +50,13 @@ public static class AddonInstaller
         return null;
     }
 
+    private static readonly string[] BundledDllNames =
+    {
+        "PcpClient",
+        "PcpGodotBridge",
+        "Tomlyn",
+    };
+
     /// <summary>
     /// Copies the addon source directory into the target Godot project's
     /// addons/pmview-bridge/ directory, overwriting existing files.
@@ -58,6 +65,20 @@ public static class AddonInstaller
     {
         var targetDir = Path.Combine(godotProjectRoot, "addons", AddonDirName);
         CopyDirectoryRecursive(addonSourceDir, targetDir);
+    }
+
+    /// <summary>
+    /// Full addon installation: copies addon files (including lib/ DLLs)
+    /// and patches the target project's .csproj with assembly references.
+    /// Assumes DLLs are already staged in addonSourceDir/lib/.
+    /// </summary>
+    public static void InstallAddonWithLibraries(string addonSourceDir, string godotProjectRoot)
+    {
+        CopyAddonTo(addonSourceDir, godotProjectRoot);
+
+        var csprojPath = CsprojPatcher.FindTargetCsproj(godotProjectRoot);
+        if (csprojPath != null)
+            CsprojPatcher.AddLibraryReferences(csprojPath, BundledDllNames);
     }
 
     private static void CopyDirectoryRecursive(string sourceDir, string targetDir)
