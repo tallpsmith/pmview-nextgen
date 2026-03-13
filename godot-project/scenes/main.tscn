@@ -1,11 +1,8 @@
-[gd_scene load_steps=7 format=3 uid="uid://main_scene"]
+[gd_scene load_steps=4 format=3 uid="uid://main_scene"]
 
 [ext_resource type="Script" path="res://scripts/scenes/metric_scene_controller.gd" id="1_controller"]
 [ext_resource type="Script" path="res://addons/pmview-bridge/MetricPoller.cs" id="2_poller"]
 [ext_resource type="Script" path="res://addons/pmview-bridge/SceneBinder.cs" id="3_binder"]
-[ext_resource type="Script" path="res://addons/pmview-bridge/MetricBrowser.cs" id="4_browser"]
-[ext_resource type="PackedScene" path="res://scenes/metric_browser.tscn" id="5_browser_ui"]
-[ext_resource type="PackedScene" path="res://scenes/playback_controls.tscn" id="6_playback_ui"]
 
 [node name="Main" type="Node"]
 script = ExtResource("1_controller")
@@ -16,9 +13,6 @@ script = ExtResource("2_poller")
 [node name="SceneBinder" type="Node" parent="."]
 script = ExtResource("3_binder")
 
-[node name="MetricBrowser" type="Node" parent="."]
-script = ExtResource("4_browser")
-
 [node name="UIOverlay" type="CanvasLayer" parent="."]
 
 [node name="StatusLabel" type="Label" parent="UIOverlay"]
@@ -27,9 +21,3 @@ offset_top = 10.0
 offset_right = 400.0
 offset_bottom = 40.0
 text = "Connection: Disconnected"
-
-[node name="MetricBrowser" parent="UIOverlay" instance=ExtResource("5_browser_ui")]
-visible = false
-
-[node name="PlaybackControls" parent="UIOverlay" instance=ExtResource("6_playback_ui")]
-visible = false

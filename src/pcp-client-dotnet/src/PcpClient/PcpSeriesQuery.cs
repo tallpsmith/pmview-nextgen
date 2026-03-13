@@ -164,6 +164,69 @@ public static class PcpSeriesQuery
         return results;
     }
 
+    public static IReadOnlyList<SeriesDescriptor> ParseDescsResponse(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var results = new List<SeriesDescriptor>();
+        foreach (var item in doc.RootElement.EnumerateArray())
+        {
+            var seriesId = item.GetProperty("series").GetString()!;
+            var pmid = item.TryGetProperty("pmid", out var p) ? p.GetString() : null;
+            var indom = item.TryGetProperty("indom", out var i) ? i.GetString() : null;
+            var semantics = item.TryGetProperty("semantics", out var s) ? s.GetString() : null;
+            var type = item.TryGetProperty("type", out var t) ? t.GetString() : null;
+            var units = item.TryGetProperty("units", out var u) ? u.GetString() : null;
+            results.Add(new SeriesDescriptor(seriesId, pmid, indom, semantics, type, units));
+        }
+        return results;
+    }
+
+    public static Uri BuildDescsUrl(Uri baseUrl, IEnumerable<string> seriesIds)
+    {
+        var ids = string.Join(",", seriesIds);
+        return new Uri(baseUrl, $"/series/descs?series={Uri.EscapeDataString(ids)}");
+    }
+
+    public static IReadOnlyList<SeriesMetricName> ParseMetricsResponse(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var results = new List<SeriesMetricName>();
+        foreach (var item in doc.RootElement.EnumerateArray())
+        {
+            var seriesId = item.GetProperty("series").GetString()!;
+            var name = item.GetProperty("name").GetString()!;
+            results.Add(new SeriesMetricName(seriesId, name));
+        }
+        return results;
+    }
+
+    public static Uri BuildMetricsUrl(Uri baseUrl, IEnumerable<string> seriesIds)
+    {
+        var ids = string.Join(",", seriesIds);
+        return new Uri(baseUrl, $"/series/metrics?series={Uri.EscapeDataString(ids)}");
+    }
+
+    public static IReadOnlyList<string> ParseLabelsResponse(string json, string labelName)
+    {
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty(labelName, out var values))
+            return Array.Empty<string>();
+
+        var results = new List<string>();
+        foreach (var item in values.EnumerateArray())
+        {
+            var val = item.GetString();
+            if (val != null)
+                results.Add(val);
+        }
+        return results;
+    }
+
+    public static Uri BuildLabelsUrl(Uri baseUrl, string labelName)
+    {
+        return new Uri(baseUrl, $"/series/labels?names={Uri.EscapeDataString(labelName)}");
+    }
+
     private static double ToEpochSeconds(DateTime utcTime)
     {
         return ((DateTimeOffset)utcTime).ToUnixTimeMilliseconds() / 1000.0;
@@ -175,6 +238,24 @@ public static class PcpSeriesQuery
 /// the numeric PCP instance ID and its human-readable name.
 /// </summary>
 public record SeriesInstanceInfo(int PcpInstanceId, string Name);
+
+/// <summary>
+/// Maps a series ID to its PCP metric name from a /series/metrics response.
+/// </summary>
+public record SeriesMetricName(string SeriesId, string Name);
+
+/// <summary>
+/// Metric descriptor from a /series/descs response: PMID, instance domain,
+/// semantics, value type, and units. All fields except SeriesId are optional
+/// — pmproxy may omit them for metrics without instances or units.
+/// </summary>
+public record SeriesDescriptor(
+    string SeriesId,
+    string? Pmid,
+    string? Indom,
+    string? Semantics,
+    string? Type,
+    string? Units);
 
 /// <summary>
 /// A single timestamped value from a historical series query.

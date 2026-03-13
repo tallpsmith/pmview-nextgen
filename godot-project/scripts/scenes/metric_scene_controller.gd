@@ -1,20 +1,14 @@
 extends Node
 
 ## Main scene controller: wires MetricPoller signals to SceneBinder.
-## Displays connection status overlay. Auto-loads default config on start.
-## Toggle metric browser with F2, playback controls with F3.
+## Displays connection status overlay. Loads scenes with editor-integrated bindings.
 
-@export var default_config: String = "res://bindings/test_bars.toml"
+@export var default_scene: String = "res://scenes/test_bars.tscn"
 
 @onready var metric_poller: Node = $MetricPoller
 @onready var scene_binder: Node = $SceneBinder
-@onready var metric_browser_bridge: Node = $MetricBrowser
 @onready var status_label: Label = $UIOverlay/StatusLabel
-@onready var metric_browser_ui: Control = $UIOverlay/MetricBrowser
-@onready var playback_controls_ui: Control = $UIOverlay/PlaybackControls
 
-var _configs: Array[String] = []
-var _current_config_index: int = -1
 var _connection_state: String = "Disconnected"
 
 # World configuration from ProjectSettings (set by pmview-bridge plugin)
@@ -29,80 +23,36 @@ func _ready() -> void:
 	metric_poller.connect("MetricsUpdated", _on_metrics_updated)
 	metric_poller.connect("ConnectionStateChanged", _on_connection_state_changed)
 	metric_poller.connect("ErrorOccurred", _on_error_occurred)
-	metric_poller.connect("PlaybackPositionChanged", _on_playback_position_changed)
-	scene_binder.connect("SceneLoaded", _on_scene_loaded)
 	scene_binder.connect("BindingError", _on_binding_error)
 
-	# Wire metric browser: when a metric is chosen, add it to the poller
-	if metric_browser_ui:
-		metric_browser_ui.connect("metric_chosen", _on_metric_chosen)
-		metric_browser_ui.visible = false
-
-	# Hide playback controls by default
-	if playback_controls_ui:
-		playback_controls_ui.visible = false
-
 	_update_status_display()
-	_scan_configs()
 
-	# Auto-load the default binding config
-	if default_config != "":
-		print("[MetricSceneController] Auto-loading config: %s" % default_config)
-		_current_config_index = _configs.find(default_config)
-		load_config(default_config)
+	# Load scene with editor-integrated bindings
+	if default_scene != "":
+		print("[MetricSceneController] Loading scene: %s" % default_scene)
+		var metric_names = _load_scene_with_properties(default_scene)
+		if metric_names.size() > 0:
+			print("[MetricSceneController] Found %d metrics from scene properties" % metric_names.size())
+			_start_polling_metrics(metric_names)
+		else:
+			print("[MetricSceneController] No bindings found in scene: %s" % default_scene)
 
 	_apply_launch_settings()
 
-func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_TAB:
-			_cycle_config()
-		elif event.keycode == KEY_F2:
-			_toggle_metric_browser()
-		elif event.keycode == KEY_F3:
-			_toggle_playback_controls()
+func _load_scene_with_properties(scene_path: String) -> PackedStringArray:
+	var packed = load(scene_path) as PackedScene
+	if packed == null:
+		print("[MetricSceneController] Cannot load scene: %s" % scene_path)
+		return PackedStringArray()
+	var scene_instance = packed.instantiate()
+	scene_binder.add_child(scene_instance)
+	var metric_names = scene_binder.call("BindFromSceneProperties", scene_instance)
+	return metric_names
 
-func _scan_configs() -> void:
-	_configs.clear()
-	var dir = DirAccess.open("res://bindings")
-	if dir == null:
-		return
-	dir.list_dir_begin()
-	var file_name = dir.get_next()
-	while file_name != "":
-		if file_name.ends_with(".toml"):
-			_configs.append("res://bindings/%s" % file_name)
-		file_name = dir.get_next()
-	dir.list_dir_end()
-	_configs.sort()
-	print("[MetricSceneController] Found %d configs: %s" % [_configs.size(), _configs])
-
-func _cycle_config() -> void:
-	if _configs.is_empty():
-		return
-	_current_config_index = (_current_config_index + 1) % _configs.size()
-	var path = _configs[_current_config_index]
-	print("[MetricSceneController] Switching to config: %s" % path)
-	load_config(path)
-
-func load_config(config_path: String) -> void:
-	print("[MetricSceneController] Loading config: %s" % config_path)
-	metric_poller.call("StopPolling")
-	var metric_names = scene_binder.call("LoadSceneWithBindings", config_path)
-	print("[MetricSceneController] Metrics to poll: %s" % [metric_names])
+func _start_polling_metrics(metric_names: PackedStringArray) -> void:
 	if metric_names.size() > 0:
 		metric_poller.call("UpdateMetricNames", metric_names)
-		var config = scene_binder.get("CurrentConfig")
-		if config != null:
-			var endpoint = config.Endpoint
-			var poll_ms = config.PollIntervalMs
-			if endpoint != null and endpoint != "":
-				print("[MetricSceneController] Using endpoint from config: %s" % endpoint)
-				metric_poller.call("UpdateEndpoint", endpoint, poll_ms)
-			else:
-				metric_poller.call("StartPolling")
-		else:
-			metric_poller.call("StartPolling")
+		metric_poller.call("StartPolling")
 
 func _on_metrics_updated(metrics: Dictionary) -> void:
 	scene_binder.call("ApplyMetrics", metrics)
@@ -112,47 +62,12 @@ func _on_connection_state_changed(state: String) -> void:
 	print("[MetricSceneController] Connection state: %s" % state)
 	_update_status_display()
 
-	# Tell the C# MetricBrowser to grab the client from MetricPoller
-	if state == "Connected" and metric_browser_bridge:
-		metric_browser_bridge.call("ConnectToPoller", metric_poller)
-
 func _on_error_occurred(message: String) -> void:
 	print("[MetricSceneController] Error: %s" % message)
 	_update_status_display()
 
-func _on_scene_loaded(scene_path: String, config_path: String) -> void:
-	print("[MetricSceneController] Scene loaded: %s with config %s" % [scene_path, config_path])
-	# Replay cached values so new bindings get data immediately (no stale defaults)
-	metric_poller.call("ReplayLastMetrics")
-
 func _on_binding_error(message: String) -> void:
 	print("[MetricSceneController] Binding error: %s" % message)
-
-func _on_metric_chosen(metric_name: String) -> void:
-	print("[MetricSceneController] Metric chosen from browser: %s" % metric_name)
-	# Add the chosen metric to the current polling set
-	var current_names: Array = Array(metric_poller.get("MetricNames"))
-	if metric_name not in current_names:
-		current_names.append(metric_name)
-		metric_poller.call("UpdateMetricNames", PackedStringArray(current_names))
-		print("[MetricSceneController] Now polling: %s" % [current_names])
-
-func _on_playback_position_changed(position: String, mode: String) -> void:
-	if playback_controls_ui:
-		playback_controls_ui.call("update_position", position)
-		playback_controls_ui.call("update_mode", mode)
-
-func _toggle_metric_browser() -> void:
-	if metric_browser_ui:
-		metric_browser_ui.visible = not metric_browser_ui.visible
-		print("[MetricSceneController] Metric browser: %s" % (
-			"shown" if metric_browser_ui.visible else "hidden"))
-
-func _toggle_playback_controls() -> void:
-	if playback_controls_ui:
-		playback_controls_ui.visible = not playback_controls_ui.visible
-		print("[MetricSceneController] Playback controls: %s" % (
-			"shown" if playback_controls_ui.visible else "hidden"))
 
 func _read_launch_settings() -> void:
 	_launch_endpoint = ProjectSettings.get_setting("pmview/endpoint", "http://localhost:44322")
@@ -172,7 +87,7 @@ func _apply_launch_settings() -> void:
 	if _launch_mode == 0:  # Archive
 		var timestamp = _launch_timestamp
 		if timestamp == "":
-			# Empty timestamp → 24 hours before now
+			# Empty timestamp -> 24 hours before now
 			var now = Time.get_unix_time_from_system()
 			var day_ago = now - 86400.0
 			timestamp = Time.get_datetime_string_from_unix_time(int(day_ago)) + "Z"

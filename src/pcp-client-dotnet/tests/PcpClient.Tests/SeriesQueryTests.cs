@@ -576,4 +576,137 @@ public class SeriesQueryTests
         // (337467969 - 337462033) / 60 = 5936 / 60 = 98.93/sec
         Assert.Equal(98.9, rates[0].NumericValue, precision: 0);
     }
+
+    // ── PcpSeriesQuery.ParseDescsResponse — metric descriptor extraction ──
+
+    [Fact]
+    public void ParseDescsResponse_ReturnsDescriptors()
+    {
+        var json = """
+        [
+            {
+                "series": "abc123",
+                "pmid": "60.0.32",
+                "indom": "60.1",
+                "semantics": "counter",
+                "type": "u64",
+                "units": "Kbyte / sec"
+            }
+        ]
+        """;
+        var result = PcpSeriesQuery.ParseDescsResponse(json);
+        Assert.Single(result);
+        Assert.Equal("abc123", result[0].SeriesId);
+        Assert.Equal("60.0.32", result[0].Pmid);
+        Assert.Equal("60.1", result[0].Indom);
+        Assert.Equal("counter", result[0].Semantics);
+        Assert.Equal("u64", result[0].Type);
+        Assert.Equal("Kbyte / sec", result[0].Units);
+    }
+
+    [Fact]
+    public void ParseDescsResponse_MissingOptionalFields_ReturnsNulls()
+    {
+        var json = """
+        [
+            {
+                "series": "abc123",
+                "semantics": "instant",
+                "type": "float"
+            }
+        ]
+        """;
+        var result = PcpSeriesQuery.ParseDescsResponse(json);
+        Assert.Single(result);
+        Assert.Null(result[0].Pmid);
+        Assert.Null(result[0].Indom);
+        Assert.Null(result[0].Units);
+    }
+
+    [Fact]
+    public void ParseDescsResponse_EmptyArray_ReturnsEmpty()
+    {
+        var json = "[]";
+        var result = PcpSeriesQuery.ParseDescsResponse(json);
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void BuildDescsUrl_FormatsSeriesIds()
+    {
+        var url = PcpSeriesQuery.BuildDescsUrl(
+            new Uri("http://localhost:44322"),
+            new[] { "abc123", "def456" });
+        var urlStr = url.ToString();
+        Assert.Contains("/series/descs", urlStr);
+        Assert.Contains("abc123", urlStr);
+    }
+
+    // ── PcpSeriesQuery.ParseMetricsResponse — series-to-metric-name mapping ──
+
+    [Fact]
+    public void ParseMetricsResponse_ReturnsSeriesMetricNames()
+    {
+        var json = """
+        [
+            {"series": "abc123", "name": "disk.dev.read"},
+            {"series": "def456", "name": "disk.dev.write"}
+        ]
+        """;
+        var result = PcpSeriesQuery.ParseMetricsResponse(json);
+        Assert.Equal(2, result.Count);
+        Assert.Equal("abc123", result[0].SeriesId);
+        Assert.Equal("disk.dev.read", result[0].Name);
+        Assert.Equal("def456", result[1].SeriesId);
+        Assert.Equal("disk.dev.write", result[1].Name);
+    }
+
+    [Fact]
+    public void ParseMetricsResponse_EmptyArray_ReturnsEmpty()
+    {
+        var json = "[]";
+        var result = PcpSeriesQuery.ParseMetricsResponse(json);
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void BuildMetricsUrl_FormatsSeriesIds()
+    {
+        var url = PcpSeriesQuery.BuildMetricsUrl(
+            new Uri("http://localhost:44322"),
+            new[] { "abc123", "def456" });
+        var urlStr = url.ToString();
+        Assert.Contains("/series/metrics", urlStr);
+        Assert.Contains("abc123", urlStr);
+        Assert.Contains("def456", urlStr);
+    }
+
+    // ── PcpSeriesQuery.ParseLabelsResponse — label value extraction ──
+
+    [Fact]
+    public void ParseLabelsResponse_ReturnsLabelValues()
+    {
+        var json = """{"hostname": ["app", "nas", "webserver01"]}""";
+        var result = PcpSeriesQuery.ParseLabelsResponse(json, "hostname");
+        Assert.Equal(3, result.Count);
+        Assert.Contains("app", result);
+        Assert.Contains("nas", result);
+        Assert.Contains("webserver01", result);
+    }
+
+    [Fact]
+    public void ParseLabelsResponse_EmptyValues_ReturnsEmpty()
+    {
+        var json = """{"hostname": []}""";
+        var result = PcpSeriesQuery.ParseLabelsResponse(json, "hostname");
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void ParseLabelsResponse_MissingLabel_ReturnsEmpty()
+    {
+        var json = """{"otherlabel": ["value1"]}""";
+        var result = PcpSeriesQuery.ParseLabelsResponse(json, "hostname");
+        Assert.Empty(result);
+    }
 }

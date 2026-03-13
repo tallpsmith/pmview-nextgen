@@ -4,21 +4,16 @@ using PcpGodotBridge;
 namespace PmviewNextgen.Bridge;
 
 /// <summary>
-/// Loads scene+binding config pairs and applies metric values to scene nodes.
+/// Discovers PcpBindable nodes in scenes, resolves bindings, and applies
+/// metric values to scene node properties at runtime.
 /// Validates properties against real nodes at scene load time.
-/// Supports scene swapping at runtime (US03).
 /// </summary>
 public partial class SceneBinder : Node
 {
 	[Signal]
-	public delegate void SceneLoadedEventHandler(string scenePath, string configPath);
-
-	[Signal]
 	public delegate void BindingErrorEventHandler(string message);
 
 	private Node? _currentScene;
-	private string? _currentConfigPath;
-	private BindingConfig? _currentConfig;
 	private readonly List<ActiveBinding> _activeBindings = new();
 	private readonly Dictionary<Node3D, float> _rotationSpeeds = new();
 
@@ -30,7 +25,6 @@ public partial class SceneBinder : Node
 		ResolvedBinding Resolved,
 		Node TargetNode);
 
-	public BindingConfig? CurrentConfig => _currentConfig;
 	public int ActiveBindingCount => _activeBindings.Count;
 	private readonly Dictionary<string, List<Node3D>> _instanceNodes = new();
 
@@ -44,50 +38,50 @@ public partial class SceneBinder : Node
 	}
 
 	/// <summary>
-	/// Load a scene and its binding config. Replaces any currently loaded scene.
-	/// Returns the list of metric names needed for polling.
+	/// Discovers PcpBindable nodes in the scene tree, reads their binding resources,
+	/// resolves and validates against real nodes, applies initial values.
+	/// Returns distinct metric names needed for polling.
 	/// </summary>
-	public string[] LoadSceneWithBindings(string configPath)
+	public string[] BindFromSceneProperties(Node sceneRoot)
 	{
-		UnloadCurrentScene();
+		_activeBindings.Clear();
+		_rotationSpeeds.Clear();
+		_currentScene = sceneRoot;
 
-		// Phase 1: Config validation (pure .NET)
-		// Resolve Godot res:// paths to filesystem paths for .NET File I/O
-		var resolvedPath = configPath.StartsWith("res://")
-			? ProjectSettings.GlobalizePath(configPath)
-			: configPath;
-		var configResult = BindingConfigLoader.LoadFromFile(resolvedPath);
-		LogConfigResult(configResult);
+		var metricNames = new HashSet<string>();
+		var bindableNodes = new List<PcpBindable>();
 
-		if (!configResult.IsValid)
+		FindBindableNodes(sceneRoot, bindableNodes);
+
+		foreach (var bindable in bindableNodes)
 		{
-			EmitSignal(SignalName.BindingError, "Config validation failed — see log");
-			return [];
+			var ownerNode = bindable.GetParent();
+			if (ownerNode == null) continue;
+
+			foreach (var bindingResource in bindable.PcpBindings)
+			{
+				if (bindingResource == null) continue;
+
+				var metricBinding = bindingResource.ToMetricBinding(ownerNode.Name);
+				var resolved = PropertyVocabulary.Resolve(metricBinding);
+
+				if (!ValidatePropertyExists(ownerNode, resolved))
+					continue;
+
+				_activeBindings.Add(new ActiveBinding(resolved, ownerNode));
+				metricNames.Add(metricBinding.Metric);
+
+				var normalisedInitial = Normalise(metricBinding.InitialValue,
+					metricBinding.SourceRangeMin, metricBinding.SourceRangeMax,
+					metricBinding.TargetRangeMin, metricBinding.TargetRangeMax);
+				ApplyProperty(new ActiveBinding(resolved, ownerNode), (float)normalisedInitial);
+
+				GD.Print($"[SceneBinder] Bound from scene: {ownerNode.Name}.{metricBinding.Property} <- {metricBinding.Metric}");
+			}
 		}
 
-		_currentConfig = configResult.Config!;
-		_currentConfigPath = configPath;
-
-		// Phase 2: Scene load + node/property validation (Godot runtime)
-		var packedScene = GD.Load<PackedScene>(_currentConfig.ScenePath);
-		if (packedScene == null)
-		{
-			EmitSignal(SignalName.BindingError,
-				$"Cannot load scene: {_currentConfig.ScenePath}");
-			return [];
-		}
-
-		_currentScene = packedScene.Instantiate();
-		AddChild(_currentScene);
-
-		ResolveAndValidateBindings();
-
-		EmitSignal(SignalName.SceneLoaded, _currentConfig.ScenePath, configPath);
-
-		return _currentConfig.Bindings
-			.Select(b => b.Metric)
-			.Distinct()
-			.ToArray();
+		GD.Print($"[SceneBinder] {_activeBindings.Count} bindings from scene properties");
+		return metricNames.ToArray();
 	}
 
 	/// <summary>
@@ -155,7 +149,6 @@ public partial class SceneBinder : Node
 			return;
 		}
 
-		// Clean up any previous per-instance nodes for this metric
 		ClearInstanceNodes(metricName);
 
 		var createdNodes = new List<Node3D>();
@@ -186,32 +179,10 @@ public partial class SceneBinder : Node
 		}
 
 		_instanceNodes[metricName] = createdNodes;
-
-		// Hide the template
 		templateNode.Visible = false;
 
 		GD.Print($"[SceneBinder] Created {createdNodes.Count} per-instance nodes " +
 				 $"for {metricName}");
-	}
-
-	private void ClearInstanceNodes(string metricName)
-	{
-		if (!_instanceNodes.TryGetValue(metricName, out var nodes))
-			return;
-
-		// Remove active bindings that target these nodes
-		_activeBindings.RemoveAll(ab => nodes.Contains(ab.TargetNode));
-
-		foreach (var node in nodes)
-		{
-			if (IsInstanceValid(node))
-			{
-				_rotationSpeeds.Remove(node);
-				node.QueueFree();
-			}
-		}
-
-		_instanceNodes.Remove(metricName);
 	}
 
 	public void UnloadCurrentScene()
@@ -219,7 +190,6 @@ public partial class SceneBinder : Node
 		_activeBindings.Clear();
 		_rotationSpeeds.Clear();
 
-		// Clean up all per-instance nodes
 		foreach (var nodes in _instanceNodes.Values)
 		{
 			foreach (var node in nodes)
@@ -235,46 +205,42 @@ public partial class SceneBinder : Node
 			_currentScene.QueueFree();
 			_currentScene = null;
 		}
-
-		_currentConfig = null;
-		_currentConfigPath = null;
 	}
 
-	private void ResolveAndValidateBindings()
+	private static void FindBindableNodes(Node root, List<PcpBindable> results)
 	{
-		_activeBindings.Clear();
-
-		foreach (var binding in _currentConfig!.Bindings)
+		foreach (var child in root.GetChildren())
 		{
-			var resolved = PropertyVocabulary.Resolve(binding);
+			if (child is PcpBindable bindable)
+				results.Add(bindable);
 
-			var node = _currentScene!.GetNodeOrNull(binding.SceneNode);
-			if (node == null)
+			FindBindableNodes(child, results);
+		}
+	}
+
+	private void ClearInstanceNodes(string metricName)
+	{
+		if (!_instanceNodes.TryGetValue(metricName, out var nodes))
+			return;
+
+		_activeBindings.RemoveAll(ab => nodes.Contains(ab.TargetNode));
+
+		foreach (var node in nodes)
+		{
+			if (IsInstanceValid(node))
 			{
-				GD.PushWarning(
-					$"[SceneBinder] Node not found: '{binding.SceneNode}' — skipping binding");
-				EmitSignal(SignalName.BindingError,
-					$"Node not found: '{binding.SceneNode}'");
-				continue;
+				_rotationSpeeds.Remove(node);
+				node.QueueFree();
 			}
-
-			if (!ValidatePropertyExists(node, resolved))
-				continue;
-
-			_activeBindings.Add(new ActiveBinding(resolved, node));
-			GD.Print($"[SceneBinder] Bound: {binding.SceneNode}.{binding.Property} " +
-					 $"<- {binding.Metric}");
 		}
 
-		GD.Print($"[SceneBinder] {_activeBindings.Count} active bindings " +
-				 $"({_currentConfig.Bindings.Count - _activeBindings.Count} skipped)");
+		_instanceNodes.Remove(metricName);
 	}
 
 	private bool ValidatePropertyExists(Node node, ResolvedBinding resolved)
 	{
 		var godotProperty = resolved.GodotPropertyName;
 
-		// For "scale:y" check "scale" exists; for "river_flow_speed" check as-is
 		var propertyName = godotProperty.Contains(':')
 			? godotProperty.Split(':')[0]
 			: godotProperty;
@@ -286,7 +252,6 @@ public partial class SceneBinder : Node
 				return true;
 		}
 
-		// Build helpful error message listing available script properties
 		var available = new List<string>();
 		foreach (var prop in propertyList)
 		{
@@ -336,7 +301,6 @@ public partial class SceneBinder : Node
 				: null;
 		}
 
-		// Singular metric (key -1) or first available instance
 		if (instances.ContainsKey(-1))
 			return instances[-1].AsDouble();
 
@@ -401,7 +365,6 @@ public partial class SceneBinder : Node
 	{
 		if (node is MeshInstance3D mesh && mesh.MaterialOverride is StandardMaterial3D mat)
 		{
-			// 0 = blue (cold), 1 = red (hot)
 			var hue = Mathf.Lerp(0.66f, 0.0f, Mathf.Clamp(value, 0f, 1f));
 			mat.AlbedoColor = Color.FromHsv(hue, 0.8f, 0.9f);
 		}
@@ -426,27 +389,5 @@ public partial class SceneBinder : Node
 		var clamped = Math.Clamp(value, srcMin, srcMax);
 		var ratio = (clamped - srcMin) / range;
 		return tgtMin + ratio * (tgtMax - tgtMin);
-	}
-
-	private void LogConfigResult(BindingConfigResult result)
-	{
-		foreach (var msg in result.Messages)
-		{
-			var prefix = msg.BindingContext != null ? $"[{msg.BindingContext}] " : "";
-			var text = $"[SceneBinder] {prefix}{msg.Message}";
-
-			switch (msg.Severity)
-			{
-				case ValidationSeverity.Error:
-					GD.PushError(text);
-					break;
-				case ValidationSeverity.Warning:
-					GD.PushWarning(text);
-					break;
-				case ValidationSeverity.Info:
-					GD.Print(text);
-					break;
-			}
-		}
 	}
 }

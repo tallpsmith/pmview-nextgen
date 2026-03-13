@@ -266,7 +266,92 @@ public partial class SceneBinderTests
 		binder.UnloadCurrentScene();
 
 		AssertThat(binder.ActiveBindingCount).IsEqual(0);
-		AssertThat(binder.CurrentConfig).IsNull();
+		await runner.AwaitIdleFrame();
+	}
+
+	// ── Initial value normalisation ─────────────────────────────────────
+
+	[TestCase]
+	[RequireGodotRuntime]
+	public async Task BindFromSceneProperties_InitialValueZero_NormalisesToTargetMin()
+	{
+		// Bug: InitialValue=0 passed raw to ApplyProperty → Scale.Y=0 →
+		// degenerate basis. When RotateY runs (rotation_speed binding),
+		// Godot can't recover the Y column and the node vanishes forever.
+		var runner = ISceneRunner.Load("res://test/scenes/test_node3d.tscn");
+		var node3D = (Node3D)runner.Scene();
+		var binder = new SceneBinder();
+		runner.Scene().AddChild(binder);
+
+		var bindable = new PcpBindable();
+		var heightBinding = new PcpBindingResource
+		{
+			MetricName = "test.metric",
+			TargetProperty = "height",
+			SourceRangeMin = 0f,
+			SourceRangeMax = 3f,
+			TargetRangeMin = 0.2f,
+			TargetRangeMax = 25f,
+			InitialValue = 0f
+		};
+		bindable.PcpBindings = new Godot.Collections.Array<PcpBindingResource> { heightBinding };
+		node3D.AddChild(bindable);
+
+		binder.BindFromSceneProperties(node3D);
+
+		// InitialValue 0 (source range) should normalise to TargetRangeMin (0.2)
+		AssertThat(node3D.Scale.Y).IsEqualApprox(0.2f, 0.01f);
+		await runner.AwaitIdleFrame();
+	}
+
+	[TestCase]
+	[RequireGodotRuntime]
+	public async Task BindFromSceneProperties_HeightAndRotation_NodeRemainsVisible()
+	{
+		// Reproduces the disappearing cube: height + rotation_speed bindings
+		// on same node. After initial values and a RotateY call, Scale.Y
+		// must remain positive so the basis never degenerates.
+		var runner = ISceneRunner.Load("res://test/scenes/test_node3d.tscn");
+		var node3D = (Node3D)runner.Scene();
+		var binder = new SceneBinder();
+		runner.Scene().AddChild(binder);
+
+		var bindable = new PcpBindable();
+		var heightBinding = new PcpBindingResource
+		{
+			MetricName = "test.metric",
+			TargetProperty = "height",
+			SourceRangeMin = 0f,
+			SourceRangeMax = 3f,
+			TargetRangeMin = 0.2f,
+			TargetRangeMax = 25f,
+			InitialValue = 0f
+		};
+		var rotationBinding = new PcpBindingResource
+		{
+			MetricName = "test.metric",
+			TargetProperty = "rotation_speed",
+			SourceRangeMin = 0f,
+			SourceRangeMax = 3f,
+			TargetRangeMin = 0f,
+			TargetRangeMax = 5400f,
+			InitialValue = 0f
+		};
+		bindable.PcpBindings = new Godot.Collections.Array<PcpBindingResource>
+			{ heightBinding, rotationBinding };
+		node3D.AddChild(bindable);
+
+		binder.BindFromSceneProperties(node3D);
+
+		// Scale.Y must be positive (not 0) after initial binding
+		AssertThat(node3D.Scale.Y).IsGreater(0f);
+
+		// Simulate what _Process does — then verify transform survives
+		node3D.RotateY(Mathf.DegToRad(12f));
+		node3D.Scale = new Vector3(node3D.Scale.X, 3.5f, node3D.Scale.Z);
+
+		// Scale.Y must survive the RotateY + Scale set cycle
+		AssertThat(node3D.Scale.Y).IsEqualApprox(3.5f, 0.01f);
 		await runner.AwaitIdleFrame();
 	}
 
