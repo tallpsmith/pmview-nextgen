@@ -29,12 +29,23 @@ tests/
 # Build PcpClient library
 dotnet build src/pcp-client-dotnet/PcpClient.sln
 
-# Run PcpClient unit tests
+# Run ALL PcpClient tests (unit + integration)
+# Integration tests REQUIRE the dev-environment stack (pmproxy + Valkey).
 dotnet test src/pcp-client-dotnet/PcpClient.sln
+
+# Run unit tests ONLY (skip integration — use when pmproxy is unavailable)
+dotnet test src/pcp-client-dotnet/PcpClient.sln --filter "FullyQualifiedName!~Integration"
+
+# Run integration tests ONLY
+dotnet test src/pcp-client-dotnet/PcpClient.sln --filter "Category=Integration"
 
 # Build Godot project C# (when godot-project/ exists)
 dotnet build godot-project/pmview-nextgen.sln
 ```
+
+**Claude Code VM note:** The VM cannot reach the dev-environment Podman stack on the
+host. Always use `--filter "FullyQualifiedName!~Integration"` when running tests from the VM.
+This is the same filter used in GitHub Actions CI (no pmproxy in CI runners either).
 
 ## Code Style
 

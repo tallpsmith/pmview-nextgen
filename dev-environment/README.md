@@ -105,3 +105,40 @@ Valkey data is stored in the `valkey-data` named volume. Use `docker compose dow
 ### Port conflicts
 
 If ports 44322 or 6379 are already in use on your host, either stop the conflicting service or edit the host-side port mappings in `docker-compose.yml`.
+
+## Running Integration Tests
+
+Integration tests exercise the full PcpClient API against a live pmproxy instance.
+They **require** the dev-environment stack to be running — tests fail hard if
+pmproxy or Valkey is unreachable. This is intentional: integration tests should
+never silently pass in a broken environment.
+
+### Quick start
+
+```bash
+# 1. Start the dev stack
+cd dev-environment
+docker compose up -d
+
+# 2. Wait for healthy status (seeder must complete)
+docker compose ps
+
+# 3. Run ALL tests (unit + integration) — the default
+cd ..
+dotnet test src/pcp-client-dotnet/PcpClient.sln -v n
+
+# 4. Run integration tests only
+dotnet test src/pcp-client-dotnet/PcpClient.sln --filter "Category=Integration" -v n
+```
+
+### Skipping integration tests
+
+When you can't run the dev-environment stack (e.g. a VM without container
+access), explicitly exclude integration tests:
+
+```bash
+dotnet test src/pcp-client-dotnet/PcpClient.sln --filter "FullyQualifiedName!~Integration" -v n
+```
+
+This is an **opt-out** — by default all tests run and integration tests will
+fail if the stack isn't up. Don't skip them unless you have a good reason.

@@ -42,7 +42,8 @@ internal static class PcpInstanceDomainFetcher
             if (doc.RootElement.TryGetProperty("message", out var msg))
             {
                 var message = msg.GetString() ?? "";
-                return message.Contains("no InDom", StringComparison.OrdinalIgnoreCase);
+                return message.Contains("no InDom", StringComparison.OrdinalIgnoreCase)
+                    || message.Contains("null indom", StringComparison.OrdinalIgnoreCase);
             }
         }
         catch (JsonException)

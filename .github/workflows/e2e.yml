@@ -5,6 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  checks: write
+
 jobs:
   e2e-tests:
     name: E2E Tests (Tier 3)
@@ -29,6 +33,13 @@ jobs:
           echo "pmproxy failed to become ready"
           docker compose -f dev-environment/docker-compose.yml logs
           exit 1
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: PcpClient integration tests
+        run: dotnet test src/pcp-client-dotnet/PcpClient.sln --filter 'Category=Integration'
 
       - uses: godot-gdunit-labs/gdUnit4-action@v1
         with:

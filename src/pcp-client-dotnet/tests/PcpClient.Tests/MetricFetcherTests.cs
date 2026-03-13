@@ -11,6 +11,27 @@ namespace PcpClient.Tests;
 /// </summary>
 public class MetricFetcherTests
 {
+    // Sample pmproxy /pmapi/fetch response — singular metric with JSON null instance (as pmproxy sends for hinv.ncpu etc.)
+    private const string NullInstanceSingularResponse = """
+        {"timestamp":1234567.89,"values":[{"pmid":"60.0.32","name":"hinv.ncpu","instances":[{"instance":null,"value":4}]}]}
+        """;
+
+    // Sample pmproxy /pmapi/fetch response — one metric present, second silently omitted
+    private const string PartialFetchResponse = """
+        {
+          "timestamp": 1709654400.0,
+          "values": [
+            {
+              "pmid": "60.0.32",
+              "name": "hinv.ncpu",
+              "instances": [
+                { "instance": null, "value": 4 }
+              ]
+            }
+          ]
+        }
+        """;
+
     // Sample pmproxy /pmapi/fetch response for a singular metric
     private const string SingularMetricResponse = """
         {
@@ -160,6 +181,68 @@ public class MetricFetcherTests
         Assert.Equal(2, values.Count);
         Assert.Equal("kernel.all.load", values[0].Name);
         Assert.Equal("disk.dev.read", values[1].Name);
+    }
+
+    // ── Null Instance Field (Bug Fix) ──
+
+    [Fact]
+    public async Task FetchAsync_JsonNullInstance_InstanceIdIsNull()
+    {
+        // pmproxy returns "instance": null (JSON null) for singular metrics like hinv.ncpu
+        // Before fix: GetInt32() on Null JsonElement threw InvalidOperationException
+        var client = await CreateConnectedClientAsync(NullInstanceSingularResponse);
+
+        var values = await client.FetchAsync(new[] { "hinv.ncpu" });
+
+        Assert.Single(values[0].InstanceValues);
+        Assert.Null(values[0].InstanceValues[0].InstanceId);
+    }
+
+    [Fact]
+    public async Task FetchAsync_JsonNullInstance_ValueParsedCorrectly()
+    {
+        var client = await CreateConnectedClientAsync(NullInstanceSingularResponse);
+
+        var values = await client.FetchAsync(new[] { "hinv.ncpu" });
+
+        Assert.Equal(4.0, values[0].InstanceValues[0].Value);
+    }
+
+    // ── ThrowIfMetricsMissing (Bug Fix) ──
+
+    [Fact]
+    public async Task FetchAsync_MetricSilentlyOmittedByPmproxy_ThrowsPcpMetricNotFoundException()
+    {
+        // pmproxy can return HTTP 200 but silently omit a metric from the values array
+        // ThrowIfMetricsMissing detects the gap and throws rather than returning partial data
+        var handler = new MockHttpHandler(request =>
+        {
+            if (request.RequestUri!.PathAndQuery.Contains("/pmapi/context"))
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        "{\"context\":1}",
+                        System.Text.Encoding.UTF8,
+                        "application/json")
+                };
+
+            return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    PartialFetchResponse,
+                    System.Text.Encoding.UTF8,
+                    "application/json")
+            };
+        });
+
+        var httpClient = new HttpClient(handler);
+        var client = new PcpClientConnection(new Uri("http://localhost:44322"), httpClient);
+        await client.ConnectAsync();
+
+        var ex = await Assert.ThrowsAsync<PcpMetricNotFoundException>(
+            () => client.FetchAsync(new[] { "hinv.ncpu", "no.such.metric" }));
+
+        Assert.Equal("no.such.metric", ex.MetricName);
     }
 
     // ── Error Cases ──

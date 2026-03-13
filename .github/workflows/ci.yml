@@ -19,7 +19,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
-      - run: dotnet test src/pcp-client-dotnet/PcpClient.sln
+      - name: Run unit tests (integration tests run in E2E workflow with pmproxy)
+        run: dotnet test src/pcp-client-dotnet/PcpClient.sln --filter 'FullyQualifiedName!~Integration'
       - run: dotnet test src/pcp-godot-bridge/PcpGodotBridge.sln
 
   godot-unit-tests:
