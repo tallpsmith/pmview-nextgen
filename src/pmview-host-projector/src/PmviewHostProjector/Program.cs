@@ -11,7 +11,7 @@ public class Program
     public static async Task<int> Main(string[] args)
     {
         var pmproxyUrl = GetArg(args, "--pmproxy") ?? "http://localhost:44322";
-        var outputPath = ResolveOutputPath(GetArg(args, "-o") ?? GetArg(args, "--output") ?? "host-view.tscn");
+        var outputPath = Path.GetFullPath(ResolveOutputPath(GetArg(args, "-o") ?? GetArg(args, "--output") ?? "host-view.tscn"));
         var installAddon = HasFlag(args, "--install-addon");
 
         Console.WriteLine($"pmview-host-projector: connecting to {pmproxyUrl}");
