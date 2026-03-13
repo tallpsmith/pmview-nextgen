@@ -15,6 +15,7 @@ public static class LayoutCalculator
     private const float GridRowSpacing     = 2.5f;
     private const long  FallbackMemoryBytes = 16_000_000_000L;
     private const float GroundPadding      = 0.6f;
+    private const float RowHeaderReservation = 2.0f;
 
     public static SceneLayout Calculate(IReadOnlyList<ZoneDefinition> zones, HostTopology topology)
     {
@@ -164,9 +165,12 @@ public static class LayoutCalculator
 
     private static float ZoneWidth(PlacedZone zone)
     {
+        // Grid zones: shapes are at Vec3.Zero (positioned by GridLayout3D at runtime).
+        // Add RowHeaderReservation to account for right-side instance labels.
+        if (zone.GridColumns.HasValue && zone.GroundWidth > 0f)
+            return zone.GroundWidth + RowHeaderReservation;
         if (zone.Shapes.Count == 0) return 0f;
-        var maxLocalX = zone.Shapes.Max(s => s.LocalPosition.X);
-        return maxLocalX; // min is always 0; width from 0 to max
+        return zone.Shapes.Max(s => s.LocalPosition.X);
     }
 
     private static float ResolveSourceRangeMax(MetricShapeMapping metric, HostTopology topology)

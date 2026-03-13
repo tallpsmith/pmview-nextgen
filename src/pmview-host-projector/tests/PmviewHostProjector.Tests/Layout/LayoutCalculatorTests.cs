@@ -219,4 +219,26 @@ public class LayoutCalculatorBackgroundTests
         var perCpu = layout.Zones.Single(z => z.Name == "Per-CPU");
         Assert.Equal(new[] { "cpu0", "cpu1" }, perCpu.InstanceLabels);
     }
+
+    [Fact]
+    public void Calculate_AdjacentBackgroundZones_HaveGapForRowHeaders()
+    {
+        // Adjacent zones must have at least (bezelWidth + 2.0 reservation) between
+        // their start positions so right-side row headers don't overlap the next bezel.
+        const float RowHeaderReservation = 2.0f;
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology(cpus: 2, nics: 2));
+        var background = layout.Zones
+            .Where(z => z.GridColumns.HasValue)
+            .OrderBy(z => z.Position.X)
+            .ToList();
+
+        for (var i = 0; i < background.Count - 1; i++)
+        {
+            var left = background[i];
+            var right = background[i + 1];
+            var gap = right.Position.X - left.Position.X;
+            Assert.True(gap >= left.GroundWidth + RowHeaderReservation,
+                $"Zone '{left.Name}' → '{right.Name}': gap {gap} < {left.GroundWidth + RowHeaderReservation} (bezel + reservation)");
+        }
+    }
 }
