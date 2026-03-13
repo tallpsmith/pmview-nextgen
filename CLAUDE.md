@@ -43,6 +43,7 @@ dotnet build godot-project/pmview-nextgen.sln
 
 **Claude Code VM note:** The VM cannot reach the dev-environment Podman stack on the
 host. Always use `--filter "FullyQualifiedName!~Integration"` when running tests from the VM.
+This is the same filter used in GitHub Actions CI (no pmproxy in CI runners either).
 
 ## Code Style
 
