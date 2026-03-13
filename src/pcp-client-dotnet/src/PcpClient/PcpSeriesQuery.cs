@@ -15,7 +15,10 @@ public static class PcpSeriesQuery
 
         foreach (var item in doc.RootElement.EnumerateArray())
         {
-            var id = item.GetString();
+            // Newer pmproxy versions return objects {"series": "id"} instead of bare strings
+            var id = item.ValueKind == JsonValueKind.Object
+                ? item.GetProperty("series").GetString()
+                : item.GetString();
             if (id != null)
                 results.Add(id);
         }

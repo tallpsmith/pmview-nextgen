@@ -51,6 +51,24 @@ public class SeriesQueryTests
         Assert.Equal("abc123def456", result[0]);
     }
 
+    [Fact]
+    public void ParseQueryResponse_ObjectFormat_ExtractsSeriesField()
+    {
+        // Newer pmproxy versions return objects instead of bare strings
+        var json = """
+        [
+            {"series": "2cd6a38f9339f2dd6f81a14f6d73946b02e0d44d"},
+            {"series": "a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0"}
+        ]
+        """;
+
+        var result = PcpSeriesQuery.ParseQueryResponse(json);
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal("2cd6a38f9339f2dd6f81a14f6d73946b02e0d44d", result[0]);
+        Assert.Equal("a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0", result[1]);
+    }
+
     // ── PcpSeriesQuery.ParseValuesResponse — timestamped value extraction ──
 
     [Fact]
