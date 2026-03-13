@@ -14,32 +14,42 @@ Current performance monitoring systems force humans to process alive, complex sy
 
 ## Architecture
 
-```
-                                                    ┌──────────────────┐
-                                                    │ pmview-host-     │
-                                                    │ projector (CLI)  │
-                                                    │ discovers host   │
-                                                    │ topology, emits  │
-                                                    │ .tscn scenes     │
-                                                    └────────┬─────────┘
-                                                             │ generates
-                                                             ▼
-GDScript Scenes  →  C# Bridge Plugin  →  PcpGodotBridge  →  PcpClient  →  pmproxy
- (.tscn + .gd)     (addons/pmview-      (binding model       (HTTP/JSON     (PCP
-                    bridge/: Poller,      + validation)        client)        daemon)
-                    Binder, Bindable,
-                    BindingResource)
+```mermaid
+graph TD
+    subgraph "Build Time"
+        Projector["Host Projector (CLI)"]
+        pmproxy_build["pmproxy"]
+        Projector -- "discovers topology" --> pmproxy_build
+        Projector -- "generates" --> Scenes
+    end
+
+    subgraph "Runtime (Godot)"
+        Scenes[".tscn Scenes + GDScript"]
+        Bridge["Bridge Plugin<br/><small>PcpBindable · PcpBindingResource<br/>MetricPoller · SceneBinder</small>"]
+        Scenes -- "bindings discovered by" --> Bridge
+    end
+
+    subgraph ".NET Libraries"
+        GodotBridge["PcpGodotBridge<br/><small>binding model · validation</small>"]
+        Client["PcpClient<br/><small>HTTP/JSON client</small>"]
+        Bridge --> GodotBridge
+        GodotBridge --> Client
+        Projector --> Client
+    end
+
+    pmproxy_run["pmproxy (PCP daemon)"]
+    Client -- "REST API" --> pmproxy_run
 ```
 
-**Four runtime layers, plus a scene generator:**
+**Layers, from scene surface down to the wire:**
 
 | Layer | Language | Tests | Purpose |
 |-------|----------|-------|---------|
-| **PcpClient** | C# (.NET 8.0) | xUnit | HTTP client for pmproxy REST API |
-| **PcpGodotBridge** | C# (.NET 8.0) | xUnit | Binding model, validation, converter |
-| **Bridge Plugin** | C# (Godot.NET.Sdk) | gdUnit4 | MetricPoller, SceneBinder, PcpBindable, PcpBindingResource, editor inspector |
+| **Host Projector** | C# (.NET 8.0) | xUnit | CLI tool: discovers host topology from pmproxy, generates .tscn scenes |
 | **Scenes** | GDScript + .tscn | Godot runtime | Visual scenes with metric-driven properties |
-| **Host Projector** | C# (.NET 8.0) | xUnit | CLI tool: discovers topology from pmproxy, generates .tscn scenes |
+| **Bridge Plugin** | C# (Godot.NET.Sdk) | gdUnit4 | MetricPoller, SceneBinder, PcpBindable, PcpBindingResource, editor inspector |
+| **PcpGodotBridge** | C# (.NET 8.0) | xUnit | Binding model, validation, converter |
+| **PcpClient** | C# (.NET 8.0) | xUnit | HTTP client for pmproxy REST API |
 
 ## Prerequisites
 
@@ -62,15 +72,15 @@ dotnet test pmview-nextgen.sln --filter "FullyQualifiedName!~Integration"
 # Start the dev-environment stack (PCP + pmproxy + synthetic data)
 cd dev-environment && docker compose up -d && cd ..
 
-# Generate a host-view scene from the running pmproxy
+# Generate a host-view scene from the running pmproxy.
+# Output goes into godot-project/ which has the required
+# pmview-bridge addon and building block scenes.
 dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- \
   --pmproxy http://localhost:44322 \
   -o godot-project/scenes/host_view.tscn
 
-# Open the Godot project in Godot Editor
-# (File → Open Project → navigate to godot-project/)
-# Build C# assemblies: dotnet build godot-project/pmview-nextgen.sln
-# Run the generated scene!
+# Open godot-project/ in Godot Editor, build C# assemblies, and run the scene
+dotnet build godot-project/pmview-nextgen.sln
 ```
 
 ## How Bindings Work
@@ -110,11 +120,13 @@ At runtime, **SceneBinder** discovers all PcpBindable nodes in the scene and wir
 
 `pmview-host-projector` is a CLI tool that connects to a live pmproxy, discovers the host's metric topology (CPUs, disks, network interfaces, memory), and generates a complete Godot `.tscn` scene with PcpBindable bindings, layout, camera, and lighting.
 
+The generated scene references resources from the `pmview-bridge` addon (`addons/pmview-bridge/`) and the building block scenes (`scenes/building_blocks/`), so **the output must land inside a Godot project that has these installed**. Currently that means `godot-project/` — when the addon is extracted to a standalone plugin, you'll be able to generate into any Godot project.
+
 ```bash
 # Default: connects to localhost:44322, outputs host-view.tscn
 dotnet run --project src/pmview-host-projector/src/PmviewHostProjector
 
-# Custom pmproxy URL and output path
+# Point at a remote pmproxy, output into the Godot project
 dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- \
   --pmproxy http://myserver:44322 \
   -o godot-project/scenes/my_host.tscn

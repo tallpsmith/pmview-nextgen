@@ -45,7 +45,7 @@ public class TscnWriterTests
     public void Write_HasExtResourceForGroundedBar_WithBuildingBlocksPath()
     {
         var tscn = TscnWriter.Write(MinimalLayout());
-        Assert.Contains("res://scenes/building_blocks/grounded_bar.tscn", tscn);
+        Assert.Contains("res://addons/pmview-bridge/building_blocks/grounded_bar.tscn", tscn);
     }
 
     [Fact]
@@ -101,7 +101,7 @@ public class TscnWriterTests
                     0f, 500_000_000f, 0.2f, 5.0f)])
         ]);
         var tscn = TscnWriter.Write(layout);
-        Assert.Contains("res://scenes/building_blocks/grounded_cylinder.tscn", tscn);
+        Assert.Contains("res://addons/pmview-bridge/building_blocks/grounded_cylinder.tscn", tscn);
     }
 
     [Fact]
@@ -130,7 +130,7 @@ public class TscnWriterTests
                     0f, 100f, 0.2f, 5.0f)])
         ]);
         var tscn = TscnWriter.Write(layout);
-        Assert.Contains("res://scripts/building_blocks/grid_layout_3d.gd", tscn);
+        Assert.Contains("res://addons/pmview-bridge/building_blocks/grid_layout_3d.gd", tscn);
         Assert.Contains("columns = 3", tscn);
     }
 

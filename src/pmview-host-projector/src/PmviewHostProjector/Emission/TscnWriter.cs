@@ -42,7 +42,7 @@ public static class TscnWriter
                 registry.Require("binding_res_script", "Script", "res://addons/pmview-bridge/PcpBindingResource.cs");
 
                 if (zone.GridColumns.HasValue)
-                    registry.Require("grid_script", "Script", "res://scripts/building_blocks/grid_layout_3d.gd");
+                    registry.Require("grid_script", "Script", "res://addons/pmview-bridge/building_blocks/grid_layout_3d.gd");
 
                 list.Add(new SubResourceEntry(
                     Id: SubResourceId(shape.NodeName),
@@ -190,8 +190,8 @@ public static class TscnWriter
 
     private static string SceneExtResourcePath(ShapeType shape) => shape switch
     {
-        ShapeType.Cylinder => "res://scenes/building_blocks/grounded_cylinder.tscn",
-        _ => "res://scenes/building_blocks/grounded_bar.tscn"
+        ShapeType.Cylinder => "res://addons/pmview-bridge/building_blocks/grounded_cylinder.tscn",
+        _ => "res://addons/pmview-bridge/building_blocks/grounded_bar.tscn"
     };
 
     private static string SubResourceId(string nodeName) => $"binding_{nodeName}";
