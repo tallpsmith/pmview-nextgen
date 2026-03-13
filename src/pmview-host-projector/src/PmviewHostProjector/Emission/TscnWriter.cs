@@ -7,6 +7,7 @@ namespace PmviewHostProjector.Emission;
 /// <summary>
 /// Emits a Godot .tscn file from a SceneLayout.
 /// Each shape gets a PcpBindable child node with PcpBindingResource sub_resources.
+/// Each zone with non-zero ground extent gets a dark-grey BoxMesh ground bezel.
 /// </summary>
 public static class TscnWriter
 {
@@ -17,11 +18,13 @@ public static class TscnWriter
         var sb = new StringBuilder();
         var registry = new ExtResourceRegistry();
         var subResources = CollectSubResources(layout, registry);
+        var bezelResources = CollectBezelSubResources(layout);
 
-        WriteHeader(sb, registry, subResources);
+        WriteHeader(sb, registry, subResources, bezelResources);
         WriteExtResources(sb, registry);
         WriteSubResources(sb, subResources);
-        WriteNodes(sb, layout, registry, subResources);
+        WriteBezelSubResources(sb, bezelResources);
+        WriteNodes(sb, layout, registry, subResources, bezelResources);
 
         return sb.ToString();
     }
@@ -59,11 +62,23 @@ public static class TscnWriter
         return list;
     }
 
+    private static List<BezelSubResources> CollectBezelSubResources(SceneLayout layout)
+        => layout.Zones
+            .Where(z => z.GroundWidth > 0f && z.GroundDepth > 0f)
+            .Select(z => new BezelSubResources(
+                z.Name,
+                $"bezel_mesh_{z.Name}",
+                $"bezel_mat_{z.Name}",
+                z.GroundWidth,
+                z.GroundDepth))
+            .ToList();
+
     // --- header ---
 
-    private static void WriteHeader(StringBuilder sb, ExtResourceRegistry registry, List<SubResourceEntry> subResources)
+    private static void WriteHeader(StringBuilder sb, ExtResourceRegistry registry,
+        List<SubResourceEntry> subResources, List<BezelSubResources> bezelResources)
     {
-        var loadSteps = registry.Count + subResources.Count + 1;
+        var loadSteps = registry.Count + subResources.Count + bezelResources.Count * 2 + 1;
         sb.AppendLine($"[gd_scene load_steps={loadSteps} format=3]");
         sb.AppendLine();
     }
@@ -103,21 +118,38 @@ public static class TscnWriter
         }
     }
 
+    private static void WriteBezelSubResources(StringBuilder sb, List<BezelSubResources> bezels)
+    {
+        foreach (var bezel in bezels)
+        {
+            sb.AppendLine($"[sub_resource type=\"BoxMesh\" id=\"{bezel.MeshId}\"]");
+            sb.AppendLine($"size = Vector3({F(bezel.Width)}, 0.02, {F(bezel.Depth)})");
+            sb.AppendLine();
+
+            sb.AppendLine($"[sub_resource type=\"StandardMaterial3D\" id=\"{bezel.MaterialId}\"]");
+            sb.AppendLine("albedo_color = Color(0.15, 0.15, 0.15, 1)");
+            sb.AppendLine();
+        }
+    }
+
     // --- nodes ---
 
-    private static void WriteNodes(StringBuilder sb, SceneLayout layout, ExtResourceRegistry registry, List<SubResourceEntry> subResources)
+    private static void WriteNodes(StringBuilder sb, SceneLayout layout, ExtResourceRegistry registry,
+        List<SubResourceEntry> subResources, List<BezelSubResources> bezelResources)
     {
         sb.AppendLine("[node name=\"HostView\" type=\"Node3D\"]");
         sb.AppendLine();
 
         foreach (var zone in layout.Zones)
-            WriteZone(sb, zone, registry, subResources);
+            WriteZone(sb, zone, registry, subResources, bezelResources);
     }
 
-    private static void WriteZone(StringBuilder sb, PlacedZone zone, ExtResourceRegistry registry, List<SubResourceEntry> subResources)
+    private static void WriteZone(StringBuilder sb, PlacedZone zone, ExtResourceRegistry registry,
+        List<SubResourceEntry> subResources, List<BezelSubResources> bezelResources)
     {
         WriteZoneContainerNode(sb, zone, registry);
         WriteZoneLabelNode(sb, zone);
+        WriteGroundBezel(sb, zone, bezelResources);
 
         foreach (var shape in zone.Shapes)
             WriteShape(sb, shape, zone, registry, subResources);
@@ -159,6 +191,22 @@ public static class TscnWriter
         sb.AppendLine("font_size = 32");
         sb.AppendLine($"text = \"{zone.ZoneLabel}\"");
         sb.AppendLine("horizontal_alignment = 1");
+        sb.AppendLine();
+    }
+
+    private static void WriteGroundBezel(StringBuilder sb, PlacedZone zone, List<BezelSubResources> bezelResources)
+    {
+        var bezel = bezelResources.FirstOrDefault(b => b.ZoneName == zone.Name);
+        if (bezel is null) return;
+
+        var centreX = zone.Shapes.Count > 0
+            ? zone.Shapes.Max(s => s.LocalPosition.X) / 2f
+            : 0f;
+
+        sb.AppendLine($"[node name=\"{zone.Name}Ground\" type=\"MeshInstance3D\" parent=\"{zone.Name}\"]");
+        sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, {F(centreX)}, -0.01, 0)");
+        sb.AppendLine($"mesh = SubResource(\"{bezel.MeshId}\")");
+        sb.AppendLine($"surface_material_override/0 = SubResource(\"{bezel.MaterialId}\")");
         sb.AppendLine();
     }
 
@@ -214,6 +262,13 @@ public static class TscnWriter
         float SourceRangeMax,
         float TargetRangeMin,
         float TargetRangeMax);
+
+    private record BezelSubResources(
+        string ZoneName,
+        string MeshId,
+        string MaterialId,
+        float Width,
+        float Depth);
 
     /// <summary>
     /// Tracks ext_resources, ensuring each id is registered only once (first-write wins).

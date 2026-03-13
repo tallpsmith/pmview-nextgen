@@ -195,4 +195,46 @@ public class TscnWriterTests
         Assert.Contains("text = \"Load\"", tscn);
         Assert.Contains("1.5, 0.01, 1.5", tscn);
     }
+
+    [Fact]
+    public void Write_EmitsGroundBezelMeshPerZone()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("CPU", "CPU", Vec3.Zero, null, null, null,
+                [new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
+                    "kernel.all.cpu.user", null, null,
+                    new RgbColour(0.976f, 0.451f, 0.086f),
+                    0f, 100f, 0.2f, 5.0f)],
+                GroundWidth: 2.0f, GroundDepth: 2.0f)
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("[node name=\"CPUGround\" type=\"MeshInstance3D\" parent=\"CPU\"]", tscn);
+        Assert.Contains("BoxMesh", tscn);
+    }
+
+    [Fact]
+    public void Write_GroundBezel_HasDarkGreyMaterial()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("CPU", "CPU", Vec3.Zero, null, null, null,
+                [new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
+                    "kernel.all.cpu.user", null, null,
+                    new RgbColour(0.976f, 0.451f, 0.086f),
+                    0f, 100f, 0.2f, 5.0f)],
+                GroundWidth: 2.0f, GroundDepth: 2.0f)
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("albedo_color = Color(0.15, 0.15, 0.15, 1)", tscn);
+    }
+
+    [Fact]
+    public void Write_ZeroGroundExtent_NoBezelEmitted()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("Empty", "Empty", Vec3.Zero, null, null, null, [],
+                GroundWidth: 0f, GroundDepth: 0f)
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.DoesNotContain("Ground", tscn);
+    }
 }
