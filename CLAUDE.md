@@ -19,9 +19,14 @@ tests/
 
 ## Environment
 
-- **dotnet**: if `dotnet` is NOT on the path, you need to `export PATH="/opt/homebrew/opt/dotnet@8/bin:$PATH"` and `export DOTNET_ROOT="/opt/homebrew/opt/dotnet@8/libexec"`
+- **dotnet**: .NET 10 SDK at `/opt/homebrew/bin/dotnet`. If not on PATH: `export PATH="/opt/homebrew/bin:$PATH"`
+- **Target frameworks**: Libraries consumed by Godot (PcpClient, PcpGodotBridge) target `net8.0` (Godot.NET.Sdk/4.6.1 is pinned to net8.0). Standalone executables and test projects target `net10.0`.
 - **Godot**: NOT installed in Claude Code VM (no UI). Write `.tscn`, `.gd`, and `.cs` files directly. User tests scenes in their host Godot editor.
-- Always include `/usr/bin:/bin:/usr/sbin:/sbin` in PATH when running shell commands (VM quirk).
+- Always include `/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin` in PATH when running shell commands (VM quirk).
+
+## Addon Development Rules
+
+- **Explicit using directives**: All C# files under `addons/pmview-bridge/` MUST use explicit `using` directives (`System`, `System.Collections.Generic`, `System.Threading.Tasks`, `System.Linq`, etc.). Never rely on `ImplicitUsings` — the addon gets installed into external Godot projects that may not have it enabled.
 
 ## Commands
 
