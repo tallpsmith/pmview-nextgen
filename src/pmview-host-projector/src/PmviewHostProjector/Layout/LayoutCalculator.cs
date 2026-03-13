@@ -40,6 +40,13 @@ public static class LayoutCalculator
 
         var (groundWidth, groundDepth) = ComputeGroundExtent(zone, topology, shapes);
 
+        var metricLabels = zone.Row == ZoneRow.Background
+            ? zone.Metrics.Select(m => m.Label).ToList()
+            : (IReadOnlyList<string>)[];
+        var instanceLabels = zone.Row == ZoneRow.Background
+            ? ResolveInstances(zone, topology).Select(ShortenInstanceName).ToList()
+            : (IReadOnlyList<string>)[];
+
         // Position will be finalised by CenterRowOnXZero; use Zero for now.
         return new PlacedZone(
             Name:              zone.Name,
@@ -50,7 +57,9 @@ public static class LayoutCalculator
             GridRowSpacing:    zone.Row == ZoneRow.Background ? GridRowSpacing : null,
             Shapes:            shapes,
             GroundWidth:       groundWidth,
-            GroundDepth:       groundDepth);
+            GroundDepth:       groundDepth,
+            MetricLabels:      metricLabels,
+            InstanceLabels:    instanceLabels);
     }
 
     private static (float Width, float Depth) ComputeGroundExtent(

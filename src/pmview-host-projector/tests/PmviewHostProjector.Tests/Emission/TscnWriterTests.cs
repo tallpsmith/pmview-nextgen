@@ -252,4 +252,43 @@ public class TscnWriterTests
         Assert.Contains("[node name=\"Load_1mLabel\" type=\"Label3D\" parent=\"Load\"]", tscn);
         Assert.Contains("text = \"1m\"", tscn);
     }
+
+    [Fact]
+    public void Write_GridZone_EmitsColumnHeaderLabels()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("Per_CPU", "Per-CPU", new Vec3(0, 0, -8),
+                3, 1.5f, 2.0f,
+                [new PlacedShape("PerCPU_cpu0_User", ShapeType.Bar, Vec3.Zero,
+                    "kernel.percpu.cpu.user", "cpu0", "cpu0",
+                    new RgbColour(0.976f, 0.451f, 0.086f),
+                    0f, 100f, 0.2f, 5.0f)],
+                GroundWidth: 5f, GroundDepth: 8f,
+                MetricLabels: ["User", "Sys", "Nice"],
+                InstanceLabels: ["cpu0", "cpu1"])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("text = \"User\"", tscn);
+        Assert.Contains("text = \"Sys\"", tscn);
+        Assert.Contains("text = \"Nice\"", tscn);
+    }
+
+    [Fact]
+    public void Write_GridZone_EmitsRowHeaderLabels()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("Per_CPU", "Per-CPU", new Vec3(0, 0, -8),
+                3, 1.5f, 2.0f,
+                [new PlacedShape("PerCPU_cpu0_User", ShapeType.Bar, Vec3.Zero,
+                    "kernel.percpu.cpu.user", "cpu0", "cpu0",
+                    new RgbColour(0.976f, 0.451f, 0.086f),
+                    0f, 100f, 0.2f, 5.0f)],
+                GroundWidth: 5f, GroundDepth: 8f,
+                MetricLabels: ["User", "Sys", "Nice"],
+                InstanceLabels: ["cpu0", "cpu1"])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("text = \"cpu0\"", tscn);
+        Assert.Contains("text = \"cpu1\"", tscn);
+    }
 }

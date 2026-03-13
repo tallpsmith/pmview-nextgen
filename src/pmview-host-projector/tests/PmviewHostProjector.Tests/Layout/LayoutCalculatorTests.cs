@@ -94,6 +94,15 @@ public class LayoutCalculatorForegroundTests
         Assert.True(load.GroundWidth > 3.0f, $"GroundWidth {load.GroundWidth} should be > 3.0");
         Assert.True(load.GroundDepth > 0f, $"GroundDepth {load.GroundDepth} should be > 0");
     }
+
+    [Fact]
+    public void Calculate_ForegroundZone_HasEmptyGridLabels()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var load = layout.Zones.Single(z => z.Name == "Load");
+        Assert.Empty(load.MetricLabels ?? []);
+        Assert.Empty(load.InstanceLabels ?? []);
+    }
 }
 
 public class LayoutCalculatorBackgroundTests
@@ -193,5 +202,21 @@ public class LayoutCalculatorBackgroundTests
         // Row spacing should be at least 2.5 to fit row header labels
         Assert.True(perCpu.GridRowSpacing >= 2.5f,
             $"Row spacing {perCpu.GridRowSpacing} should be >= 2.5 for label clearance");
+    }
+
+    [Fact]
+    public void Calculate_PerCpuZone_HasMetricLabels()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology(cpus: 2));
+        var perCpu = layout.Zones.Single(z => z.Name == "Per-CPU");
+        Assert.Equal(new[] { "User", "Sys", "Nice" }, perCpu.MetricLabels);
+    }
+
+    [Fact]
+    public void Calculate_PerCpuZone_HasInstanceLabels()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology(cpus: 2));
+        var perCpu = layout.Zones.Single(z => z.Name == "Per-CPU");
+        Assert.Equal(new[] { "cpu0", "cpu1" }, perCpu.InstanceLabels);
     }
 }

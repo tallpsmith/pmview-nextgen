@@ -151,6 +151,12 @@ public static class TscnWriter
         WriteZoneLabelNode(sb, zone);
         WriteGroundBezel(sb, zone, bezelResources);
 
+        if (zone.GridColumns.HasValue)
+        {
+            WriteGridColumnHeaders(sb, zone);
+            WriteGridRowHeaders(sb, zone);
+        }
+
         foreach (var shape in zone.Shapes)
         {
             WriteShape(sb, shape, zone, registry, subResources);
@@ -237,6 +243,40 @@ public static class TscnWriter
         sb.AppendLine($"PcpBindings = Array[ExtResource(\"binding_res_script\")]([SubResource(\"{subResId}\")])");
 
         sb.AppendLine();
+    }
+
+    private static void WriteGridColumnHeaders(StringBuilder sb, PlacedZone zone)
+    {
+        if (zone.MetricLabels is null || zone.MetricLabels.Count == 0) return;
+        var colSpacing = zone.GridColumnSpacing ?? 1.5f;
+        for (var i = 0; i < zone.MetricLabels.Count; i++)
+        {
+            var x = i * colSpacing;
+            sb.AppendLine($"[node name=\"{zone.Name}ColLabel{i}\" type=\"Label3D\" parent=\"{zone.Name}\"]");
+            sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, {F(x)}, 0.01, -0.8)");
+            sb.AppendLine("pixel_size = 0.008");
+            sb.AppendLine("font_size = 24");
+            sb.AppendLine($"text = \"{zone.MetricLabels[i]}\"");
+            sb.AppendLine("horizontal_alignment = 1");
+            sb.AppendLine();
+        }
+    }
+
+    private static void WriteGridRowHeaders(StringBuilder sb, PlacedZone zone)
+    {
+        if (zone.InstanceLabels is null || zone.InstanceLabels.Count == 0) return;
+        var rowSpacing = zone.GridRowSpacing ?? 2.0f;
+        for (var i = 0; i < zone.InstanceLabels.Count; i++)
+        {
+            var z = -(i * rowSpacing);
+            sb.AppendLine($"[node name=\"{zone.Name}RowLabel{i}\" type=\"Label3D\" parent=\"{zone.Name}\"]");
+            sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, -0.8, 0.01, {F(z)})");
+            sb.AppendLine("pixel_size = 0.008");
+            sb.AppendLine("font_size = 24");
+            sb.AppendLine($"text = \"{zone.InstanceLabels[i]}\"");
+            sb.AppendLine("horizontal_alignment = 1");
+            sb.AppendLine();
+        }
     }
 
     private static void WriteShapeLabel(StringBuilder sb, PlacedShape shape, string zoneName)
