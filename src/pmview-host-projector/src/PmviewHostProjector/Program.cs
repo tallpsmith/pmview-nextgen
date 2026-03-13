@@ -11,7 +11,7 @@ public class Program
     public static async Task<int> Main(string[] args)
     {
         var pmproxyUrl = GetArg(args, "--pmproxy") ?? "http://localhost:44322";
-        var outputPath = GetArg(args, "-o") ?? GetArg(args, "--output") ?? "host-view.tscn";
+        var outputPath = ResolveOutputPath(GetArg(args, "-o") ?? GetArg(args, "--output") ?? "host-view.tscn");
         var installAddon = HasFlag(args, "--install-addon");
 
         Console.WriteLine($"pmview-host-projector: connecting to {pmproxyUrl}");
@@ -82,4 +82,15 @@ public class Program
 
     private static bool HasFlag(string[] args, string flag) =>
         Array.IndexOf(args, flag) >= 0;
+
+    /// <summary>
+    /// If the output path is an existing directory or has no file extension,
+    /// treat it as a directory and append the default filename.
+    /// </summary>
+    private static string ResolveOutputPath(string path)
+    {
+        if (Directory.Exists(path) || (!Path.HasExtension(path) && !path.EndsWith(".tscn")))
+            return Path.Combine(path, "host-view.tscn");
+        return path;
+    }
 }

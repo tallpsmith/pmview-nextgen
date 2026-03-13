@@ -47,6 +47,17 @@ public class AddonInstallerTests : IDisposable
     }
 
     [Fact]
+    public void FindGodotProjectRoot_FindsRootWhenOutputPathIsTheGodotRoot()
+    {
+        var godotRoot = Path.Combine(_tempDir, "my-project");
+        Directory.CreateDirectory(godotRoot);
+        File.WriteAllText(Path.Combine(godotRoot, "project.godot"), "");
+
+        var result = AddonInstaller.FindGodotProjectRoot(godotRoot);
+        Assert.Equal(godotRoot, result);
+    }
+
+    [Fact]
     public void FindGodotProjectRoot_ReturnsNullWhenNotFound()
     {
         var scenePath = Path.Combine(_tempDir, "no-godot", "scenes", "host.tscn");

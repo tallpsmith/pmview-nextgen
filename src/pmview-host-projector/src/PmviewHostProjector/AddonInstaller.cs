@@ -12,9 +12,14 @@ public static class AddonInstaller
     /// Walks parent directories from the output file path looking for project.godot.
     /// Returns the directory containing it, or null if not found.
     /// </summary>
-    public static string? FindGodotProjectRoot(string outputFilePath)
+    public static string? FindGodotProjectRoot(string outputPath)
     {
-        var dir = Path.GetDirectoryName(Path.GetFullPath(outputFilePath));
+        var fullPath = Path.GetFullPath(outputPath);
+
+        // If the path is an existing directory, start searching from it directly.
+        // Otherwise treat it as a file path and start from its parent directory.
+        var dir = Directory.Exists(fullPath) ? fullPath : Path.GetDirectoryName(fullPath);
+
         while (dir != null)
         {
             if (File.Exists(Path.Combine(dir, GodotProjectFile)))
