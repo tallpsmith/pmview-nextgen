@@ -41,6 +41,18 @@ dotnet test src/pcp-client-dotnet/PcpClient.sln --filter "Category=Integration"
 
 # Build Godot project C# (when godot-project/ exists)
 dotnet build godot-project/pmview-nextgen.sln
+
+# Build pmview-host-projector (scene generator)
+dotnet build src/pmview-host-projector/PmviewHostProjector.sln
+
+# Run pmview-host-projector tests
+dotnet test src/pmview-host-projector/PmviewHostProjector.sln
+
+# Generate a host-view scene from a running pmproxy
+# Requires dev-environment stack running (podman compose up)
+dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- \
+  --pmproxy http://localhost:44322 \
+  -o godot-project/scenes/host_view.tscn
 ```
 
 **Claude Code VM note:** The VM cannot reach the dev-environment Podman stack on the
