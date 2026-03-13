@@ -345,4 +345,28 @@ public class TscnWriterTests
         // Confirm old inside-bezel position is gone
         Assert.DoesNotContain("0.01, -0.8)", tscn);
     }
+
+    [Fact]
+    public void Write_GridZone_RowHeaders_AreOnRightSide_BeyondLastColumn()
+    {
+        // 3 metrics, colSpacing=1.5, shapeWidth=0.8, rightOffset=0.5
+        // → X = (3-1)*1.5 + 0.8 + 0.5 = 4.3
+        // 2 instances, rowSpacing=2.0 → Z = 0 for cpu0, Z = -2 for cpu1
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("Per_CPU", "Per-CPU", Vec3.Zero,
+                3, 1.5f, 2.0f,
+                [new PlacedShape("s1", ShapeType.Bar, Vec3.Zero,
+                    "kernel.percpu.cpu.user", "cpu0", "cpu0",
+                    new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f)],
+                GroundWidth: 5f, GroundDepth: 8f,
+                MetricLabels: ["User", "Sys", "Nice"],
+                InstanceLabels: ["cpu0", "cpu1"])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+
+        Assert.Contains("4.3, 0.01, 0)", tscn);   // cpu0 at Z=0
+        Assert.Contains("4.3, 0.01, -2)", tscn);  // cpu1 at Z=-2
+        // Confirm old left-side position is gone
+        Assert.DoesNotContain("-0.8, 0.01,", tscn);
+    }
 }

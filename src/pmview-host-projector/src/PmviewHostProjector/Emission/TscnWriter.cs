@@ -313,11 +313,17 @@ public static class TscnWriter
     {
         if (zone.InstanceLabels is null || zone.InstanceLabels.Count == 0) return;
         var rowSpacing = zone.GridRowSpacing ?? 2.5f;
+        var colCount = zone.MetricLabels?.Count ?? 1;
+        var colSpacing = zone.GridColumnSpacing ?? 1.5f;
+        const float ShapeWidth = 0.8f;
+        const float RightEdgeOffset = 0.5f;
+        var x = (colCount - 1) * colSpacing + ShapeWidth + RightEdgeOffset;
+
         for (var i = 0; i < zone.InstanceLabels.Count; i++)
         {
-            var z = -(i * rowSpacing);
+            var z = i == 0 ? 0f : -(i * rowSpacing);
             sb.AppendLine($"[node name=\"{zone.Name}RowLabel{i}\" type=\"Label3D\" parent=\"{zone.Name}\"]");
-            sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, -0.8, 0.01, {F(z)})");
+            sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, {F(x)}, 0.01, {F(z)})");
             sb.AppendLine("pixel_size = 0.008");
             sb.AppendLine("font_size = 24");
             sb.AppendLine($"text = \"{zone.InstanceLabels[i]}\"");
