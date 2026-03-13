@@ -19,12 +19,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
-      - name: Run PcpClient unit tests (integration tests run in E2E workflow with pmproxy)
-        run: dotnet test src/pcp-client-dotnet/PcpClient.sln --filter 'FullyQualifiedName!~Integration'
-      - name: Run PcpGodotBridge tests
-        run: dotnet test src/pcp-godot-bridge/PcpGodotBridge.sln
-      - name: Run pmview-host-projector tests
-        run: dotnet test src/pmview-host-projector/PmviewHostProjector.sln
+      - name: Run all .NET unit tests (integration tests run in E2E workflow with pmproxy)
+        run: dotnet test pmview-nextgen.sln --filter 'FullyQualifiedName!~Integration'
 
   godot-unit-tests:
     name: Godot Unit Tests (Tier 2)

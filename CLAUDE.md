@@ -26,27 +26,18 @@ tests/
 ## Commands
 
 ```bash
-# Build PcpClient library
-dotnet build src/pcp-client-dotnet/PcpClient.sln
+# Build and test everything (root solution includes all .NET projects)
+dotnet build pmview-nextgen.sln
+dotnet test pmview-nextgen.sln --filter "FullyQualifiedName!~Integration"
 
-# Run ALL PcpClient tests (unit + integration)
-# Integration tests REQUIRE the dev-environment stack (pmproxy + Valkey).
-dotnet test src/pcp-client-dotnet/PcpClient.sln
-
-# Run unit tests ONLY (skip integration — use when pmproxy is unavailable)
-dotnet test src/pcp-client-dotnet/PcpClient.sln --filter "FullyQualifiedName!~Integration"
+# Run ALL tests including integration (requires dev-environment stack)
+dotnet test pmview-nextgen.sln
 
 # Run integration tests ONLY
 dotnet test src/pcp-client-dotnet/PcpClient.sln --filter "Category=Integration"
 
 # Build Godot project C# (when godot-project/ exists)
 dotnet build godot-project/pmview-nextgen.sln
-
-# Build pmview-host-projector (scene generator)
-dotnet build src/pmview-host-projector/PmviewHostProjector.sln
-
-# Run pmview-host-projector tests
-dotnet test src/pmview-host-projector/PmviewHostProjector.sln
 
 # Generate a host-view scene from a running pmproxy
 # Requires dev-environment stack running (podman compose up)
