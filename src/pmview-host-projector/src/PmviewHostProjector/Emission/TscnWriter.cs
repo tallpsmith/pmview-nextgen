@@ -315,13 +315,15 @@ public static class TscnWriter
         var rowSpacing = zone.GridRowSpacing ?? 2.5f;
         var colCount = zone.MetricLabels?.Count ?? 1;
         var colSpacing = zone.GridColumnSpacing ?? 1.5f;
+        // ShapeWidth matches the grounded_bar default X scale (see building_blocks/grounded_bar.tscn)
         const float ShapeWidth = 0.8f;
         const float RightEdgeOffset = 0.5f;
         var x = (colCount - 1) * colSpacing + ShapeWidth + RightEdgeOffset;
 
         for (var i = 0; i < zone.InstanceLabels.Count; i++)
         {
-            var z = i == 0 ? 0f : -(i * rowSpacing);
+            // Negate after computing; -(0 * rowSpacing) is -0f but F() formats it as "0" on InvariantCulture
+            var z = -(i * rowSpacing);
             sb.AppendLine($"[node name=\"{zone.Name}RowLabel{i}\" type=\"Label3D\" parent=\"{zone.Name}\"]");
             sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, {F(x)}, 0.01, {F(z)})");
             sb.AppendLine("pixel_size = 0.008");
@@ -360,7 +362,8 @@ public static class TscnWriter
 
     private static string SubResourceId(string nodeName) => $"binding_{nodeName}";
 
-    private static string F(float value) => value.ToString(Inv);
+    // Normalise -0f → 0f so the tscn output never contains the ugly "-0" literal.
+    private static string F(float value) => (value == 0f ? 0f : value).ToString(Inv);
 
     private static string ToResourceId(string name) =>
         string.Concat(name.Select(c => char.IsAsciiLetterOrDigit(c) || c == '_' ? c : '_'));
