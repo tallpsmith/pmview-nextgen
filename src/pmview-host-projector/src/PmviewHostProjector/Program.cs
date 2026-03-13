@@ -43,6 +43,15 @@ public class Program
                     return 1;
                 }
 
+                var csprojPath = CsprojPatcher.FindTargetCsproj(godotRoot);
+                if (csprojPath == null)
+                {
+                    Console.Error.WriteLine("Error: No .csproj found in the Godot project. " +
+                                            "Create a C# solution first (Project > Tools > C# > Create C# Solution) " +
+                                            "then re-run with --install-addon.");
+                    return 1;
+                }
+
                 var addonLibDir = Path.Combine(addonSource, "lib");
                 Console.WriteLine("Building PcpClient and PcpGodotBridge libraries...");
                 LibraryBuilder.PublishLibraries(repoRoot, addonLibDir);
@@ -50,12 +59,7 @@ public class Program
                 // Copy addon (with DLLs) and patch target .csproj
                 AddonInstaller.InstallAddonWithLibraries(addonSource, godotRoot);
                 Console.WriteLine($"Addon installed to: {Path.Combine(godotRoot, "addons", "pmview-bridge")}");
-
-                var csprojPath = CsprojPatcher.FindTargetCsproj(godotRoot);
-                if (csprojPath != null)
-                    Console.WriteLine($"Patched {Path.GetFileName(csprojPath)} with library references");
-                else
-                    Console.WriteLine("Warning: No .csproj found — create C# solution in Godot first, then re-run with --install-addon");
+                Console.WriteLine($"Patched {Path.GetFileName(csprojPath)} with library references");
             }
 
             await using var pcpClient = new PcpClientConnection(new Uri(pmproxyUrl));
