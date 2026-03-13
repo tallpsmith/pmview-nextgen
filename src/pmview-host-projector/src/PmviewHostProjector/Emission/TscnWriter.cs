@@ -24,6 +24,7 @@ public static class TscnWriter
         WriteExtResources(sb, registry);
         WriteSubResources(sb, subResources);
         WriteBezelSubResources(sb, bezelResources);
+        WriteWorldEnvironmentSubResource(sb);
         WriteNodes(sb, layout, registry, subResources, bezelResources);
 
         return sb.ToString();
@@ -67,8 +68,8 @@ public static class TscnWriter
             .Where(z => z.GroundWidth > 0f && z.GroundDepth > 0f)
             .Select(z => new BezelSubResources(
                 z.Name,
-                $"bezel_mesh_{z.Name}",
-                $"bezel_mat_{z.Name}",
+                $"bezel_mesh_{ToResourceId(z.Name)}",
+                $"bezel_mat_{ToResourceId(z.Name)}",
                 z.GroundWidth,
                 z.GroundDepth))
             .ToList();
@@ -78,7 +79,8 @@ public static class TscnWriter
     private static void WriteHeader(StringBuilder sb, ExtResourceRegistry registry,
         List<SubResourceEntry> subResources, List<BezelSubResources> bezelResources)
     {
-        var loadSteps = registry.Count + subResources.Count + bezelResources.Count * 2 + 1;
+        // +1 for scene itself, +1 for WorldEnvironment Environment sub_resource
+        var loadSteps = registry.Count + subResources.Count + bezelResources.Count * 2 + 2;
         sb.AppendLine($"[gd_scene load_steps={loadSteps} format=3]");
         sb.AppendLine();
     }
@@ -127,9 +129,20 @@ public static class TscnWriter
             sb.AppendLine();
 
             sb.AppendLine($"[sub_resource type=\"StandardMaterial3D\" id=\"{bezel.MaterialId}\"]");
-            sb.AppendLine("albedo_color = Color(0.15, 0.15, 0.15, 1)");
+            sb.AppendLine("albedo_color = Color(0.3, 0.3, 0.3, 1)");
             sb.AppendLine();
         }
+    }
+
+    private static void WriteWorldEnvironmentSubResource(StringBuilder sb)
+    {
+        sb.AppendLine("[sub_resource type=\"Environment\" id=\"world_env\"]");
+        sb.AppendLine("background_mode = 1");
+        sb.AppendLine("background_color = Color(0.02, 0.02, 0.06, 1)");
+        sb.AppendLine("ambient_light_source = 1");
+        sb.AppendLine("ambient_light_color = Color(0.4, 0.4, 0.5, 1)");
+        sb.AppendLine("ambient_light_energy = 0.5");
+        sb.AppendLine();
     }
 
     // --- nodes ---
@@ -138,6 +151,23 @@ public static class TscnWriter
         List<SubResourceEntry> subResources, List<BezelSubResources> bezelResources)
     {
         sb.AppendLine("[node name=\"HostView\" type=\"Node3D\"]");
+        sb.AppendLine();
+
+        sb.AppendLine("[node name=\"WorldEnvironment\" type=\"WorldEnvironment\" parent=\".\"]");
+        sb.AppendLine("environment = SubResource(\"world_env\")");
+        sb.AppendLine();
+
+        // Key light: front-above at ~45° pitch, illuminates camera-facing surfaces
+        sb.AppendLine("[node name=\"KeyLight\" type=\"DirectionalLight3D\" parent=\".\"]");
+        sb.AppendLine("transform = Transform3D(1, 0, 0, 0, 0.707, -0.707, 0, 0.707, 0.707, 0, 0, 0)");
+        sb.AppendLine("light_energy = 1.2");
+        sb.AppendLine("shadow_enabled = true");
+        sb.AppendLine();
+
+        // Fill light: from rear-above at ~30° pitch, lifts the back and side faces out of shadow
+        sb.AppendLine("[node name=\"FillLight\" type=\"DirectionalLight3D\" parent=\".\"]");
+        sb.AppendLine("transform = Transform3D(-1, 0, 0, 0, 0.866, 0.5, 0, 0.5, -0.866, 0, 0, 0)");
+        sb.AppendLine("light_energy = 0.5");
         sb.AppendLine();
 
         foreach (var zone in layout.Zones)
@@ -210,12 +240,25 @@ public static class TscnWriter
         var bezel = bezelResources.FirstOrDefault(b => b.ZoneName == zone.Name);
         if (bezel is null) return;
 
-        var centreX = zone.Shapes.Count > 0
-            ? zone.Shapes.Max(s => s.LocalPosition.X) / 2f
-            : 0f;
+        float centreX, centreZ;
+        if (zone.GridColumns.HasValue)
+        {
+            // Grid shapes are positioned by GridLayout3D at runtime — centre on the grid's visual extent
+            var cols = zone.GridColumns.Value;
+            var colSpacing = zone.GridColumnSpacing ?? 2.0f;
+            var rows = zone.InstanceLabels?.Count ?? 1;
+            var rowSpacing = zone.GridRowSpacing ?? 2.5f;
+            centreX = (cols - 1) * colSpacing / 2f;
+            centreZ = -(rows - 1) * rowSpacing / 2f;
+        }
+        else
+        {
+            centreX = zone.Shapes.Count > 0 ? zone.Shapes.Max(s => s.LocalPosition.X) / 2f : 0f;
+            centreZ = 0f;
+        }
 
         sb.AppendLine($"[node name=\"{zone.Name}Ground\" type=\"MeshInstance3D\" parent=\"{zone.Name}\"]");
-        sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, {F(centreX)}, -0.01, 0)");
+        sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, {F(centreX)}, -0.01, {F(centreZ)})");
         sb.AppendLine($"mesh = SubResource(\"{bezel.MeshId}\")");
         sb.AppendLine($"surface_material_override/0 = SubResource(\"{bezel.MaterialId}\")");
         sb.AppendLine();
@@ -248,12 +291,16 @@ public static class TscnWriter
     private static void WriteGridColumnHeaders(StringBuilder sb, PlacedZone zone)
     {
         if (zone.MetricLabels is null || zone.MetricLabels.Count == 0) return;
-        var colSpacing = zone.GridColumnSpacing ?? 1.5f;
+        var colSpacing = zone.GridColumnSpacing ?? 2.0f;
+        var rowCount = zone.InstanceLabels?.Count ?? 1;
+        var rowSpacing = zone.GridRowSpacing ?? 2.5f;
+        var z = -(rowCount - 1) * rowSpacing - 1.0f;
+
         for (var i = 0; i < zone.MetricLabels.Count; i++)
         {
             var x = i * colSpacing;
             sb.AppendLine($"[node name=\"{zone.Name}ColLabel{i}\" type=\"Label3D\" parent=\"{zone.Name}\"]");
-            sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, {F(x)}, 0.01, -0.8)");
+            sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, {F(x)}, 0.01, {F(z)})");
             sb.AppendLine("pixel_size = 0.008");
             sb.AppendLine("font_size = 24");
             sb.AppendLine($"text = \"{zone.MetricLabels[i]}\"");
@@ -265,12 +312,20 @@ public static class TscnWriter
     private static void WriteGridRowHeaders(StringBuilder sb, PlacedZone zone)
     {
         if (zone.InstanceLabels is null || zone.InstanceLabels.Count == 0) return;
-        var rowSpacing = zone.GridRowSpacing ?? 2.0f;
+        var rowSpacing = zone.GridRowSpacing ?? 2.5f;
+        var colCount = zone.MetricLabels?.Count ?? 1;
+        var colSpacing = zone.GridColumnSpacing ?? 2.0f;
+        // ShapeWidth matches the grounded_bar default X scale (see building_blocks/grounded_bar.tscn)
+        const float ShapeWidth = 0.8f;
+        const float RightEdgeOffset = 0.5f;
+        var x = (colCount - 1) * colSpacing + ShapeWidth + RightEdgeOffset;
+
         for (var i = 0; i < zone.InstanceLabels.Count; i++)
         {
+            // Negate after computing; -(0 * rowSpacing) is -0f but F() formats it as "0" on InvariantCulture
             var z = -(i * rowSpacing);
             sb.AppendLine($"[node name=\"{zone.Name}RowLabel{i}\" type=\"Label3D\" parent=\"{zone.Name}\"]");
-            sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, -0.8, 0.01, {F(z)})");
+            sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, {F(x)}, 0.01, {F(z)})");
             sb.AppendLine("pixel_size = 0.008");
             sb.AppendLine("font_size = 24");
             sb.AppendLine($"text = \"{zone.InstanceLabels[i]}\"");
@@ -307,7 +362,11 @@ public static class TscnWriter
 
     private static string SubResourceId(string nodeName) => $"binding_{nodeName}";
 
-    private static string F(float value) => value.ToString(Inv);
+    // Normalise -0f → 0f so the tscn output never contains the ugly "-0" literal.
+    private static string F(float value) => (value == 0f ? 0f : value).ToString(Inv);
+
+    private static string ToResourceId(string name) =>
+        string.Concat(name.Select(c => char.IsAsciiLetterOrDigit(c) || c == '_' ? c : '_'));
 
     // --- private supporting types ---
 

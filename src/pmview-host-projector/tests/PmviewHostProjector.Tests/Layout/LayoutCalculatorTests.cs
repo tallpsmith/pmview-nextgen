@@ -219,4 +219,30 @@ public class LayoutCalculatorBackgroundTests
         var perCpu = layout.Zones.Single(z => z.Name == "Per-CPU");
         Assert.Equal(new[] { "cpu0", "cpu1" }, perCpu.InstanceLabels);
     }
+
+    [Fact]
+    public void Calculate_AdjacentBackgroundZones_StrideIncludesRowHeaderReservation()
+    {
+        // Without RowHeaderReservation, stride = bezelWidth + ZoneGap(3.0).
+        // With it, stride = bezelWidth + RowHeaderReservation(2.0) + ZoneGap(3.0).
+        // The extra 2.0 is the distinguishing assertion.
+        const float ZoneGap = 3.0f;
+        const float RowHeaderReservation = 2.0f;
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology(cpus: 2, nics: 2));
+        var background = layout.Zones
+            .Where(z => z.GridColumns.HasValue)
+            .OrderBy(z => z.Position.X)
+            .ToList();
+
+        for (var i = 0; i < background.Count - 1; i++)
+        {
+            var left = background[i];
+            var right = background[i + 1];
+            var stride = right.Position.X - left.Position.X;
+            // Stride must include the bezel, the row header reservation, and the inter-group gap.
+            // Without RowHeaderReservation this would only be bezelWidth + ZoneGap.
+            Assert.True(stride >= left.GroundWidth + RowHeaderReservation + ZoneGap,
+                $"Zone '{left.Name}' → '{right.Name}': stride {stride:F2} < {left.GroundWidth + RowHeaderReservation + ZoneGap:F2} (bezel + reservation + gap)");
+        }
+    }
 }
