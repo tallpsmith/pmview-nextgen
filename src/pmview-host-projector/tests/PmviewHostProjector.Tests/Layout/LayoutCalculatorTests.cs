@@ -181,4 +181,17 @@ public class LayoutCalculatorBackgroundTests
         Assert.True(perCpu.GroundWidth > 0f);
         Assert.True(perCpu.GroundDepth > 0f);
     }
+
+    [Fact]
+    public void Calculate_GridSpacing_WiderThanShapeWidth()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology(cpus: 4));
+        var perCpu = layout.Zones.Single(z => z.Name == "Per-CPU");
+        // Column spacing should be at least 2.0 to fit label text between columns
+        Assert.True(perCpu.GridColumnSpacing >= 2.0f,
+            $"Column spacing {perCpu.GridColumnSpacing} should be >= 2.0 for label clearance");
+        // Row spacing should be at least 2.5 to fit row header labels
+        Assert.True(perCpu.GridRowSpacing >= 2.5f,
+            $"Row spacing {perCpu.GridRowSpacing} should be >= 2.5 for label clearance");
+    }
 }

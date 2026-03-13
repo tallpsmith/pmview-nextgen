@@ -11,8 +11,8 @@ public static class LayoutCalculator
     private const float ShapeSpacing       = 1.5f;
     private const float ZoneGap            = 3.0f;
     private const float BackgroundZOffset  = -8.0f;
-    private const float GridColumnSpacing  = 1.5f;
-    private const float GridRowSpacing     = 2.0f;
+    private const float GridColumnSpacing  = 2.0f;
+    private const float GridRowSpacing     = 2.5f;
     private const long  FallbackMemoryBytes = 16_000_000_000L;
     private const float GroundPadding      = 0.6f;
 
