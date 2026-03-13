@@ -112,7 +112,7 @@ public class Program
     /// </summary>
     private static string ResolveOutputPath(string path)
     {
-        if (Directory.Exists(path) || (!Path.HasExtension(path) && !path.EndsWith(".tscn")))
+        if (Directory.Exists(path) || !Path.HasExtension(path))
             return Path.Combine(path, "host-view.tscn");
         return path;
     }

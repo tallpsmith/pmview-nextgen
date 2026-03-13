@@ -157,4 +157,138 @@ public class TscnWriterTests
         var tscn = TscnWriter.Write(layout);
         Assert.Contains("Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, 0)", tscn);
     }
+
+    [Fact]
+    public void Write_ShapeNode_EmitsColourProperty()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("CPU", "CPU", Vec3.Zero, null, null, null,
+                [new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
+                    "kernel.all.cpu.user", null, null,
+                    new RgbColour(0.976f, 0.451f, 0.086f),
+                    0f, 100f, 0.2f, 5.0f)])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("colour = Color(0.976, 0.451, 0.086, 1)", tscn);
+    }
+
+    [Fact]
+    public void Write_ZoneLabel_CentredOnShapeSpan()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("Load", "Load", Vec3.Zero, null, null, null,
+                [
+                    new PlacedShape("Load_1m", ShapeType.Bar, new Vec3(0, 0, 0),
+                        "kernel.all.load", "1 minute", "1m",
+                        new RgbColour(0.388f, 0.400f, 0.945f), 0f, 10f, 0.2f, 5.0f),
+                    new PlacedShape("Load_5m", ShapeType.Bar, new Vec3(1.5f, 0, 0),
+                        "kernel.all.load", "5 minute", "5m",
+                        new RgbColour(0.388f, 0.400f, 0.945f), 0f, 10f, 0.2f, 5.0f),
+                    new PlacedShape("Load_15m", ShapeType.Bar, new Vec3(3.0f, 0, 0),
+                        "kernel.all.load", "15 minute", "15m",
+                        new RgbColour(0.388f, 0.400f, 0.945f), 0f, 10f, 0.2f, 5.0f),
+                ],
+                GroundWidth: 4.6f, GroundDepth: 2.0f)
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        // Label should be at X = 1.5 (centre of 0..3.0 span), Z = 1.5
+        Assert.Contains("text = \"Load\"", tscn);
+        Assert.Contains("1.5, 0.01, 1.5", tscn);
+    }
+
+    [Fact]
+    public void Write_EmitsGroundBezelMeshPerZone()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("CPU", "CPU", Vec3.Zero, null, null, null,
+                [new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
+                    "kernel.all.cpu.user", null, null,
+                    new RgbColour(0.976f, 0.451f, 0.086f),
+                    0f, 100f, 0.2f, 5.0f)],
+                GroundWidth: 2.0f, GroundDepth: 2.0f)
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("[node name=\"CPUGround\" type=\"MeshInstance3D\" parent=\"CPU\"]", tscn);
+        Assert.Contains("BoxMesh", tscn);
+    }
+
+    [Fact]
+    public void Write_GroundBezel_HasDarkGreyMaterial()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("CPU", "CPU", Vec3.Zero, null, null, null,
+                [new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
+                    "kernel.all.cpu.user", null, null,
+                    new RgbColour(0.976f, 0.451f, 0.086f),
+                    0f, 100f, 0.2f, 5.0f)],
+                GroundWidth: 2.0f, GroundDepth: 2.0f)
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("albedo_color = Color(0.15, 0.15, 0.15, 1)", tscn);
+    }
+
+    [Fact]
+    public void Write_ZeroGroundExtent_NoBezelEmitted()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("Empty", "Empty", Vec3.Zero, null, null, null, [],
+                GroundWidth: 0f, GroundDepth: 0f)
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.DoesNotContain("Ground", tscn);
+    }
+
+    [Fact]
+    public void Write_ForegroundShape_EmitsMetricLabel()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("Load", "Load", Vec3.Zero, null, null, null,
+                [new PlacedShape("Load_1m", ShapeType.Bar, new Vec3(0, 0, 0),
+                    "kernel.all.load", "1 minute", "1m",
+                    new RgbColour(0.388f, 0.400f, 0.945f),
+                    0f, 10f, 0.2f, 5.0f)])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("[node name=\"Load_1mLabel\" type=\"Label3D\" parent=\"Load\"]", tscn);
+        Assert.Contains("text = \"1m\"", tscn);
+    }
+
+    [Fact]
+    public void Write_GridZone_EmitsColumnHeaderLabels()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("Per_CPU", "Per-CPU", new Vec3(0, 0, -8),
+                3, 1.5f, 2.0f,
+                [new PlacedShape("PerCPU_cpu0_User", ShapeType.Bar, Vec3.Zero,
+                    "kernel.percpu.cpu.user", "cpu0", "cpu0",
+                    new RgbColour(0.976f, 0.451f, 0.086f),
+                    0f, 100f, 0.2f, 5.0f)],
+                GroundWidth: 5f, GroundDepth: 8f,
+                MetricLabels: ["User", "Sys", "Nice"],
+                InstanceLabels: ["cpu0", "cpu1"])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("text = \"User\"", tscn);
+        Assert.Contains("text = \"Sys\"", tscn);
+        Assert.Contains("text = \"Nice\"", tscn);
+    }
+
+    [Fact]
+    public void Write_GridZone_EmitsRowHeaderLabels()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("Per_CPU", "Per-CPU", new Vec3(0, 0, -8),
+                3, 1.5f, 2.0f,
+                [new PlacedShape("PerCPU_cpu0_User", ShapeType.Bar, Vec3.Zero,
+                    "kernel.percpu.cpu.user", "cpu0", "cpu0",
+                    new RgbColour(0.976f, 0.451f, 0.086f),
+                    0f, 100f, 0.2f, 5.0f)],
+                GroundWidth: 5f, GroundDepth: 8f,
+                MetricLabels: ["User", "Sys", "Nice"],
+                InstanceLabels: ["cpu0", "cpu1"])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("text = \"cpu0\"", tscn);
+        Assert.Contains("text = \"cpu1\"", tscn);
+    }
 }

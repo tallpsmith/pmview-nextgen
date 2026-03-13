@@ -84,6 +84,25 @@ public class LayoutCalculatorForegroundTests
             Assert.Equal(zone.Shapes.Count, xPositions.Count);
         }
     }
+
+    [Fact]
+    public void Calculate_ForegroundZone_HasGroundExtent()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var load = layout.Zones.Single(z => z.Name == "Load");
+        // Load zone has 3 shapes at X=0, 1.5, 3.0. Ground should span them + padding.
+        Assert.True(load.GroundWidth > 3.0f, $"GroundWidth {load.GroundWidth} should be > 3.0");
+        Assert.True(load.GroundDepth > 0f, $"GroundDepth {load.GroundDepth} should be > 0");
+    }
+
+    [Fact]
+    public void Calculate_ForegroundZone_HasEmptyGridLabels()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var load = layout.Zones.Single(z => z.Name == "Load");
+        Assert.Empty(load.MetricLabels ?? []);
+        Assert.Empty(load.InstanceLabels ?? []);
+    }
 }
 
 public class LayoutCalculatorBackgroundTests
@@ -160,5 +179,44 @@ public class LayoutCalculatorBackgroundTests
         var layout = LayoutCalculator.Calculate(LinuxZones, topology);
         var perDisk = layout.Zones.Single(z => z.Name == "Per-Disk");
         Assert.Empty(perDisk.Shapes);
+    }
+
+    [Fact]
+    public void Calculate_BackgroundZone_HasGroundExtent()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology(cpus: 4));
+        var perCpu = layout.Zones.Single(z => z.Name == "Per-CPU");
+        // 4 instances x 3 metrics, grid 3 cols => 4 rows x 3 cols
+        Assert.True(perCpu.GroundWidth > 0f);
+        Assert.True(perCpu.GroundDepth > 0f);
+    }
+
+    [Fact]
+    public void Calculate_GridSpacing_WiderThanShapeWidth()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology(cpus: 4));
+        var perCpu = layout.Zones.Single(z => z.Name == "Per-CPU");
+        // Column spacing should be at least 2.0 to fit label text between columns
+        Assert.True(perCpu.GridColumnSpacing >= 2.0f,
+            $"Column spacing {perCpu.GridColumnSpacing} should be >= 2.0 for label clearance");
+        // Row spacing should be at least 2.5 to fit row header labels
+        Assert.True(perCpu.GridRowSpacing >= 2.5f,
+            $"Row spacing {perCpu.GridRowSpacing} should be >= 2.5 for label clearance");
+    }
+
+    [Fact]
+    public void Calculate_PerCpuZone_HasMetricLabels()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology(cpus: 2));
+        var perCpu = layout.Zones.Single(z => z.Name == "Per-CPU");
+        Assert.Equal(new[] { "User", "Sys", "Nice" }, perCpu.MetricLabels);
+    }
+
+    [Fact]
+    public void Calculate_PerCpuZone_HasInstanceLabels()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology(cpus: 2));
+        var perCpu = layout.Zones.Single(z => z.Name == "Per-CPU");
+        Assert.Equal(new[] { "cpu0", "cpu1" }, perCpu.InstanceLabels);
     }
 }

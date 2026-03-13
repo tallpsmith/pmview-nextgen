@@ -11,9 +11,10 @@ public static class LayoutCalculator
     private const float ShapeSpacing       = 1.5f;
     private const float ZoneGap            = 3.0f;
     private const float BackgroundZOffset  = -8.0f;
-    private const float GridColumnSpacing  = 1.5f;
-    private const float GridRowSpacing     = 2.0f;
+    private const float GridColumnSpacing  = 2.0f;
+    private const float GridRowSpacing     = 2.5f;
     private const long  FallbackMemoryBytes = 16_000_000_000L;
+    private const float GroundPadding      = 0.6f;
 
     public static SceneLayout Calculate(IReadOnlyList<ZoneDefinition> zones, HostTopology topology)
     {
@@ -37,6 +38,15 @@ public static class LayoutCalculator
             ? BuildForegroundShapes(zone, topology)
             : BuildBackgroundShapes(zone, topology);
 
+        var (groundWidth, groundDepth) = ComputeGroundExtent(zone, topology, shapes);
+
+        var metricLabels = zone.Row == ZoneRow.Background
+            ? zone.Metrics.Select(m => m.Label).ToList()
+            : (IReadOnlyList<string>)[];
+        var instanceLabels = zone.Row == ZoneRow.Background
+            ? ResolveInstances(zone, topology).Select(ShortenInstanceName).ToList()
+            : (IReadOnlyList<string>)[];
+
         // Position will be finalised by CenterRowOnXZero; use Zero for now.
         return new PlacedZone(
             Name:              zone.Name,
@@ -45,7 +55,35 @@ public static class LayoutCalculator
             GridColumns:       zone.Row == ZoneRow.Background ? zone.Metrics.Count : null,
             GridColumnSpacing: zone.Row == ZoneRow.Background ? GridColumnSpacing : null,
             GridRowSpacing:    zone.Row == ZoneRow.Background ? GridRowSpacing : null,
-            Shapes:            shapes);
+            Shapes:            shapes,
+            GroundWidth:       groundWidth,
+            GroundDepth:       groundDepth,
+            MetricLabels:      metricLabels,
+            InstanceLabels:    instanceLabels);
+    }
+
+    private static (float Width, float Depth) ComputeGroundExtent(
+        ZoneDefinition zone,
+        HostTopology topology,
+        IReadOnlyList<PlacedShape> shapes)
+    {
+        if (shapes.Count == 0) return (0f, 0f);
+
+        if (zone.Row == ZoneRow.Foreground)
+        {
+            var maxX  = shapes.Max(s => s.LocalPosition.X);
+            var width = maxX + 0.8f + GroundPadding * 2;
+            var depth = 0.8f + GroundPadding * 2;
+            return (width, depth);
+        }
+        else
+        {
+            var cols  = zone.Metrics.Count;
+            var rows  = ResolveInstances(zone, topology).Count;
+            var width = (cols - 1) * GridColumnSpacing + 0.8f + GroundPadding * 2;
+            var depth = (rows - 1) * GridRowSpacing    + 0.8f + GroundPadding * 2;
+            return (width, depth);
+        }
     }
 
     private static IReadOnlyList<PlacedShape> BuildForegroundShapes(ZoneDefinition zone, HostTopology topology)

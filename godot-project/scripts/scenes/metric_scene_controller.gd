@@ -3,7 +3,7 @@ extends Node
 ## Main scene controller: wires MetricPoller signals to SceneBinder.
 ## Displays connection status overlay. Loads scenes with editor-integrated bindings.
 
-@export var default_scene: String = "res://scenes/test_bars.tscn"
+@export var default_scene: String = "res://scenes/host-view.tscn"
 
 @onready var metric_poller: Node = $MetricPoller
 @onready var scene_binder: Node = $SceneBinder
