@@ -171,4 +171,28 @@ public class TscnWriterTests
         var tscn = TscnWriter.Write(layout);
         Assert.Contains("colour = Color(0.976, 0.451, 0.086, 1)", tscn);
     }
+
+    [Fact]
+    public void Write_ZoneLabel_CentredOnShapeSpan()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("Load", "Load", Vec3.Zero, null, null, null,
+                [
+                    new PlacedShape("Load_1m", ShapeType.Bar, new Vec3(0, 0, 0),
+                        "kernel.all.load", "1 minute", "1m",
+                        new RgbColour(0.388f, 0.400f, 0.945f), 0f, 10f, 0.2f, 5.0f),
+                    new PlacedShape("Load_5m", ShapeType.Bar, new Vec3(1.5f, 0, 0),
+                        "kernel.all.load", "5 minute", "5m",
+                        new RgbColour(0.388f, 0.400f, 0.945f), 0f, 10f, 0.2f, 5.0f),
+                    new PlacedShape("Load_15m", ShapeType.Bar, new Vec3(3.0f, 0, 0),
+                        "kernel.all.load", "15 minute", "15m",
+                        new RgbColour(0.388f, 0.400f, 0.945f), 0f, 10f, 0.2f, 5.0f),
+                ],
+                GroundWidth: 4.6f, GroundDepth: 2.0f)
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        // Label should be at X = 1.5 (centre of 0..3.0 span), Z = 1.5
+        Assert.Contains("text = \"Load\"", tscn);
+        Assert.Contains("1.5, 0.01, 1.5", tscn);
+    }
 }

@@ -148,8 +148,13 @@ public static class TscnWriter
 
     private static void WriteZoneLabelNode(StringBuilder sb, PlacedZone zone)
     {
+        var centreX = zone.Shapes.Count > 0
+            ? zone.Shapes.Max(s => s.LocalPosition.X) / 2f
+            : 0f;
+        var labelZ = 1.5f;
+
         sb.AppendLine($"[node name=\"{zone.Name}Label\" type=\"Label3D\" parent=\"{zone.Name}\"]");
-        sb.AppendLine("transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0.01, 1)");
+        sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, {F(centreX)}, 0.01, {F(labelZ)})");
         sb.AppendLine("pixel_size = 0.01");
         sb.AppendLine("font_size = 32");
         sb.AppendLine($"text = \"{zone.ZoneLabel}\"");
