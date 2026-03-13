@@ -7,7 +7,7 @@ namespace PcpClient.Tests.Integration;
 /// Tests fail hard if pmproxy is unavailable — that's intentional.
 /// To skip integration tests (e.g. in a VM without network access to
 /// the dev-environment stack), run with:
-///   dotnet test --filter "Category!=Integration"
+///   dotnet test --filter "FullyQualifiedName!~Integration"
 /// </summary>
 public abstract class IntegrationTestBase : IAsyncLifetime
 {

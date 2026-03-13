@@ -137,7 +137,7 @@ When you can't run the dev-environment stack (e.g. a VM without container
 access), explicitly exclude integration tests:
 
 ```bash
-dotnet test src/pcp-client-dotnet/PcpClient.sln --filter "Category!=Integration" -v n
+dotnet test src/pcp-client-dotnet/PcpClient.sln --filter "FullyQualifiedName!~Integration" -v n
 ```
 
 This is an **opt-out** — by default all tests run and integration tests will
