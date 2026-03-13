@@ -26,7 +26,9 @@ public record PlacedZone(
     int? GridColumns,
     float? GridColumnSpacing,
     float? GridRowSpacing,
-    IReadOnlyList<PlacedShape> Shapes);
+    IReadOnlyList<PlacedShape> Shapes,
+    float GroundWidth = 0f,
+    float GroundDepth = 0f);
 
 public record SceneLayout(
     string Hostname,

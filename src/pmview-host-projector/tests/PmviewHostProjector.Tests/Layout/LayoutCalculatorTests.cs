@@ -84,6 +84,16 @@ public class LayoutCalculatorForegroundTests
             Assert.Equal(zone.Shapes.Count, xPositions.Count);
         }
     }
+
+    [Fact]
+    public void Calculate_ForegroundZone_HasGroundExtent()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var load = layout.Zones.Single(z => z.Name == "Load");
+        // Load zone has 3 shapes at X=0, 1.5, 3.0. Ground should span them + padding.
+        Assert.True(load.GroundWidth > 3.0f, $"GroundWidth {load.GroundWidth} should be > 3.0");
+        Assert.True(load.GroundDepth > 0f, $"GroundDepth {load.GroundDepth} should be > 0");
+    }
 }
 
 public class LayoutCalculatorBackgroundTests
@@ -160,5 +170,15 @@ public class LayoutCalculatorBackgroundTests
         var layout = LayoutCalculator.Calculate(LinuxZones, topology);
         var perDisk = layout.Zones.Single(z => z.Name == "Per-Disk");
         Assert.Empty(perDisk.Shapes);
+    }
+
+    [Fact]
+    public void Calculate_BackgroundZone_HasGroundExtent()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology(cpus: 4));
+        var perCpu = layout.Zones.Single(z => z.Name == "Per-CPU");
+        // 4 instances x 3 metrics, grid 3 cols => 4 rows x 3 cols
+        Assert.True(perCpu.GroundWidth > 0f);
+        Assert.True(perCpu.GroundDepth > 0f);
     }
 }
