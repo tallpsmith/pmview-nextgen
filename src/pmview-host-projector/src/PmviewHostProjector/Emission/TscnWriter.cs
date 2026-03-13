@@ -291,7 +291,7 @@ public static class TscnWriter
     private static void WriteGridColumnHeaders(StringBuilder sb, PlacedZone zone)
     {
         if (zone.MetricLabels is null || zone.MetricLabels.Count == 0) return;
-        var colSpacing = zone.GridColumnSpacing ?? 1.5f;
+        var colSpacing = zone.GridColumnSpacing ?? 2.0f;
         var rowCount = zone.InstanceLabels?.Count ?? 1;
         var rowSpacing = zone.GridRowSpacing ?? 2.5f;
         var z = -(rowCount - 1) * rowSpacing - 1.0f;
@@ -314,7 +314,7 @@ public static class TscnWriter
         if (zone.InstanceLabels is null || zone.InstanceLabels.Count == 0) return;
         var rowSpacing = zone.GridRowSpacing ?? 2.5f;
         var colCount = zone.MetricLabels?.Count ?? 1;
-        var colSpacing = zone.GridColumnSpacing ?? 1.5f;
+        var colSpacing = zone.GridColumnSpacing ?? 2.0f;
         // ShapeWidth matches the grounded_bar default X scale (see building_blocks/grounded_bar.tscn)
         const float ShapeWidth = 0.8f;
         const float RightEdgeOffset = 0.5f;
