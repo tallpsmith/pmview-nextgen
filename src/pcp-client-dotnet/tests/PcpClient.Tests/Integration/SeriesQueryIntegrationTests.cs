@@ -5,35 +5,11 @@ namespace PcpClient.Tests.Integration;
 [Trait("Category", "Integration")]
 public class SeriesQueryIntegrationTests : IntegrationTestBase
 {
-    // Valkey/pmseries may not be running even when pmproxy is up.
-    // Probe with a tight timeout; any non-response means skip.
-    private static readonly Lazy<bool> SeriesAvailable = new(() =>
-    {
-        try
-        {
-            using var probe = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
-            var url = PcpSeriesQuery.BuildQueryUrl(
-                new Uri("http://localhost:44322"), "kernel.all.cpu.user", samples: 1);
-            probe.GetStringAsync(url).GetAwaiter().GetResult();
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
-    });
-
-    private static void SkipIfSeriesUnavailable() =>
-        Skip.If(!SeriesAvailable.Value,
-            "pmseries/Valkey not available — start dev-environment stack with archive data loaded");
-
-    // Fresh client per test: avoids stale keep-alive sockets hanging until default 100s timeout.
     private static HttpClient NewHttp() => new() { Timeout = TimeSpan.FromSeconds(10) };
 
-    [SkippableFact]
+    [Fact]
     public async Task QuerySeries_KnownMetric_ReturnsSeriesIds()
     {
-        SkipIfSeriesUnavailable();
         using var http = NewHttp();
 
         var url = PcpSeriesQuery.BuildQueryUrl(PmproxyUri, "kernel.all.cpu.user", samples: 1);
@@ -44,10 +20,9 @@ public class SeriesQueryIntegrationTests : IntegrationTestBase
         Assert.All(seriesIds, id => Assert.False(string.IsNullOrWhiteSpace(id)));
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task QuerySeries_TwoDistinctMetrics_ReturnDifferentSeriesIds()
     {
-        SkipIfSeriesUnavailable();
         using var http = NewHttp();
 
         var urlUser = PcpSeriesQuery.BuildQueryUrl(PmproxyUri, "kernel.all.cpu.user", samples: 1);
@@ -62,16 +37,14 @@ public class SeriesQueryIntegrationTests : IntegrationTestBase
         Assert.NotEmpty(idsUser);
         Assert.NotEmpty(idsSys);
 
-        // The two metrics must not share all series IDs — they are distinct counters
         var userSet = new HashSet<string>(idsUser);
         Assert.False(userSet.SetEquals(idsSys),
             "kernel.all.cpu.user and kernel.all.cpu.sys should have different series IDs");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task QuerySeries_NonExistentMetric_ReturnsEmpty()
     {
-        SkipIfSeriesUnavailable();
         using var http = NewHttp();
 
         var url = PcpSeriesQuery.BuildQueryUrl(PmproxyUri, "no.such.metric.exists", samples: 1);
@@ -81,19 +54,16 @@ public class SeriesQueryIntegrationTests : IntegrationTestBase
         Assert.Empty(seriesIds);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task QueryInstances_InstancedMetric_ReturnsInstanceInfo()
     {
-        SkipIfSeriesUnavailable();
         using var http = NewHttp();
 
-        // First resolve the series IDs for the instanced metric
         var queryUrl = PcpSeriesQuery.BuildQueryUrl(PmproxyUri, "kernel.all.load", samples: 1);
         var queryJson = await http.GetStringAsync(queryUrl);
         var seriesIds = PcpSeriesQuery.ParseQueryResponse(queryJson);
 
-        Skip.If(!seriesIds.Any(),
-            "No series found for kernel.all.load — archive data may not be loaded into Valkey");
+        Assert.NotEmpty(seriesIds);
 
         var instancesUrl = PcpSeriesQuery.BuildInstancesUrl(PmproxyUri, seriesIds);
         var instancesJson = await http.GetStringAsync(instancesUrl);

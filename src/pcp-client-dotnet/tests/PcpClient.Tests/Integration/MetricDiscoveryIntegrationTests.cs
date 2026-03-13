@@ -5,7 +5,7 @@ namespace PcpClient.Tests.Integration;
 [Trait("Category", "Integration")]
 public class MetricDiscoveryIntegrationTests : IntegrationTestBase
 {
-    [SkippableFact]
+    [Fact]
     public async Task GetChildrenAsync_RootPrefix_ReturnsNonEmptyNamespace()
     {
         await Client.ConnectAsync();
@@ -15,7 +15,7 @@ public class MetricDiscoveryIntegrationTests : IntegrationTestBase
         Assert.NotEmpty(root.NonLeafNames);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task GetChildrenAsync_KernelPrefix_ContainsAllChild()
     {
         await Client.ConnectAsync();
@@ -25,7 +25,7 @@ public class MetricDiscoveryIntegrationTests : IntegrationTestBase
         Assert.Contains("all", ns.NonLeafNames);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task GetChildrenAsync_NonExistentPrefix_ReturnsEmptyNamespace()
     {
         await Client.ConnectAsync();
@@ -36,7 +36,7 @@ public class MetricDiscoveryIntegrationTests : IntegrationTestBase
         Assert.Empty(ns.NonLeafNames);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task DescribeMetricsAsync_KnownMetric_ReturnsDescriptor()
     {
         await Client.ConnectAsync();
@@ -50,7 +50,7 @@ public class MetricDiscoveryIntegrationTests : IntegrationTestBase
         Assert.NotEmpty(desc.OneLineHelp);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task DescribeMetricsAsync_MultipleMetrics_ReturnsAll()
     {
         await Client.ConnectAsync();
@@ -63,7 +63,7 @@ public class MetricDiscoveryIntegrationTests : IntegrationTestBase
         Assert.Contains(descriptors, d => d.Name == "kernel.all.cpu.user");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task GetInstanceDomainAsync_InstancedMetric_ReturnsInstances()
     {
         await Client.ConnectAsync();
@@ -75,7 +75,7 @@ public class MetricDiscoveryIntegrationTests : IntegrationTestBase
         Assert.Contains(indom.Instances, i => i.Name == "1 minute");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task GetInstanceDomainAsync_SingularMetric_ReturnsEmptyDomain()
     {
         await Client.ConnectAsync();

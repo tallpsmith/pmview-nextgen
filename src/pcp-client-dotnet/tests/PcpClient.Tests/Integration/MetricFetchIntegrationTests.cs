@@ -5,7 +5,7 @@ namespace PcpClient.Tests.Integration;
 [Trait("Category", "Integration")]
 public class MetricFetchIntegrationTests : IntegrationTestBase
 {
-    [SkippableFact]
+    [Fact]
     public async Task FetchAsync_SingularMetric_ReturnsSingleValue()
     {
         await Client.ConnectAsync();
@@ -22,7 +22,7 @@ public class MetricFetchIntegrationTests : IntegrationTestBase
         Assert.True(mv.InstanceValues[0].Value > 0, "ncpu should be > 0");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task FetchAsync_InstancedMetric_ReturnsMultipleInstanceValues()
     {
         await Client.ConnectAsync();
@@ -38,7 +38,7 @@ public class MetricFetchIntegrationTests : IntegrationTestBase
         Assert.All(mv.InstanceValues, iv => Assert.NotNull(iv.InstanceId));
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task FetchAsync_MultipleMetrics_ReturnsAllValues()
     {
         await Client.ConnectAsync();
@@ -51,7 +51,7 @@ public class MetricFetchIntegrationTests : IntegrationTestBase
         Assert.Contains(values, v => v.Name == "hinv.ncpu");
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task FetchAsync_ConsecutiveFetches_ReturnFreshTimestamps()
     {
         await Client.ConnectAsync();

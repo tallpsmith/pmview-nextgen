@@ -108,8 +108,10 @@ If ports 44322 or 6379 are already in use on your host, either stop the conflict
 
 ## Running Integration Tests
 
-The PcpClient integration tests exercise the full API against a live pmproxy instance.
-They require the dev-environment stack to be running.
+Integration tests exercise the full PcpClient API against a live pmproxy instance.
+They **require** the dev-environment stack to be running — tests fail hard if
+pmproxy or Valkey is unreachable. This is intentional: integration tests should
+never silently pass in a broken environment.
 
 ### Quick start
 
@@ -121,22 +123,22 @@ docker compose up -d
 # 2. Wait for healthy status (seeder must complete)
 docker compose ps
 
-# 3. Run integration tests only
+# 3. Run ALL tests (unit + integration) — the default
 cd ..
-dotnet test src/pcp-client-dotnet/PcpClient.sln --filter "Category=Integration" -v n
-
-# 4. Run ALL tests (unit + integration)
 dotnet test src/pcp-client-dotnet/PcpClient.sln -v n
+
+# 4. Run integration tests only
+dotnet test src/pcp-client-dotnet/PcpClient.sln --filter "Category=Integration" -v n
 ```
 
-### Skipping in CI
+### Skipping integration tests
 
-Integration tests skip gracefully when pmproxy is unreachable. No special
-configuration is needed — just run `dotnet test` and they'll appear as `[Skipped]`
-in the output. Series query tests additionally skip when Valkey is not available.
-
-### Running unit tests only (no pmproxy needed)
+When you can't run the dev-environment stack (e.g. a VM without container
+access), explicitly exclude integration tests:
 
 ```bash
 dotnet test src/pcp-client-dotnet/PcpClient.sln --filter "Category!=Integration" -v n
 ```
+
+This is an **opt-out** — by default all tests run and integration tests will
+fail if the stack isn't up. Don't skip them unless you have a good reason.

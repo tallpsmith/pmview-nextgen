@@ -5,7 +5,7 @@ namespace PcpClient.Tests.Integration;
 [Trait("Category", "Integration")]
 public class ErrorHandlingIntegrationTests : IntegrationTestBase
 {
-    [SkippableFact]
+    [Fact]
     public async Task ConnectAsync_UnreachableEndpoint_ThrowsPcpConnectionException()
     {
         await using var badClient = new PcpClientConnection(new Uri("http://localhost:19999"));
@@ -14,7 +14,7 @@ public class ErrorHandlingIntegrationTests : IntegrationTestBase
             () => badClient.ConnectAsync(pollTimeoutSeconds: 2));
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task ConnectAsync_UnreachableEndpoint_StateIsFailed()
     {
         await using var badClient = new PcpClientConnection(new Uri("http://localhost:19999"));
@@ -25,7 +25,7 @@ public class ErrorHandlingIntegrationTests : IntegrationTestBase
         Assert.Equal(ConnectionState.Failed, badClient.State);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task DescribeMetricsAsync_UnknownMetric_ThrowsPcpMetricNotFoundException()
     {
         await Client.ConnectAsync();
@@ -36,7 +36,7 @@ public class ErrorHandlingIntegrationTests : IntegrationTestBase
         Assert.Equal("totally.bogus.metric.xyz", ex.MetricName);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task FetchAsync_UnknownMetric_ThrowsPcpMetricNotFoundException()
     {
         await Client.ConnectAsync();

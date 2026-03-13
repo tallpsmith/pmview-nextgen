@@ -5,7 +5,7 @@ namespace PcpClient.Tests.Integration;
 [Trait("Category", "Integration")]
 public class ConnectionLifecycleTests : IntegrationTestBase
 {
-    [SkippableFact]
+    [Fact]
     public async Task ConnectAsync_ReturnsValidContextId()
     {
         var contextId = await Client.ConnectAsync();
@@ -14,7 +14,7 @@ public class ConnectionLifecycleTests : IntegrationTestBase
         Assert.Equal(ConnectionState.Connected, Client.State);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task ConnectAsync_ThenDisconnect_ReturnsToDisconnected()
     {
         await Client.ConnectAsync();
@@ -24,7 +24,7 @@ public class ConnectionLifecycleTests : IntegrationTestBase
         Assert.Equal(ConnectionState.Disconnected, Client.State);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task MultipleConnections_EachGetsUniqueContext()
     {
         await using var client2 = CreateClient();
@@ -35,7 +35,7 @@ public class ConnectionLifecycleTests : IntegrationTestBase
         Assert.NotEqual(ctx1, ctx2);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task InitialState_IsDisconnected()
     {
         await using var fresh = CreateClient();
