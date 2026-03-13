@@ -83,7 +83,7 @@ public partial class MetricPollerTests
 		public Task<InstanceDomain> GetInstanceDomainAsync(string metricName,
 			CancellationToken cancellationToken = default)
 		{
-			return Task.FromResult(new InstanceDomain(null, []));
+			return Task.FromResult(new InstanceDomain("", []));
 		}
 
 		public Task<IReadOnlyList<MetricValue>> FetchAsync(
