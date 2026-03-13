@@ -1,4 +1,8 @@
 #if TOOLS
+using System;
+using System.Collections.Generic;
+using System.Net.Http;
+using System.Threading.Tasks;
 using Godot;
 using PcpClient;
 using PcpGodotBridge;
