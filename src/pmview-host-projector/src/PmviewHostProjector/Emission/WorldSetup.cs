@@ -12,9 +12,16 @@ public record SceneBounds(float MinX, float MaxX, float MinZ, float MaxZ)
     public static SceneBounds FromLayout(SceneLayout layout)
     {
         if (layout.Zones.Count == 0) return new SceneBounds(-5, 5, -10, 0);
-        var allX = layout.Zones.Select(z => z.Position.X);
+        var minX = layout.Zones.Min(z => z.Position.X);
+        var maxX = layout.Zones.Max(z => z.Position.X + ZoneWidth(z));
         var allZ = layout.Zones.Select(z => z.Position.Z);
-        return new SceneBounds(allX.Min() - 5, allX.Max() + 5, allZ.Min() - 5, 0);
+        return new SceneBounds(minX - 2, maxX + 2, allZ.Min() - 5, 0);
+    }
+
+    private static float ZoneWidth(PlacedZone zone)
+    {
+        if (zone.Shapes.Count == 0) return 0f;
+        return zone.Shapes.Max(s => s.LocalPosition.X);
     }
 }
 

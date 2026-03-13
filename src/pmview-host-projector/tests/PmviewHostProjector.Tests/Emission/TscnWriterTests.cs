@@ -42,10 +42,10 @@ public class TscnWriterTests
     }
 
     [Fact]
-    public void Write_HasExtResourceForGroundedBar()
+    public void Write_HasExtResourceForGroundedBar_WithBuildingBlocksPath()
     {
         var tscn = TscnWriter.Write(MinimalLayout());
-        Assert.Contains("grounded_bar.tscn", tscn);
+        Assert.Contains("res://scenes/building_blocks/grounded_bar.tscn", tscn);
     }
 
     [Fact]
@@ -87,11 +87,11 @@ public class TscnWriterTests
         var tscn = TscnWriter.Write(MinimalLayout());
         Assert.Contains("[node name=\"PcpBindable\" type=\"Node\" parent=\"CPU/CPU_User\"]", tscn);
         Assert.Contains("script = ExtResource(\"bindable_script\")", tscn);
-        Assert.Contains("PcpBindings = [SubResource(", tscn);
+        Assert.Contains("PcpBindings = Array[ExtResource(\"binding_res_script\")]([SubResource(", tscn);
     }
 
     [Fact]
-    public void Write_CylinderShape_UsesGroundedCylinder()
+    public void Write_CylinderShape_UsesGroundedCylinder_WithBuildingBlocksPath()
     {
         var layout = new SceneLayout("testhost", [
             new PlacedZone("Disk", "Disk", Vec3.Zero, null, null, null,
@@ -101,7 +101,7 @@ public class TscnWriterTests
                     0f, 500_000_000f, 0.2f, 5.0f)])
         ]);
         var tscn = TscnWriter.Write(layout);
-        Assert.Contains("grounded_cylinder.tscn", tscn);
+        Assert.Contains("res://scenes/building_blocks/grounded_cylinder.tscn", tscn);
     }
 
     [Fact]
@@ -130,16 +130,19 @@ public class TscnWriterTests
                     0f, 100f, 0.2f, 5.0f)])
         ]);
         var tscn = TscnWriter.Write(layout);
-        Assert.Contains("grid_layout_3d.gd", tscn);
+        Assert.Contains("res://scripts/building_blocks/grid_layout_3d.gd", tscn);
         Assert.Contains("columns = 3", tscn);
     }
 
     [Fact]
-    public void Write_EmitsZoneLabelNode()
+    public void Write_EmitsZoneLabelNode_WithGroundPlaneProperties()
     {
         var tscn = TscnWriter.Write(MinimalLayout());
         Assert.Contains("Label3D", tscn);
         Assert.Contains("text = \"CPU\"", tscn);
+        Assert.Contains("font_size = 32", tscn);
+        Assert.Contains("pixel_size = 0.01", tscn);
+        Assert.Contains("horizontal_alignment = 1", tscn);
     }
 
     [Fact]

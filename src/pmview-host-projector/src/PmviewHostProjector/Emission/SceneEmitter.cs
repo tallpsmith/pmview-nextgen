@@ -24,13 +24,43 @@ public static class SceneEmitter
         var bounds = SceneBounds.FromLayout(layout);
         var setup = WorldSetup.ComputeCamera(bounds);
         var p = setup.Position;
-        var t = setup.LookAtTarget;
+        var transform = BuildLookAtTransform(setup.Position, setup.LookAtTarget);
 
         var sb = new StringBuilder();
         sb.AppendLine("[node name=\"Camera3D\" type=\"Camera3D\" parent=\".\"]");
-        sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, {F(p.X)}, {F(p.Y)}, {F(p.Z)})");
+        sb.AppendLine($"transform = {transform}");
         sb.AppendLine();
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// Computes a Godot Transform3D string that positions the camera at <paramref name="eye"/>
+    /// looking at <paramref name="target"/> with Y-up. Matches Godot's look_at convention
+    /// where camera forward is -Z in local space.
+    /// </summary>
+    private static string BuildLookAtTransform(Vec3 eye, Vec3 target)
+    {
+        // Forward vector (Godot camera looks along -Z, so forward = normalise(eye - target))
+        var fwd = Normalise(eye.X - target.X, eye.Y - target.Y, eye.Z - target.Z);
+        // Right vector = cross(up, forward)
+        var right = Normalise(
+            /* up.Y * fwd.Z - up.Z * fwd.Y */ fwd.Z,
+            /* up.Z * fwd.X - up.X * fwd.Z */ 0f,
+            /* up.X * fwd.Y - up.Y * fwd.X */ -fwd.X);
+        // True up = cross(forward, right)
+        var up = (
+            X: fwd.Y * right.Z - fwd.Z * right.Y,
+            Y: fwd.Z * right.X - fwd.X * right.Z,
+            Z: fwd.X * right.Y - fwd.Y * right.X);
+
+        // Transform3D column-major: (right.x, up.x, fwd.x, right.y, up.y, fwd.y, right.z, up.z, fwd.z, pos.x, pos.y, pos.z)
+        return $"Transform3D({F(right.X)}, {F(up.X)}, {F(fwd.X)}, {F(right.Y)}, {F(up.Y)}, {F(fwd.Y)}, {F(right.Z)}, {F(up.Z)}, {F(fwd.Z)}, {F(eye.X)}, {F(eye.Y)}, {F(eye.Z)})";
+    }
+
+    private static (float X, float Y, float Z) Normalise(float x, float y, float z)
+    {
+        var len = MathF.Sqrt(x * x + y * y + z * z);
+        return len > 0f ? (x / len, y / len, z / len) : (0f, 0f, 1f);
     }
 
     private static string BuildDirectionalLight()

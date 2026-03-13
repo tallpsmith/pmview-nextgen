@@ -42,7 +42,7 @@ public static class TscnWriter
                 registry.Require("binding_res_script", "Script", "res://addons/pmview-bridge/PcpBindingResource.cs");
 
                 if (zone.GridColumns.HasValue)
-                    registry.Require("grid_script", "Script", "res://scripts/grid_layout_3d.gd");
+                    registry.Require("grid_script", "Script", "res://scripts/building_blocks/grid_layout_3d.gd");
 
                 list.Add(new SubResourceEntry(
                     Id: SubResourceId(shape.NodeName),
@@ -149,7 +149,11 @@ public static class TscnWriter
     private static void WriteZoneLabelNode(StringBuilder sb, PlacedZone zone)
     {
         sb.AppendLine($"[node name=\"{zone.Name}Label\" type=\"Label3D\" parent=\"{zone.Name}\"]");
+        sb.AppendLine("transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0.01, 1)");
+        sb.AppendLine("pixel_size = 0.01");
+        sb.AppendLine("font_size = 32");
         sb.AppendLine($"text = \"{zone.ZoneLabel}\"");
+        sb.AppendLine("horizontal_alignment = 1");
         sb.AppendLine();
     }
 
@@ -171,7 +175,8 @@ public static class TscnWriter
         var subResId = SubResourceId(shape.NodeName);
         sb.AppendLine($"[node name=\"PcpBindable\" type=\"Node\" parent=\"{shapePath}\"]");
         sb.AppendLine("script = ExtResource(\"bindable_script\")");
-        sb.AppendLine($"PcpBindings = [SubResource(\"{subResId}\")]");
+        sb.AppendLine($"PcpBindings = Array[ExtResource(\"binding_res_script\")]([SubResource(\"{subResId}\")])");
+
         sb.AppendLine();
     }
 
@@ -185,8 +190,8 @@ public static class TscnWriter
 
     private static string SceneExtResourcePath(ShapeType shape) => shape switch
     {
-        ShapeType.Cylinder => "res://scenes/grounded_cylinder.tscn",
-        _ => "res://scenes/grounded_bar.tscn"
+        ShapeType.Cylinder => "res://scenes/building_blocks/grounded_cylinder.tscn",
+        _ => "res://scenes/building_blocks/grounded_bar.tscn"
     };
 
     private static string SubResourceId(string nodeName) => $"binding_{nodeName}";

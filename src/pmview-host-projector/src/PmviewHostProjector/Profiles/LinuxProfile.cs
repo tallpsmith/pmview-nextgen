@@ -101,9 +101,9 @@ public static class LinuxProfile
         Type: ZoneType.PerInstance,
         Metrics:
         [
-            new("network.interface.in.bytes",   ShapeType.Bar, "Bytes",  Blue, 0f, 0f, 0.2f, 5.0f),
-            new("network.interface.in.packets", ShapeType.Bar, "Pkts",   Blue, 0f, 0f, 0.2f, 5.0f),
-            new("network.interface.in.errors",  ShapeType.Bar, "Errors", Red,  0f, 0f, 0.2f, 5.0f),
+            new("network.interface.in.bytes",   ShapeType.Bar, "Bytes",  Blue, 0f, 125_000_000f, 0.2f, 5.0f),
+            new("network.interface.in.packets", ShapeType.Bar, "Pkts",   Blue, 0f, 100_000f,     0.2f, 5.0f),
+            new("network.interface.in.errors",  ShapeType.Bar, "Errors", Red,  0f, 100f,         0.2f, 5.0f),
         ],
         InstanceMetricSource: "network.interface.in.bytes");
 
@@ -113,9 +113,9 @@ public static class LinuxProfile
         Type: ZoneType.PerInstance,
         Metrics:
         [
-            new("network.interface.out.bytes",   ShapeType.Bar, "Bytes",  Rose, 0f, 0f, 0.2f, 5.0f),
-            new("network.interface.out.packets", ShapeType.Bar, "Pkts",   Rose, 0f, 0f, 0.2f, 5.0f),
-            new("network.interface.out.errors",  ShapeType.Bar, "Errors", Red,  0f, 0f, 0.2f, 5.0f),
+            new("network.interface.out.bytes",   ShapeType.Bar, "Bytes",  Rose, 0f, 125_000_000f, 0.2f, 5.0f),
+            new("network.interface.out.packets", ShapeType.Bar, "Pkts",   Rose, 0f, 100_000f,     0.2f, 5.0f),
+            new("network.interface.out.errors",  ShapeType.Bar, "Errors", Red,  0f, 100f,         0.2f, 5.0f),
         ],
         InstanceMetricSource: "network.interface.out.bytes");
 }

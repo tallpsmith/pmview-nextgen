@@ -162,5 +162,6 @@ public static class LayoutCalculator
     }
 
     private static string SanitiseNodeName(string name) =>
-        name.Replace(' ', '_').Replace('-', '_').Replace('/', '_');
+        name.Replace(' ', '_').Replace('-', '_').Replace('/', '_')
+            .Replace(':', '_').Replace('@', '_').Replace('%', '_').Replace('.', '_');
 }

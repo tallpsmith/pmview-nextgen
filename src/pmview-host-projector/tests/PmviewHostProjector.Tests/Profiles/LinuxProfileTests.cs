@@ -123,4 +123,21 @@ public class LinuxProfileTests
         var red = RgbColour.FromHex("#ef4444");
         Assert.Equal(red.R, errors.DefaultColour.R, 0.01f);
     }
+
+    [Fact]
+    public void NetworkZones_HaveNonZeroSourceRangeMax()
+    {
+        var netIn = _zones.Single(z => z.Name == "Network In");
+        var netOut = _zones.Single(z => z.Name == "Network Out");
+        Assert.All(netIn.Metrics, m => Assert.True(m.SourceRangeMax > 0f, $"{m.MetricName} has SourceRangeMax=0"));
+        Assert.All(netOut.Metrics, m => Assert.True(m.SourceRangeMax > 0f, $"{m.MetricName} has SourceRangeMax=0"));
+    }
+
+    [Fact]
+    public void NetworkBytesMetrics_SourceRangeMax_Is125MB()
+    {
+        var netIn = _zones.Single(z => z.Name == "Network In");
+        var bytes = netIn.Metrics.Single(m => m.MetricName.Contains("bytes"));
+        Assert.Equal(125_000_000f, bytes.SourceRangeMax);
+    }
 }
