@@ -221,10 +221,12 @@ public class LayoutCalculatorBackgroundTests
     }
 
     [Fact]
-    public void Calculate_AdjacentBackgroundZones_HaveGapForRowHeaders()
+    public void Calculate_AdjacentBackgroundZones_StrideIncludesRowHeaderReservation()
     {
-        // Adjacent zones must have at least (bezelWidth + 2.0 reservation) between
-        // their start positions so right-side row headers don't overlap the next bezel.
+        // Without RowHeaderReservation, stride = bezelWidth + ZoneGap(3.0).
+        // With it, stride = bezelWidth + RowHeaderReservation(2.0) + ZoneGap(3.0).
+        // The extra 2.0 is the distinguishing assertion.
+        const float ZoneGap = 3.0f;
         const float RowHeaderReservation = 2.0f;
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology(cpus: 2, nics: 2));
         var background = layout.Zones
@@ -236,9 +238,11 @@ public class LayoutCalculatorBackgroundTests
         {
             var left = background[i];
             var right = background[i + 1];
-            var gap = right.Position.X - left.Position.X;
-            Assert.True(gap >= left.GroundWidth + RowHeaderReservation,
-                $"Zone '{left.Name}' → '{right.Name}': gap {gap} < {left.GroundWidth + RowHeaderReservation} (bezel + reservation)");
+            var stride = right.Position.X - left.Position.X;
+            // Stride must include the bezel, the row header reservation, and the inter-group gap.
+            // Without RowHeaderReservation this would only be bezelWidth + ZoneGap.
+            Assert.True(stride >= left.GroundWidth + RowHeaderReservation + ZoneGap,
+                $"Zone '{left.Name}' → '{right.Name}': stride {stride:F2} < {left.GroundWidth + RowHeaderReservation + ZoneGap:F2} (bezel + reservation + gap)");
         }
     }
 }
