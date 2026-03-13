@@ -72,14 +72,18 @@ dotnet test pmview-nextgen.sln --filter "FullyQualifiedName!~Integration"
 # Start the dev-environment stack (PCP + pmproxy + synthetic data)
 cd dev-environment && docker compose up -d && cd ..
 
-# Generate a host-view scene from the running pmproxy.
-# Output goes into godot-project/ which has the required
-# pmview-bridge addon and building block scenes.
+# Generate a host-view scene into the included Godot project
 dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- \
   --pmproxy http://localhost:44322 \
   -o godot-project/scenes/host_view.tscn
 
-# Open godot-project/ in Godot Editor, build C# assemblies, and run the scene
+# Or generate into your own Godot project (installs the addon automatically)
+dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- \
+  --pmproxy http://localhost:44322 \
+  --install-addon \
+  -o /path/to/my-godot-project/scenes/host_view.tscn
+
+# Open the Godot project, build C# assemblies, and run the scene
 dotnet build godot-project/pmview-nextgen.sln
 ```
 
@@ -120,16 +124,19 @@ At runtime, **SceneBinder** discovers all PcpBindable nodes in the scene and wir
 
 `pmview-host-projector` is a CLI tool that connects to a live pmproxy, discovers the host's metric topology (CPUs, disks, network interfaces, memory), and generates a complete Godot `.tscn` scene with PcpBindable bindings, layout, camera, and lighting.
 
-The generated scene references resources from the `pmview-bridge` addon (`addons/pmview-bridge/`) and the building block scenes (`scenes/building_blocks/`), so **the output must land inside a Godot project that has these installed**. Currently that means `godot-project/` — when the addon is extracted to a standalone plugin, you'll be able to generate into any Godot project.
+The generated scene references resources from the `pmview-bridge` addon (`addons/pmview-bridge/`), so **the target Godot project must have the addon installed**. Use `--install-addon` to copy it automatically, or generate into `godot-project/` which already has it.
 
 ```bash
-# Default: connects to localhost:44322, outputs host-view.tscn
-dotnet run --project src/pmview-host-projector/src/PmviewHostProjector
+# Generate into the included Godot project (addon already installed)
+dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- \
+  --pmproxy http://localhost:44322 \
+  -o godot-project/scenes/host_view.tscn
 
-# Point at a remote pmproxy, output into the Godot project
+# Generate into your own Godot project, installing the addon
 dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- \
   --pmproxy http://myserver:44322 \
-  -o godot-project/scenes/my_host.tscn
+  --install-addon \
+  -o /path/to/my-godot-project/scenes/host_view.tscn
 ```
 
 The generated scene includes 8 metric zones:
@@ -161,11 +168,11 @@ pmview-nextgen/
 │       ├── src/PmviewHostProjector/
 │       └── tests/PmviewHostProjector.Tests/
 ├── godot-project/                      # Godot 4.4 project
-│   ├── addons/pmview-bridge/           # C# bridge plugin (Poller, Binder, Bindable, Inspector)
+│   ├── addons/pmview-bridge/           # Self-contained addon (copy this dir to install)
+│   │   ├── *.cs                        # Bridge plugin (Poller, Binder, Bindable, Inspector)
+│   │   └── building_blocks/            # GroundedBar/Cylinder, GridLayout3D, ZoneLabel
 │   ├── scenes/                         # .tscn scene files
-│   │   └── building_blocks/            # Reusable GroundedBar, GroundedCylinder, ZoneLabel
 │   ├── scripts/
-│   │   ├── building_blocks/            # GroundedShape, GridLayout3D (GDScript)
 │   │   └── scenes/                     # Scene controllers (GDScript)
 │   ├── test/                           # gdUnit4 tests
 │   ├── pmview-nextgen.csproj           # Godot C# project

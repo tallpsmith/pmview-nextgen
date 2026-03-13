@@ -44,6 +44,12 @@ dotnet build godot-project/pmview-nextgen.sln
 dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- \
   --pmproxy http://localhost:44322 \
   -o godot-project/scenes/host_view.tscn
+
+# Generate into an external Godot project (copies addon automatically)
+dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- \
+  --pmproxy http://localhost:44322 \
+  --install-addon \
+  -o /path/to/my-godot-project/scenes/host_view.tscn
 ```
 
 **Claude Code VM note:** The VM cannot reach the dev-environment Podman stack on the

@@ -12,11 +12,33 @@ public class Program
     {
         var pmproxyUrl = GetArg(args, "--pmproxy") ?? "http://localhost:44322";
         var outputPath = GetArg(args, "-o") ?? GetArg(args, "--output") ?? "host-view.tscn";
+        var installAddon = HasFlag(args, "--install-addon");
 
         Console.WriteLine($"pmview-host-projector: connecting to {pmproxyUrl}");
 
         try
         {
+            if (installAddon)
+            {
+                var godotRoot = AddonInstaller.FindGodotProjectRoot(outputPath);
+                if (godotRoot == null)
+                {
+                    Console.Error.WriteLine("Error: Cannot find Godot project root (no project.godot found). " +
+                                            "Ensure the output path is inside a Godot project.");
+                    return 1;
+                }
+
+                var addonSource = AddonInstaller.FindAddonSource();
+                if (addonSource == null)
+                {
+                    Console.Error.WriteLine("Error: Cannot find addon source. Run from the pmview-nextgen repository.");
+                    return 1;
+                }
+
+                AddonInstaller.CopyAddonTo(addonSource, godotRoot);
+                Console.WriteLine($"Addon installed to: {Path.Combine(godotRoot, "addons", "pmview-bridge")}");
+            }
+
             await using var pcpClient = new PcpClientConnection(new Uri(pmproxyUrl));
             await pcpClient.ConnectAsync();
 
@@ -57,4 +79,7 @@ public class Program
         var idx = Array.IndexOf(args, flag);
         return idx >= 0 && idx + 1 < args.Length ? args[idx + 1] : null;
     }
+
+    private static bool HasFlag(string[] args, string flag) =>
+        Array.IndexOf(args, flag) >= 0;
 }
