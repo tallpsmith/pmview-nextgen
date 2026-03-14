@@ -347,6 +347,44 @@ public class TscnWriterTests
     }
 
     [Fact]
+    public void Write_RootNode_HasControllerScript()
+    {
+        var tscn = TscnWriter.Write(MinimalLayout());
+        Assert.Contains("host_view_controller.gd", tscn);
+        Assert.Contains("controller_script", tscn);
+    }
+
+    [Fact]
+    public void Write_HasMetricPollerChildNode()
+    {
+        var tscn = TscnWriter.Write(MinimalLayout());
+        Assert.Contains("[node name=\"MetricPoller\" type=\"Node\" parent=\".\"]", tscn);
+        Assert.Contains("MetricPoller.cs", tscn);
+    }
+
+    [Fact]
+    public void Write_HasSceneBinderChildNode()
+    {
+        var tscn = TscnWriter.Write(MinimalLayout());
+        Assert.Contains("[node name=\"SceneBinder\" type=\"Node\" parent=\".\"]", tscn);
+        Assert.Contains("SceneBinder.cs", tscn);
+    }
+
+    [Fact]
+    public void Write_MetricPoller_HasEndpointProperty()
+    {
+        var tscn = TscnWriter.Write(MinimalLayout(), "http://my-pcp:44322");
+        Assert.Contains("Endpoint = \"http://my-pcp:44322\"", tscn);
+    }
+
+    [Fact]
+    public void Write_MetricPoller_DefaultEndpoint_IsLocalhost()
+    {
+        var tscn = TscnWriter.Write(MinimalLayout());
+        Assert.Contains("Endpoint = \"http://localhost:44322\"", tscn);
+    }
+
+    [Fact]
     public void Write_GridZone_RowHeaders_AreOnRightSide_BeyondLastColumn()
     {
         // 3 metrics, colSpacing=1.5, shapeWidth=0.8, rightOffset=0.5

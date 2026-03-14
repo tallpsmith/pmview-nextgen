@@ -13,10 +13,12 @@ public static class TscnWriter
 {
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
-    public static string Write(SceneLayout layout)
+    public static string Write(SceneLayout layout,
+        string pmproxyEndpoint = "http://localhost:44322")
     {
         var sb = new StringBuilder();
         var registry = new ExtResourceRegistry();
+        RegisterControllerResources(registry);
         var subResources = CollectSubResources(layout, registry);
         var bezelResources = CollectBezelSubResources(layout);
 
@@ -25,9 +27,19 @@ public static class TscnWriter
         WriteSubResources(sb, subResources);
         WriteBezelSubResources(sb, bezelResources);
         WriteWorldEnvironmentSubResource(sb);
-        WriteNodes(sb, layout, registry, subResources, bezelResources);
+        WriteNodes(sb, layout, registry, subResources, bezelResources, pmproxyEndpoint);
 
         return sb.ToString();
+    }
+
+    private static void RegisterControllerResources(ExtResourceRegistry registry)
+    {
+        registry.Require("controller_script", "Script",
+            "res://addons/pmview-bridge/host_view_controller.gd");
+        registry.Require("metric_poller_script", "Script",
+            "res://addons/pmview-bridge/MetricPoller.cs");
+        registry.Require("scene_binder_script", "Script",
+            "res://addons/pmview-bridge/SceneBinder.cs");
     }
 
     // --- resource collection ---
@@ -148,9 +160,20 @@ public static class TscnWriter
     // --- nodes ---
 
     private static void WriteNodes(StringBuilder sb, SceneLayout layout, ExtResourceRegistry registry,
-        List<SubResourceEntry> subResources, List<BezelSubResources> bezelResources)
+        List<SubResourceEntry> subResources, List<BezelSubResources> bezelResources,
+        string pmproxyEndpoint)
     {
         sb.AppendLine("[node name=\"HostView\" type=\"Node3D\"]");
+        sb.AppendLine("script = ExtResource(\"controller_script\")");
+        sb.AppendLine();
+
+        sb.AppendLine("[node name=\"MetricPoller\" type=\"Node\" parent=\".\"]");
+        sb.AppendLine("script = ExtResource(\"metric_poller_script\")");
+        sb.AppendLine($"Endpoint = \"{pmproxyEndpoint}\"");
+        sb.AppendLine();
+
+        sb.AppendLine("[node name=\"SceneBinder\" type=\"Node\" parent=\".\"]");
+        sb.AppendLine("script = ExtResource(\"scene_binder_script\")");
         sb.AppendLine();
 
         sb.AppendLine("[node name=\"WorldEnvironment\" type=\"WorldEnvironment\" parent=\".\"]");

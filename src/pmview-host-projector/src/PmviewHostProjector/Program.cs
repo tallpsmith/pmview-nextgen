@@ -75,7 +75,7 @@ public class Program
             var layout = LayoutCalculator.Calculate(zones, topology);
 
             Console.WriteLine("Generating scene...");
-            var tscn = SceneEmitter.Emit(layout);
+            var tscn = SceneEmitter.Emit(layout, pmproxyUrl);
 
             var directory = Path.GetDirectoryName(outputPath);
             if (!string.IsNullOrEmpty(directory))

@@ -12,9 +12,10 @@ public static class SceneEmitter
 {
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
-    public static string Emit(SceneLayout layout)
+    public static string Emit(SceneLayout layout,
+        string pmproxyEndpoint = "http://localhost:44322")
     {
-        var tscn = TscnWriter.Write(layout);
+        var tscn = TscnWriter.Write(layout, pmproxyEndpoint);
         var camera = ComputeCamera(layout);
         return tscn + camera + BuildDirectionalLight();
     }
