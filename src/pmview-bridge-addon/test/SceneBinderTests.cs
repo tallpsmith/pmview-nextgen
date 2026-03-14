@@ -478,6 +478,50 @@ public partial class SceneBinderTests
 		AssertThat(label.Text).IsEqual("");
 	}
 
+	// ── MetricPoller virtual metrics ───────────────────────────────────────
+
+	[TestCase]
+	[RequireGodotRuntime]
+	public void InjectVirtualMetrics_IncludesTimestampTextValue()
+	{
+		var poller = new MetricPoller();
+		var dict = new Godot.Collections.Dictionary();
+
+		poller.InjectVirtualMetrics(dict);
+
+		AssertThat(dict.ContainsKey("pmview.meta.timestamp")).IsTrue();
+		var entry = dict["pmview.meta.timestamp"].AsGodotDictionary();
+		AssertThat(entry.ContainsKey("text_value")).IsTrue();
+		AssertThat(entry["text_value"].AsString()).IsNotEmpty();
+	}
+
+	[TestCase]
+	[RequireGodotRuntime]
+	public void InjectVirtualMetrics_IncludesHostname_WhenSet()
+	{
+		var poller = new MetricPoller();
+		poller.Hostname = "my-server";
+		var dict = new Godot.Collections.Dictionary();
+
+		poller.InjectVirtualMetrics(dict);
+
+		AssertThat(dict.ContainsKey("pmview.meta.hostname")).IsTrue();
+		var entry = dict["pmview.meta.hostname"].AsGodotDictionary();
+		AssertThat(entry["text_value"].AsString()).IsEqual("my-server");
+	}
+
+	[TestCase]
+	[RequireGodotRuntime]
+	public void InjectVirtualMetrics_OmitsHostname_WhenEmpty()
+	{
+		var poller = new MetricPoller();   // Hostname = "" by default
+		var dict = new Godot.Collections.Dictionary();
+
+		poller.InjectVirtualMetrics(dict);
+
+		AssertThat(dict.ContainsKey("pmview.meta.hostname")).IsFalse();
+	}
+
 	// ── Helpers ──────────────────────────────────────────────────────────
 
 	private static Godot.Collections.Dictionary MakeSingularMetrics(

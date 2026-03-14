@@ -27,6 +27,7 @@ public partial class MetricPoller : Node
 	[Export] public string Endpoint { get; set; } = "http://localhost:44322";
 	[Export] public int PollIntervalMs { get; set; } = 1000;
 	[Export] public string[] MetricNames { get; set; } = [];
+	[Export] public string Hostname { get; set; } = "";
 
 	[Signal]
 	public delegate void PlaybackPositionChangedEventHandler(string position, string mode);
@@ -201,7 +202,10 @@ public partial class MetricPoller : Node
 
 		try
 		{
-			var descriptors = await _client.DescribeMetricsAsync(MetricNames);
+			var realMetrics = MetricNames
+				.Where(m => !m.StartsWith("pmview.meta.", StringComparison.Ordinal))
+				.ToArray();
+			var descriptors = await _client.DescribeMetricsAsync(realMetrics);
 			_rateConverter = new MetricRateConverter(descriptors);
 			var counterNames = descriptors
 				.Where(d => d.Semantics == MetricSemantics.Counter)
@@ -289,18 +293,24 @@ public partial class MetricPoller : Node
 		if (_lastEmittedMetrics != null && _lastEmittedMetrics.Count > 0)
 		{
 			GD.Print($"[MetricPoller] Replaying {_lastEmittedMetrics.Count} cached metrics for new scene");
-			EmitSignal(SignalName.MetricsUpdated, _lastEmittedMetrics);
+			var dict = _lastEmittedMetrics.Duplicate();
+			InjectVirtualMetrics(dict);
+			EmitSignal(SignalName.MetricsUpdated, dict);
 		}
 	}
 
 	private async Task FetchLiveMetrics()
 	{
-		var values = await _client!.FetchAsync(MetricNames);
+		var realMetrics = MetricNames
+			.Where(m => !m.StartsWith("pmview.meta.", StringComparison.Ordinal))
+			.ToArray();
+
+		var values = await _client!.FetchAsync(realMetrics);
 		var converted = _rateConverter != null
 			? _rateConverter.Convert(values)
 			: values;
 
-		foreach (var metricName in MetricNames)
+		foreach (var metricName in realMetrics)
 		{
 			if (_liveInstanceNamesPopulated.Contains(metricName))
 				continue;
@@ -327,6 +337,7 @@ public partial class MetricPoller : Node
 		if (converted.Count > 0)
 		{
 			var dict = MarshalMetricValues(converted);
+			InjectVirtualMetrics(dict);
 			_lastEmittedMetrics = dict;
 			EmitSignal(SignalName.MetricsUpdated, dict);
 		}
@@ -399,10 +410,13 @@ public partial class MetricPoller : Node
 		var dict = new Godot.Collections.Dictionary();
 		var endpointUri = new Uri(Endpoint);
 		var cursorPosition = _timeCursor.Position;
+		var realMetrics = MetricNames
+			.Where(m => !m.StartsWith("pmview.meta.", StringComparison.Ordinal))
+			.ToArray();
 
 		GD.Print($"[MetricPoller] Historical fetch at cursor: {cursorPosition:o}");
 
-		foreach (var metricName in MetricNames)
+		foreach (var metricName in realMetrics)
 		{
 			try
 			{
@@ -552,6 +566,7 @@ public partial class MetricPoller : Node
 		if (dict.Count > 0)
 		{
 			GD.Print($"[MetricPoller] Historical update: {dict.Count} metrics with new data");
+			InjectVirtualMetrics(dict);
 			_lastEmittedMetrics = dict;
 			EmitSignal(SignalName.MetricsUpdated, dict);
 		}
@@ -649,6 +664,35 @@ public partial class MetricPoller : Node
 		}
 
 		return dict;
+	}
+
+	/// <summary>
+	/// Adds synthetic pmview.meta.* keys to the outgoing metric dictionary.
+	/// These are derived from local poller state, not fetched from pmproxy.
+	/// </summary>
+	internal void InjectVirtualMetrics(Godot.Collections.Dictionary dict)
+	{
+		var now = _timeCursor.Mode == CursorMode.Playback
+			? _timeCursor.Position
+			: DateTime.UtcNow;
+
+		dict["pmview.meta.timestamp"] = new Godot.Collections.Dictionary
+		{
+			["text_value"] = now.ToString("yyyy-MM-dd · HH:mm:ss")
+		};
+
+		if (!string.IsNullOrEmpty(Hostname))
+		{
+			dict["pmview.meta.hostname"] = new Godot.Collections.Dictionary
+			{
+				["text_value"] = Hostname
+			};
+		}
+
+		dict["pmview.meta.endpoint"] = new Godot.Collections.Dictionary
+		{
+			["text_value"] = Endpoint
+		};
 	}
 
 	private void EmitConnectionState(string state)
