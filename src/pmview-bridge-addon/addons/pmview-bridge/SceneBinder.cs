@@ -97,6 +97,10 @@ public partial class SceneBinder : Node
 				_activeBindings.Add(new ActiveBinding(resolved, ownerNode));
 				metricNames.Add(metricBinding.Metric);
 
+				// Text bindings have no numeric initial value — skip normalise/apply.
+				if (metricBinding.Property == "text")
+					continue;
+
 				var normalisedInitial = Normalise(metricBinding.InitialValue,
 					metricBinding.SourceRangeMin, metricBinding.SourceRangeMax,
 					metricBinding.TargetRangeMin, metricBinding.TargetRangeMax);
@@ -122,6 +126,13 @@ public partial class SceneBinder : Node
 
 			if (!metrics.ContainsKey(binding.Metric))
 				continue;
+
+			// Text bindings carry a string value — handled separately, no normalisation.
+			if (binding.Property == "text")
+			{
+				ApplyTextMetric(active, metrics);
+				continue;
+			}
 
 			var metricData = metrics[binding.Metric].AsGodotDictionary();
 			var instances = metricData["instances"].AsGodotDictionary();
@@ -441,5 +452,34 @@ public partial class SceneBinder : Node
 		var clamped = Math.Clamp(value, srcMin, srcMax);
 		var ratio = (clamped - srcMin) / range;
 		return tgtMin + ratio * (tgtMax - tgtMin);
+	}
+
+	private static void ApplyTextMetric(ActiveBinding active,
+		Godot.Collections.Dictionary metrics)
+	{
+		var metricKey = active.Resolved.Binding.Metric;
+		if (!metrics.ContainsKey(metricKey))
+			return;
+
+		var metricData = metrics[metricKey].AsGodotDictionary();
+		if (!metricData.ContainsKey("text_value"))
+			return;
+
+		active.TargetNode.Set("text", metricData["text_value"].AsString());
+	}
+
+	/// <summary>
+	/// Test-only helper. Registers a text binding directly, bypassing
+	/// BindFromSceneProperties scene traversal.
+	/// </summary>
+	internal void AddTextBindingForTest(string metricName, Node targetNode)
+	{
+		var fakeBinding = new MetricBinding(
+			(string)targetNode.Name, metricName, "text",
+			SourceRangeMin: 0, SourceRangeMax: 1,
+			TargetRangeMin: 0, TargetRangeMax: 1,
+			InstanceId: -1, InstanceName: null);
+		var resolved = PropertyVocabulary.Resolve(fakeBinding);
+		_activeBindings.Add(new ActiveBinding(resolved, targetNode));
 	}
 }

@@ -424,6 +424,60 @@ public partial class SceneBinderTests
 		AssertThat(node3D.Scale.Y).IsLess(valueAfterUpdate);
 	}
 
+	// ── Text binding ───────────────────────────────────────────────────────
+
+	[TestCase]
+	[RequireGodotRuntime]
+	public void ApplyMetrics_TextBinding_SetsLabelText()
+	{
+		var binder = new SceneBinder();
+		var label = new Label3D();
+		label.Name = "TimestampLabel";
+		binder.AddTextBindingForTest("pmview.meta.timestamp", label);
+
+		var metrics = new Godot.Collections.Dictionary();
+		metrics["pmview.meta.timestamp"] = new Godot.Collections.Dictionary
+		{
+			["text_value"] = "2025-03-14 · 14:23:07"
+		};
+
+		binder.ApplyMetrics(metrics);
+
+		AssertThat(label.Text).IsEqual("2025-03-14 · 14:23:07");
+	}
+
+	[TestCase]
+	[RequireGodotRuntime]
+	public void ApplyMetrics_TextBinding_NoTextValueKey_DoesNotThrow()
+	{
+		var binder = new SceneBinder();
+		var label = new Label3D();
+		label.Name = "TimestampLabel";
+		binder.AddTextBindingForTest("pmview.meta.timestamp", label);
+
+		var metrics = new Godot.Collections.Dictionary();
+		metrics["pmview.meta.timestamp"] = new Godot.Collections.Dictionary
+		{
+			["instances"] = new Godot.Collections.Dictionary()
+		};
+
+		binder.ApplyMetrics(metrics);   // must not throw
+		AssertThat(label.Text).IsEqual("");
+	}
+
+	[TestCase]
+	[RequireGodotRuntime]
+	public void ApplyMetrics_TextBinding_MetricAbsent_DoesNotThrow()
+	{
+		var binder = new SceneBinder();
+		var label = new Label3D();
+		label.Name = "TimestampLabel";
+		binder.AddTextBindingForTest("pmview.meta.timestamp", label);
+
+		binder.ApplyMetrics(new Godot.Collections.Dictionary());  // empty dict
+		AssertThat(label.Text).IsEqual("");
+	}
+
 	// ── Helpers ──────────────────────────────────────────────────────────
 
 	private static Godot.Collections.Dictionary MakeSingularMetrics(
