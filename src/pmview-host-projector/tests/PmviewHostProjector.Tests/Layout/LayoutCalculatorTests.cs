@@ -142,6 +142,32 @@ public class LayoutCalculatorForegroundTests
         Assert.Equal(0f, netIn.Position.Z);
         Assert.Equal(2, netIn.Shapes.Count);
     }
+
+    [Fact]
+    public void Calculate_ForegroundZones_InterZoneGapIsAtMostTwoPointFive()
+    {
+        // ZoneGap reduced from 3.0 to 2.0. The gap (empty space) between adjacent
+        // foreground zones should now be <= 2.5. With old ZoneGap=3.0 it was ~3.0
+        // so this test will fail until the constant is updated.
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var foreground = layout.Zones
+            .Where(z => z.GridColumns == null)
+            .OrderBy(z => z.Position.X)
+            .ToList();
+
+        for (int i = 0; i < foreground.Count - 1; i++)
+        {
+            var left  = foreground[i];
+            var right = foreground[i + 1];
+            // Zone position marks the start of its first shape at local X=0.
+            // The zone's footprint ends at Position.X + max(shape.LocalPosition.X).
+            var leftFootprintEnd = left.Position.X +
+                (left.Shapes.Count > 0 ? left.Shapes.Max(s => s.LocalPosition.X) : 0f);
+            var gap = right.Position.X - leftFootprintEnd;
+            Assert.True(gap <= 2.5f,
+                $"Gap '{left.Name}'→'{right.Name}' is {gap:F2}, expected <= 2.5 (ZoneGap=2.0)");
+        }
+    }
 }
 
 public class LayoutCalculatorBackgroundTests
@@ -262,10 +288,10 @@ public class LayoutCalculatorBackgroundTests
     [Fact]
     public void Calculate_AdjacentBackgroundZones_StrideIncludesRowHeaderReservation()
     {
-        // Without RowHeaderReservation, stride = bezelWidth + ZoneGap(3.0).
-        // With it, stride = bezelWidth + RowHeaderReservation(2.0) + ZoneGap(3.0).
+        // Without RowHeaderReservation, stride = bezelWidth + ZoneGap(2.0).
+        // With it, stride = bezelWidth + RowHeaderReservation(2.0) + ZoneGap(2.0).
         // The extra 2.0 is the distinguishing assertion.
-        const float ZoneGap = 3.0f;
+        const float ZoneGap = 2.0f;   // was 3.0f — matches LayoutCalculator constant
         const float RowHeaderReservation = 2.0f;
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology(cpus: 2, nics: 2));
         var background = layout.Zones

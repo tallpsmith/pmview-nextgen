@@ -8,8 +8,8 @@ namespace PmviewHostProjector.Layout;
 /// </summary>
 public static class LayoutCalculator
 {
-    private const float ShapeSpacing       = 1.5f;
-    private const float ZoneGap            = 3.0f;
+    private const float ShapeSpacing       = 1.2f;   // was 1.5f — tighter bar grouping
+    private const float ZoneGap            = 2.0f;   // was 3.0f — less dead air between zones
     private const float BackgroundZOffset  = -8.0f;
     private const float GridColumnSpacing  = 2.0f;
     private const float GridRowSpacing     = 2.5f;
