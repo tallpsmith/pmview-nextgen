@@ -485,4 +485,69 @@ public class TscnWriterTests
         // Confirm old left-side position is gone
         Assert.DoesNotContain("-0.8, 0.01,", tscn);
     }
+
+    [Fact]
+    public void Write_HasTimestampLabelNode()
+    {
+        var tscn = TscnWriter.Write(MinimalLayout());
+        Assert.Contains("[node name=\"TimestampLabel\" type=\"Label3D\" parent=\".\"]", tscn);
+    }
+
+    [Fact]
+    public void Write_TimestampLabel_IsFlat_WithNeonOrangeAndLargeFont()
+    {
+        var tscn = TscnWriter.Write(MinimalLayout());
+        // Flat on floor: rotated -90° around X, centred at scene X=0, between rows at Z=-4
+        Assert.Contains("Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0.02, -4)", tscn);
+        Assert.Contains("font_size = 96", tscn);
+        Assert.Contains("pixel_size = 0.02", tscn);
+        Assert.Contains("outline_size = 8", tscn);
+        // Orange: f97316 = (0.976, 0.451, 0.086)
+        Assert.Contains("modulate = Color(0.976, 0.451, 0.086, 1)", tscn);
+    }
+
+    [Fact]
+    public void Write_TimestampLabel_HasPcpBindableForTimestampMetric()
+    {
+        var tscn = TscnWriter.Write(MinimalLayout());
+        Assert.Contains("MetricName = \"pmview.meta.timestamp\"", tscn);
+        Assert.Contains("TargetProperty = \"text\"", tscn);
+        Assert.Contains("[node name=\"PcpBindable\" type=\"Node\" parent=\"TimestampLabel\"]", tscn);
+    }
+
+    [Fact]
+    public void Write_HasHostnameLabelNode()
+    {
+        var tscn = TscnWriter.Write(MinimalLayout());
+        Assert.Contains("[node name=\"HostnameLabel\" type=\"Label3D\" parent=\".\"]", tscn);
+    }
+
+    [Fact]
+    public void Write_HostnameLabel_IsBillboard_FloatingAtYTen()
+    {
+        var tscn = TscnWriter.Write(MinimalLayout());
+        Assert.Contains("billboard = 1", tscn);
+        Assert.Contains("font_size = 128", tscn);
+        Assert.Contains("outline_size = 12", tscn);
+        Assert.Contains("uppercase = true", tscn);
+        // The HostnameLabel's transform places it at Y=10, directly above scene centre.
+        Assert.Contains("[node name=\"HostnameLabel\" type=\"Label3D\" parent=\".\"]", tscn);
+        Assert.Contains("Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 10, 0)", tscn);
+    }
+
+    [Fact]
+    public void Write_HostnameLabel_HasPcpBindableForHostnameMetric()
+    {
+        var tscn = TscnWriter.Write(MinimalLayout());
+        Assert.Contains("MetricName = \"pmview.meta.hostname\"", tscn);
+        Assert.Contains("[node name=\"PcpBindable\" type=\"Node\" parent=\"HostnameLabel\"]", tscn);
+    }
+
+    [Fact]
+    public void Write_MetricPoller_HasHostnameProperty()
+    {
+        var layout = new SceneLayout("my-server", MinimalLayout().Zones);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("Hostname = \"my-server\"", tscn);
+    }
 }

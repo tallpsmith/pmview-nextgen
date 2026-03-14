@@ -25,13 +25,15 @@ public static class TscnWriter
                 "res://addons/pmview-bridge/camera_orbit.gd");
         var subResources = CollectSubResources(layout, registry);
         var bezelResources = CollectBezelSubResources(layout);
+        var ambientLabels = BuildAmbientLabels();
 
-        WriteHeader(sb, registry, subResources, bezelResources);
+        WriteHeader(sb, registry, subResources, bezelResources, ambientLabels);
         WriteExtResources(sb, registry);
         WriteSubResources(sb, subResources);
         WriteBezelSubResources(sb, bezelResources);
+        WriteAmbientSubResources(sb, ambientLabels);
         WriteWorldEnvironmentSubResource(sb);
-        WriteNodes(sb, layout, registry, subResources, bezelResources, pmproxyEndpoint, camera);
+        WriteNodes(sb, layout, registry, subResources, bezelResources, ambientLabels, pmproxyEndpoint, camera);
 
         return sb.ToString();
     }
@@ -93,10 +95,11 @@ public static class TscnWriter
     // --- header ---
 
     private static void WriteHeader(StringBuilder sb, ExtResourceRegistry registry,
-        List<SubResourceEntry> subResources, List<BezelSubResources> bezelResources)
+        List<SubResourceEntry> subResources, List<BezelSubResources> bezelResources,
+        IReadOnlyList<AmbientLabelSpec> ambientLabels)
     {
         // +1 for scene itself, +1 for WorldEnvironment Environment sub_resource
-        var loadSteps = registry.Count + subResources.Count + bezelResources.Count * 2 + 2;
+        var loadSteps = registry.Count + subResources.Count + bezelResources.Count * 2 + ambientLabels.Count + 2;
         sb.AppendLine($"[gd_scene load_steps={loadSteps} format=3]");
         sb.AppendLine();
     }
@@ -150,6 +153,26 @@ public static class TscnWriter
         }
     }
 
+    private static void WriteAmbientSubResources(StringBuilder sb,
+        IReadOnlyList<AmbientLabelSpec> labels)
+    {
+        foreach (var label in labels)
+        {
+            sb.AppendLine($"[sub_resource type=\"Resource\" id=\"{label.SubResourceId}\"]");
+            sb.AppendLine("script = ExtResource(\"binding_res_script\")");
+            sb.AppendLine("resource_local_to_scene = true");
+            sb.AppendLine($"MetricName = \"{label.MetricName}\"");
+            sb.AppendLine("TargetProperty = \"text\"");
+            sb.AppendLine("SourceRangeMin = 0");
+            sb.AppendLine("SourceRangeMax = 1");
+            sb.AppendLine("TargetRangeMin = 0");
+            sb.AppendLine("TargetRangeMax = 1");
+            sb.AppendLine("InstanceId = -1");
+            sb.AppendLine("InitialValue = 0");
+            sb.AppendLine();
+        }
+    }
+
     private static void WriteWorldEnvironmentSubResource(StringBuilder sb)
     {
         sb.AppendLine("[sub_resource type=\"Environment\" id=\"world_env\"]");
@@ -165,6 +188,7 @@ public static class TscnWriter
 
     private static void WriteNodes(StringBuilder sb, SceneLayout layout, ExtResourceRegistry registry,
         List<SubResourceEntry> subResources, List<BezelSubResources> bezelResources,
+        IReadOnlyList<AmbientLabelSpec> ambientLabels,
         string pmproxyEndpoint, CameraSetup? camera)
     {
         sb.AppendLine("[node name=\"HostView\" type=\"Node3D\"]");
@@ -174,6 +198,7 @@ public static class TscnWriter
         sb.AppendLine("[node name=\"MetricPoller\" type=\"Node\" parent=\".\"]");
         sb.AppendLine("script = ExtResource(\"metric_poller_script\")");
         sb.AppendLine($"Endpoint = \"{pmproxyEndpoint}\"");
+        sb.AppendLine($"Hostname = \"{layout.Hostname}\"");
         sb.AppendLine();
 
         sb.AppendLine("[node name=\"SceneBinder\" type=\"Node\" parent=\".\"]");
@@ -200,8 +225,48 @@ public static class TscnWriter
         foreach (var zone in layout.Zones)
             WriteZone(sb, zone, registry, subResources, bezelResources);
 
+        WriteAmbientLabels(sb, ambientLabels);
+
         if (camera != null)
             WriteCameraNode(sb, camera);
+    }
+
+    private static void WriteAmbientLabels(StringBuilder sb,
+        IReadOnlyList<AmbientLabelSpec> labels)
+    {
+        foreach (var label in labels)
+        {
+            sb.AppendLine($"[node name=\"{label.NodeName}\" type=\"Label3D\" parent=\".\"]");
+
+            if (label.IsFlatOnFloor)
+                // Rotated -90° around X (lies flat), centred at X=0, between rows at Z=-4
+                sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, {F(label.YPosition)}, -4)");
+            else
+                sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, {F(label.YPosition)}, 0)");
+
+            if (!label.IsFlatOnFloor)
+                sb.AppendLine("billboard = 1");
+
+            sb.AppendLine($"pixel_size = {F(label.PixelSize)}");
+            sb.AppendLine($"font_size = {label.FontSize}");
+            sb.AppendLine($"outline_size = {label.OutlineSize}");
+            sb.AppendLine("outline_modulate = Color(0, 0, 0, 1)");
+
+            if (label.Modulate != null)
+                sb.AppendLine($"modulate = {label.Modulate}");
+
+            if (label.Uppercase)
+                sb.AppendLine("uppercase = true");
+
+            sb.AppendLine("horizontal_alignment = 1");
+            sb.AppendLine("text = \"\"");
+            sb.AppendLine();
+
+            sb.AppendLine($"[node name=\"PcpBindable\" type=\"Node\" parent=\"{label.NodeName}\"]");
+            sb.AppendLine("script = ExtResource(\"bindable_script\")");
+            sb.AppendLine($"PcpBindings = Array[ExtResource(\"binding_res_script\")]([SubResource(\"{label.SubResourceId}\")])");
+            sb.AppendLine();
+        }
     }
 
     private static void WriteCameraNode(StringBuilder sb, CameraSetup camera)
@@ -443,6 +508,32 @@ public static class TscnWriter
         string MaterialId,
         float Width,
         float Depth);
+
+    private record AmbientLabelSpec(
+        string NodeName,
+        string MetricName,
+        string SubResourceId,
+        bool IsFlatOnFloor,
+        int FontSize,
+        float PixelSize,
+        int OutlineSize,
+        string? Modulate,
+        bool Uppercase,
+        float YPosition);
+
+    private static IReadOnlyList<AmbientLabelSpec> BuildAmbientLabels() =>
+    [
+        new("TimestampLabel", "pmview.meta.timestamp", "binding_TimestampLabel",
+            IsFlatOnFloor: true,
+            FontSize: 96, PixelSize: 0.02f, OutlineSize: 8,
+            Modulate: "Color(0.976, 0.451, 0.086, 1)",
+            Uppercase: false, YPosition: 0.02f),
+        new("HostnameLabel", "pmview.meta.hostname", "binding_HostnameLabel",
+            IsFlatOnFloor: false,
+            FontSize: 128, PixelSize: 0.015f, OutlineSize: 12,
+            Modulate: null,
+            Uppercase: true, YPosition: 10f),
+    ];
 
     /// <summary>
     /// Tracks ext_resources, ensuring each id is registered only once (first-write wins).
