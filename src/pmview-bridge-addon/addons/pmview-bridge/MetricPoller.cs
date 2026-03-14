@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Godot;
@@ -94,7 +95,7 @@ public partial class MetricPoller : Node
 	public async void StartPlayback(string startTimeIso)
 	{
 		if (DateTime.TryParse(startTimeIso, null,
-			System.Globalization.DateTimeStyles.AdjustToUniversal, out var startTime))
+			DateTimeStyles.AdjustToUniversal, out var startTime))
 		{
 			_lastEmittedTimestamp.Clear();
 			_seriesInstanceMap.Clear();
@@ -293,7 +294,7 @@ public partial class MetricPoller : Node
 		if (_lastEmittedMetrics != null && _lastEmittedMetrics.Count > 0)
 		{
 			GD.Print($"[MetricPoller] Replaying {_lastEmittedMetrics.Count} cached metrics for new scene");
-			var dict = _lastEmittedMetrics.Duplicate();
+			var dict = _lastEmittedMetrics.Duplicate(true);   // deep copy — inner dicts are independent
 			InjectVirtualMetrics(dict);
 			EmitSignal(SignalName.MetricsUpdated, dict);
 		}

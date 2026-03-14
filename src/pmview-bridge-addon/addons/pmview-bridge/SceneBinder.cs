@@ -135,6 +135,8 @@ public partial class SceneBinder : Node
 			}
 
 			var metricData = metrics[binding.Metric].AsGodotDictionary();
+			if (!metricData.ContainsKey("instances"))
+				continue;
 			var instances = metricData["instances"].AsGodotDictionary();
 			var nameToId = metricData.ContainsKey("name_to_id")
 				? metricData["name_to_id"].AsGodotDictionary()
