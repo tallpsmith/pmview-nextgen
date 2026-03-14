@@ -1,5 +1,5 @@
 @tool
-class_name GridLayout3D
+class_name HostProjectionGrid3D
 extends Node3D
 
 ## Number of columns before wrapping to a new row.

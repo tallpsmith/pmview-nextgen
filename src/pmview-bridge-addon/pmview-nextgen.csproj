@@ -8,8 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\src\pcp-client-dotnet\src\PcpClient\PcpClient.csproj" />
-    <ProjectReference Include="..\src\pcp-godot-bridge\src\PcpGodotBridge\PcpGodotBridge.csproj" />
+    <ProjectReference Include="..\..\src\pcp-client-dotnet\src\PcpClient\PcpClient.csproj" />
+    <ProjectReference Include="..\..\src\pcp-godot-bridge\src\PcpGodotBridge\PcpGodotBridge.csproj" />
   </ItemGroup>
 
   <ItemGroup>
