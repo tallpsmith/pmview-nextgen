@@ -42,31 +42,6 @@ public class LayoutCalculatorForegroundTests
     }
 
     [Fact]
-    public void Calculate_CpuForegroundZone_HasThreeShapes()
-    {
-        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var cpu = layout.Zones.Single(z => z.Name == "CPU");
-        Assert.Equal(3, cpu.Shapes.Count);
-    }
-
-    [Fact]
-    public void Calculate_LoadZone_ShapesCarryInstanceNames()
-    {
-        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var load = layout.Zones.Single(z => z.Name == "Load");
-        var instances = load.Shapes.Select(s => s.InstanceName).ToList();
-        Assert.Equal(new[] { "1 minute", "5 minute", "15 minute" }, instances);
-    }
-
-    [Fact]
-    public void Calculate_MemoryZone_SourceRangeMaxSetFromPhysmem()
-    {
-        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var mem = layout.Zones.Single(z => z.Name == "Memory");
-        Assert.All(mem.Shapes, s => Assert.Equal(16_000_000_000f, s.SourceRangeMax));
-    }
-
-    [Fact]
     public void Calculate_ForegroundShapes_HaveUniqueNodeNames()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
@@ -86,22 +61,86 @@ public class LayoutCalculatorForegroundTests
     }
 
     [Fact]
-    public void Calculate_ForegroundZone_HasGroundExtent()
-    {
-        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var load = layout.Zones.Single(z => z.Name == "Load");
-        // Load zone has 3 shapes at X=0, 1.5, 3.0. Ground should span them + padding.
-        Assert.True(load.GroundWidth > 3.0f, $"GroundWidth {load.GroundWidth} should be > 3.0");
-        Assert.True(load.GroundDepth > 0f, $"GroundDepth {load.GroundDepth} should be > 0");
-    }
-
-    [Fact]
     public void Calculate_ForegroundZone_HasEmptyGridLabels()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var load = layout.Zones.Single(z => z.Name == "Load");
-        Assert.Empty(load.MetricLabels ?? []);
-        Assert.Empty(load.InstanceLabels ?? []);
+        var system = layout.Zones.Single(z => z.Name == "System");
+        Assert.Empty(system.MetricLabels ?? []);
+        Assert.Empty(system.InstanceLabels ?? []);
+    }
+
+    [Fact]
+    public void Calculate_SystemZone_HasNineShapes()
+    {
+        // CPU(3) + Load(3) + Memory(3) = 9 shapes in the merged System zone.
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var system = layout.Zones.Single(z => z.Name == "System");
+        Assert.Equal(9, system.Shapes.Count);
+    }
+
+    [Fact]
+    public void Calculate_SystemZone_IsForeground_AtZZero()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var system = layout.Zones.Single(z => z.Name == "System");
+        Assert.Equal(0f, system.Position.Z);
+        Assert.Null(system.GridColumns);
+    }
+
+    [Fact]
+    public void Calculate_SystemZone_LoadShapes_CarryInstanceNames()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var system = layout.Zones.Single(z => z.Name == "System");
+        var loadInstances = system.Shapes
+            .Where(s => s.MetricName == "kernel.all.load")
+            .Select(s => s.InstanceName)
+            .ToList();
+        Assert.Equal(new[] { "1 minute", "5 minute", "15 minute" }, loadInstances);
+    }
+
+    [Fact]
+    public void Calculate_SystemZone_MemoryShapes_SourceRangeMaxFromPhysmem()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var system = layout.Zones.Single(z => z.Name == "System");
+        var memShapes = system.Shapes.Where(s => s.MetricName.StartsWith("mem.")).ToList();
+        Assert.Equal(3, memShapes.Count);
+        Assert.All(memShapes, s => Assert.Equal(16_000_000_000f, s.SourceRangeMax));
+    }
+
+    [Fact]
+    public void Calculate_SystemZone_HasGroundExtent()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var system = layout.Zones.Single(z => z.Name == "System");
+        // 9 shapes — ground must span them all + padding
+        Assert.True(system.GroundWidth > 9f,
+            $"GroundWidth {system.GroundWidth} should be > 9 for a 9-bar zone");
+        Assert.True(system.GroundDepth > 0f);
+    }
+
+    [Fact]
+    public void Calculate_ForegroundZoneOrder_IsSystemDiskNetInNetOut()
+    {
+        // Foreground zones ordered left-to-right: System, Disk, Net-In, Net-Out
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var foreground = layout.Zones
+            .Where(z => z.GridColumns == null)
+            .OrderBy(z => z.Position.X)
+            .Select(z => z.Name)
+            .ToList();
+        Assert.Equal(new[] { "System", "Disk", "Net-In", "Net-Out" }, foreground);
+    }
+
+    [Fact]
+    public void Calculate_NetInAggregateZone_IsForeground_HasTwoShapes()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        // Net-In foreground zone (not the per-instance background zone "Network In")
+        var netIn = layout.Zones.Single(z => z.Name == "Net-In" && z.GridColumns == null);
+        Assert.Equal(0f, netIn.Position.Z);
+        Assert.Equal(2, netIn.Shapes.Count);
     }
 }
 

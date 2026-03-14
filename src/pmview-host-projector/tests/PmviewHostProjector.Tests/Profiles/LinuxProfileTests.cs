@@ -23,10 +23,10 @@ public class LinuxProfileTests
     }
 
     [Fact]
-    public void GetZones_ForegroundOrder_IsDiskLoadMemoryCpu()
+    public void GetZones_ForegroundOrder_IsSystemDiskNetInNetOut()
     {
         var names = _zones.Where(z => z.Row == ZoneRow.Foreground).Select(z => z.Name).ToList();
-        Assert.Equal(new[] { "Disk", "Load", "Memory", "CPU" }, names);
+        Assert.Equal(new[] { "System", "Disk", "Net-In", "Net-Out" }, names);
     }
 
     [Fact]
@@ -37,38 +37,44 @@ public class LinuxProfileTests
     }
 
     [Fact]
-    public void CpuZone_HasThreeBarsWithCorrectMetrics()
+    public void SystemZone_HasNineMetrics_CpuLoadMemory()
     {
-        var cpu = _zones.Single(z => z.Name == "CPU");
-        Assert.Equal(3, cpu.Metrics.Count);
-        Assert.All(cpu.Metrics, m => Assert.Equal(ShapeType.Bar, m.Shape));
-        var names = cpu.Metrics.Select(m => m.MetricName).ToList();
+        var system = _zones.Single(z => z.Name == "System");
+        Assert.Equal(9, system.Metrics.Count);
+        var names = system.Metrics.Select(m => m.MetricName).ToList();
         Assert.Contains("kernel.all.cpu.user", names);
         Assert.Contains("kernel.all.cpu.sys", names);
         Assert.Contains("kernel.all.cpu.nice", names);
+        Assert.Contains("kernel.all.load", names);
+        Assert.Contains("mem.util.used", names);
     }
 
     [Fact]
-    public void CpuZone_SourceRange_IsZeroToHundred()
+    public void SystemZone_CpuMetrics_SourceRange_IsZeroToHundred()
     {
-        var cpu = _zones.Single(z => z.Name == "CPU");
-        Assert.All(cpu.Metrics, m => { Assert.Equal(0f, m.SourceRangeMin); Assert.Equal(100f, m.SourceRangeMax); });
+        var system = _zones.Single(z => z.Name == "System");
+        var cpuMetrics = system.Metrics.Where(m => m.MetricName.StartsWith("kernel.all.cpu.")).ToList();
+        Assert.Equal(3, cpuMetrics.Count);
+        Assert.All(cpuMetrics, m => { Assert.Equal(0f, m.SourceRangeMin); Assert.Equal(100f, m.SourceRangeMax); });
     }
 
     [Fact]
-    public void CpuZone_TargetRange_IsPointTwoToFive()
+    public void SystemZone_LoadMetrics_HaveInstanceNames()
     {
-        var cpu = _zones.Single(z => z.Name == "CPU");
-        Assert.All(cpu.Metrics, m => { Assert.Equal(0.2f, m.TargetRangeMin); Assert.Equal(5.0f, m.TargetRangeMax); });
-    }
-
-    [Fact]
-    public void LoadZone_HasThreeBarsWithInstanceNames()
-    {
-        var load = _zones.Single(z => z.Name == "Load");
-        Assert.Equal(3, load.Metrics.Count);
-        var instanceNames = load.Metrics.Select(m => m.InstanceName).ToList();
+        var system = _zones.Single(z => z.Name == "System");
+        var loadMetrics = system.Metrics.Where(m => m.MetricName == "kernel.all.load").ToList();
+        Assert.Equal(3, loadMetrics.Count);
+        var instanceNames = loadMetrics.Select(m => m.InstanceName).ToList();
         Assert.Equal(new[] { "1 minute", "5 minute", "15 minute" }, instanceNames);
+    }
+
+    [Fact]
+    public void SystemZone_MemoryMetrics_HaveZeroSourceRangeMax_AutoDetectedAtRuntime()
+    {
+        var system = _zones.Single(z => z.Name == "System");
+        var memMetrics = system.Metrics.Where(m => m.MetricName.StartsWith("mem.")).ToList();
+        Assert.Equal(3, memMetrics.Count);
+        Assert.All(memMetrics, m => Assert.Equal(0f, m.SourceRangeMax));
     }
 
     [Fact]
@@ -77,13 +83,6 @@ public class LinuxProfileTests
         var disk = _zones.Single(z => z.Name == "Disk");
         Assert.Equal(2, disk.Metrics.Count);
         Assert.All(disk.Metrics, m => Assert.Equal(ShapeType.Cylinder, m.Shape));
-    }
-
-    [Fact]
-    public void MemoryZone_HasZeroSourceRangeMax_AutoDetectedAtRuntime()
-    {
-        var mem = _zones.Single(z => z.Name == "Memory");
-        Assert.All(mem.Metrics, m => Assert.Equal(0f, m.SourceRangeMax));
     }
 
     [Fact]

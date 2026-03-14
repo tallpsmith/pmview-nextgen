@@ -15,15 +15,33 @@ public static class LinuxProfile
 
     public static IReadOnlyList<ZoneDefinition> GetZones() =>
     [
+        SystemZone(),
         DiskTotalsZone(),
-        LoadZone(),
-        MemoryZone(),
-        CpuZone(),
+        NetworkInAggregateZone(),
+        NetworkOutAggregateZone(),
         PerCpuZone(),
         PerDiskZone(),
         NetworkInZone(),
         NetworkOutZone(),
     ];
+
+    private static ZoneDefinition SystemZone() => new(
+        Name: "System",
+        Row: ZoneRow.Foreground,
+        Type: ZoneType.Aggregate,
+        Metrics:
+        [
+            new("kernel.all.cpu.user", ShapeType.Bar, "User",    Orange, 0f, 100f, 0.2f, 5.0f),
+            new("kernel.all.cpu.sys",  ShapeType.Bar, "Sys",     Orange, 0f, 100f, 0.2f, 5.0f),
+            new("kernel.all.cpu.nice", ShapeType.Bar, "Nice",    Orange, 0f, 100f, 0.2f, 5.0f),
+            new("kernel.all.load", ShapeType.Bar, "1m",  Indigo, 0f, 10f, 0.2f, 5.0f, InstanceName: "1 minute"),
+            new("kernel.all.load", ShapeType.Bar, "5m",  Indigo, 0f, 10f, 0.2f, 5.0f, InstanceName: "5 minute"),
+            new("kernel.all.load", ShapeType.Bar, "15m", Indigo, 0f, 10f, 0.2f, 5.0f, InstanceName: "15 minute"),
+            new("mem.util.used",   ShapeType.Bar, "Used",    Green, 0f, 0f, 0.2f, 5.0f),
+            new("mem.util.cached", ShapeType.Bar, "Cached",  Green, 0f, 0f, 0.2f, 5.0f),
+            new("mem.util.bufmem", ShapeType.Bar, "Buffers", Green, 0f, 0f, 0.2f, 5.0f),
+        ],
+        InstanceMetricSource: null);
 
     private static ZoneDefinition DiskTotalsZone() => new(
         Name: "Disk",
@@ -36,39 +54,25 @@ public static class LinuxProfile
         ],
         InstanceMetricSource: null);
 
-    private static ZoneDefinition LoadZone() => new(
-        Name: "Load",
+    private static ZoneDefinition NetworkInAggregateZone() => new(
+        Name: "Net-In",
         Row: ZoneRow.Foreground,
         Type: ZoneType.Aggregate,
         Metrics:
         [
-            new("kernel.all.load", ShapeType.Bar, "1m",  Indigo, 0f, 10f, 0.2f, 5.0f, InstanceName: "1 minute"),
-            new("kernel.all.load", ShapeType.Bar, "5m",  Indigo, 0f, 10f, 0.2f, 5.0f, InstanceName: "5 minute"),
-            new("kernel.all.load", ShapeType.Bar, "15m", Indigo, 0f, 10f, 0.2f, 5.0f, InstanceName: "15 minute"),
+            new("network.all.in.bytes",   ShapeType.Bar, "Bytes", Blue, 0f, 125_000_000f, 0.2f, 5.0f),
+            new("network.all.in.packets", ShapeType.Bar, "Pkts",  Blue, 0f, 100_000f,     0.2f, 5.0f),
         ],
         InstanceMetricSource: null);
 
-    private static ZoneDefinition MemoryZone() => new(
-        Name: "Memory",
+    private static ZoneDefinition NetworkOutAggregateZone() => new(
+        Name: "Net-Out",
         Row: ZoneRow.Foreground,
         Type: ZoneType.Aggregate,
         Metrics:
         [
-            new("mem.util.used",   ShapeType.Bar, "Used",   Green, 0f, 0f, 0.2f, 5.0f),
-            new("mem.util.cached", ShapeType.Bar, "Cached", Green, 0f, 0f, 0.2f, 5.0f),
-            new("mem.util.bufmem", ShapeType.Bar, "Buffers",Green, 0f, 0f, 0.2f, 5.0f),
-        ],
-        InstanceMetricSource: null);
-
-    private static ZoneDefinition CpuZone() => new(
-        Name: "CPU",
-        Row: ZoneRow.Foreground,
-        Type: ZoneType.Aggregate,
-        Metrics:
-        [
-            new("kernel.all.cpu.user", ShapeType.Bar, "User", Orange, 0f, 100f, 0.2f, 5.0f),
-            new("kernel.all.cpu.sys",  ShapeType.Bar, "Sys",  Orange, 0f, 100f, 0.2f, 5.0f),
-            new("kernel.all.cpu.nice", ShapeType.Bar, "Nice", Orange, 0f, 100f, 0.2f, 5.0f),
+            new("network.all.out.bytes",   ShapeType.Bar, "Bytes", Rose, 0f, 125_000_000f, 0.2f, 5.0f),
+            new("network.all.out.packets", ShapeType.Bar, "Pkts",  Rose, 0f, 100_000f,     0.2f, 5.0f),
         ],
         InstanceMetricSource: null);
 
