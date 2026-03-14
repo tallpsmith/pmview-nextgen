@@ -26,10 +26,12 @@ public class LayoutCalculatorForegroundTests
     [Fact]
     public void Calculate_ForegroundRow_CenteredOnXZero()
     {
+        // Row visual centre (based on GroundWidth footprint) should land at X=0.
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
         var foreground = layout.Zones.Where(z => z.GridColumns == null).ToList();
-        var allX = foreground.SelectMany(z => z.Shapes.Select(s => z.Position.X + s.LocalPosition.X));
-        var centre = (allX.Min() + allX.Max()) / 2f;
+        var leftEdge  = foreground.Min(z => z.Position.X);
+        var rightEdge = foreground.Max(z => z.Position.X + z.GroundWidth);
+        var centre    = (leftEdge + rightEdge) / 2f;
         Assert.True(Math.Abs(centre) < 0.01f, $"Foreground centre {centre} should be ~0");
     }
 
@@ -144,11 +146,29 @@ public class LayoutCalculatorForegroundTests
     }
 
     [Fact]
+    public void Calculate_ForegroundRow_CenteredOnGroundWidthFootprint()
+    {
+        // ZoneWidth must use GroundWidth (visual footprint including shape width + padding),
+        // not just the max shape X-origin. The row's visual centre should land at X=0.
+        // We verify by computing centre as midpoint of [leftmost zone start, rightmost zone end],
+        // where zone end = zone.Position.X + zone.GroundWidth.
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var foreground = layout.Zones.Where(z => z.GridColumns == null).ToList();
+
+        var leftEdge  = foreground.Min(z => z.Position.X);
+        var rightEdge = foreground.Max(z => z.Position.X + z.GroundWidth);
+        var centre    = (leftEdge + rightEdge) / 2f;
+
+        Assert.True(Math.Abs(centre) < 0.1f,
+            $"Foreground visual centre {centre:F4} should be ~0 when using GroundWidth footprint");
+    }
+
+    [Fact]
     public void Calculate_ForegroundZones_InterZoneGapIsAtMostTwoPointFive()
     {
         // ZoneGap reduced from 3.0 to 2.0. The gap (empty space) between adjacent
-        // foreground zones should now be <= 2.5. With old ZoneGap=3.0 it was ~3.0
-        // so this test will fail until the constant is updated.
+        // foreground zones should now be <= 2.5. With old ZoneGap=3.0 it was ~3.0.
+        // Gap is measured using GroundWidth as the zone's visual right edge.
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
         var foreground = layout.Zones
             .Where(z => z.GridColumns == null)
@@ -159,10 +179,8 @@ public class LayoutCalculatorForegroundTests
         {
             var left  = foreground[i];
             var right = foreground[i + 1];
-            // Zone position marks the start of its first shape at local X=0.
-            // The zone's footprint ends at Position.X + max(shape.LocalPosition.X).
-            var leftFootprintEnd = left.Position.X +
-                (left.Shapes.Count > 0 ? left.Shapes.Max(s => s.LocalPosition.X) : 0f);
+            // The zone's visual footprint ends at Position.X + GroundWidth.
+            var leftFootprintEnd = left.Position.X + left.GroundWidth;
             var gap = right.Position.X - leftFootprintEnd;
             Assert.True(gap <= 2.5f,
                 $"Gap '{left.Name}'→'{right.Name}' is {gap:F2}, expected <= 2.5 (ZoneGap=2.0)");

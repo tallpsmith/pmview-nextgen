@@ -550,4 +550,39 @@ public class TscnWriterTests
         var tscn = TscnWriter.Write(layout);
         Assert.Contains("Hostname = \"my-server\"", tscn);
     }
+
+    [Fact]
+    public void Write_LoadSteps_EqualsExtResourcesPlusSubResourcesPlusWorldEnv()
+    {
+        // MinimalLayout: 1 Bar shape, no bezel (GroundWidth=0), no camera.
+        // ext_resources (6): controller_script, metric_poller_script, scene_binder_script,
+        //                     bar_scene, bindable_script, binding_res_script
+        // sub_resources (1): binding for CPU_User
+        // bezel sub_resources (0): no bezel on this zone
+        // ambient labels (2): TimestampLabel, HostnameLabel
+        // WorldEnvironment (1): the single [sub_resource type="Environment"] block
+        // Root scene node is NOT a resource — should NOT be counted.
+        // Correct formula: extResources + subResources + bezelResources*2 + ambientLabels + 1
+        // = 6 + 1 + 0 + 2 + 1 = 10
+        var tscn = TscnWriter.Write(MinimalLayout());
+        Assert.Contains("load_steps=10 ", tscn);
+    }
+
+    [Fact]
+    public void Write_LoadSteps_WithBezel_IncludesBezelSubResources()
+    {
+        // Zone with GroundWidth > 0 produces 2 sub_resources: BoxMesh + StandardMaterial3D.
+        // ext_resources (6), sub_resources (1 binding), bezel (2), ambient (2), WorldEnv (1)
+        // = 6 + 1 + 2 + 2 + 1 = 12
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("CPU", "CPU", Vec3.Zero, null, null, null,
+                [new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
+                    "kernel.all.cpu.user", null, null,
+                    new RgbColour(0.976f, 0.451f, 0.086f),
+                    0f, 100f, 0.2f, 5.0f)],
+                GroundWidth: 2.0f, GroundDepth: 2.0f)
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("load_steps=12 ", tscn);
+    }
 }

@@ -98,8 +98,9 @@ public static class TscnWriter
         List<SubResourceEntry> subResources, List<BezelSubResources> bezelResources,
         IReadOnlyList<AmbientLabelSpec> ambientLabels)
     {
-        // +1 for scene itself, +1 for WorldEnvironment Environment sub_resource
-        var loadSteps = registry.Count + subResources.Count + bezelResources.Count * 2 + ambientLabels.Count + 2;
+        // +1 for WorldEnvironment Environment sub_resource only.
+        // The root scene node is NOT a resource — Godot format 3 does not count it.
+        var loadSteps = registry.Count + subResources.Count + bezelResources.Count * 2 + ambientLabels.Count + 1;
         sb.AppendLine($"[gd_scene load_steps={loadSteps} format=3]");
         sb.AppendLine();
     }

@@ -170,7 +170,9 @@ public static class LayoutCalculator
         if (zone.GridColumns.HasValue && zone.GroundWidth > 0f)
             return zone.GroundWidth + RowHeaderReservation;
         if (zone.Shapes.Count == 0) return 0f;
-        return zone.Shapes.Max(s => s.LocalPosition.X);
+        // Use GroundWidth (visual footprint = shape origins + shape width + padding),
+        // not just the rightmost shape X-origin, so centering reflects the actual extent.
+        return zone.GroundWidth;
     }
 
     private static float ResolveSourceRangeMax(MetricShapeMapping metric, HostTopology topology)
