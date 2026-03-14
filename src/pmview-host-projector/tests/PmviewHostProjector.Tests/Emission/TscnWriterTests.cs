@@ -347,6 +347,30 @@ public class TscnWriterTests
     }
 
     [Fact]
+    public void Write_WithCamera_EmitsCameraNode()
+    {
+        var camera = new CameraSetup(new Vec3(5, 8, 12), new Vec3(2, 1.5f, -4));
+        var tscn = TscnWriter.Write(MinimalLayout(), camera: camera);
+        Assert.Contains("[node name=\"Camera3D\" type=\"Camera3D\" parent=\".\"]", tscn);
+        Assert.Contains("camera_orbit.gd", tscn);
+    }
+
+    [Fact]
+    public void Write_WithCamera_BakesOrbitCenterIntoNode()
+    {
+        var camera = new CameraSetup(new Vec3(5, 8, 12), new Vec3(2, 1.5f, -4));
+        var tscn = TscnWriter.Write(MinimalLayout(), camera: camera);
+        Assert.Contains("orbit_center = Vector3(2, 1.5, -4)", tscn);
+    }
+
+    [Fact]
+    public void Write_WithoutCamera_NoCameraNode()
+    {
+        var tscn = TscnWriter.Write(MinimalLayout());
+        Assert.DoesNotContain("Camera3D", tscn);
+    }
+
+    [Fact]
     public void Write_RootNode_HasControllerScript()
     {
         var tscn = TscnWriter.Write(MinimalLayout());
