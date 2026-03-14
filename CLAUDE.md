@@ -41,16 +41,11 @@ dotnet test pmview-nextgen.sln
 # Run integration tests ONLY
 dotnet test src/pcp-client-dotnet/PcpClient.sln --filter "Category=Integration"
 
-# Build Godot project C# (when godot-project/ exists)
-dotnet build godot-project/pmview-nextgen.sln
+# Build Godot addon C# (from the addon dev workspace)
+dotnet build src/pmview-bridge-addon/pmview-nextgen.sln
 
-# Generate a host-view scene from a running pmproxy
+# Generate a host-view scene into an external Godot project
 # Requires dev-environment stack running (podman compose up)
-dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- \
-  --pmproxy http://localhost:44322 \
-  -o godot-project/scenes/host_view.tscn
-
-# Generate into an external Godot project (copies addon automatically)
 dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- \
   --pmproxy http://localhost:44322 \
   --install-addon \

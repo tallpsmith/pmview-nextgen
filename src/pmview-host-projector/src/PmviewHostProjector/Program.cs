@@ -52,12 +52,9 @@ public class Program
                     return 1;
                 }
 
-                var addonLibDir = Path.Combine(addonSource, "lib");
+                // Copy addon, build DLLs directly into target lib/, patch .csproj
                 Console.WriteLine("Building PcpClient and PcpGodotBridge libraries...");
-                LibraryBuilder.PublishLibraries(repoRoot, addonLibDir);
-
-                // Copy addon (with DLLs) and patch target .csproj
-                AddonInstaller.InstallAddonWithLibraries(addonSource, godotRoot);
+                AddonInstaller.InstallAddonWithLibraries(addonSource, godotRoot, repoRoot);
                 Console.WriteLine($"Addon installed to: {Path.Combine(godotRoot, "addons", "pmview-bridge")}");
                 Console.WriteLine($"Patched {Path.GetFileName(csprojPath)} with library references");
             }

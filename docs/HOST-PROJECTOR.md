@@ -5,11 +5,6 @@
 ## Basic Usage
 
 ```bash
-# Generate into the included godot-project/ (addon already installed)
-dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- \
-  --pmproxy http://localhost:44322 \
-  -o godot-project/scenes/host_view.tscn
-
 # Generate into your own Godot project
 dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- \
   --pmproxy http://myserver:44322 \
@@ -19,7 +14,7 @@ dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- \
 
 ## Installing into Your Own Godot Project
 
-The generated scene references resources from the `pmview-bridge` addon (`addons/pmview-bridge/`). The included `godot-project/` already has it. For external projects, use `--install-addon`.
+The generated scene references resources from the `pmview-bridge` addon (`addons/pmview-bridge/`). Use `--install-addon` to copy the addon and its .NET dependencies into your project automatically.
 
 **Before running:** Create the C# solution in Godot first:
 `Project → Tools → C# → Create C# Solution`

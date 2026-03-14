@@ -76,18 +76,14 @@ pmview-nextgen/
 │   └── pmview-host-projector/          # Host Projector CLI
 │       ├── src/PmviewHostProjector/
 │       └── tests/PmviewHostProjector.Tests/
-├── godot-project/                      # Godot 4.4 project
-│   ├── addons/pmview-bridge/           # Self-contained addon
-│   │   ├── *.cs                        # Bridge plugin source
-│   │   ├── lib/                        # Bundled DLLs
-│   │   └── building_blocks/            # GroundedBar/Cylinder, GridLayout3D, ZoneLabel
-│   ├── scenes/                         # .tscn scene files
-│   ├── scripts/scenes/                 # Scene controllers (GDScript)
-│   ├── test/                           # gdUnit4 tests
-│   ├── pmview-nextgen.csproj
-│   └── pmview-nextgen.sln
+│   └── pmview-bridge-addon/            # Addon development workspace (Godot project)
+│       ├── addons/pmview-bridge/       # Self-contained addon (copied to target projects)
+│       │   ├── *.cs                    # Bridge plugin source
+│       │   └── building_blocks/        # GroundedBar/Cylinder, GridLayout3D, ZoneLabel
+│       ├── test/                       # gdUnit4 tests
+│       ├── pmview-nextgen.csproj
+│       └── pmview-nextgen.sln
 ├── dev-environment/                    # Docker compose: PCP + pmproxy + synthetic data
-├── prototypes/                         # Spike prototypes (validated, archived)
 ├── specs/                              # Feature specifications
 └── docs/                              # Design documents and plans
 ```

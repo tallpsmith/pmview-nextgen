@@ -31,17 +31,16 @@ public static class AddonInstaller
 
     /// <summary>
     /// Finds the addon source directory by walking up from the executing assembly's
-    /// location looking for the repo's godot-project/addons/pmview-bridge/.
+    /// location looking for src/pmview-bridge-addon/addons/pmview-bridge/.
     /// Returns null if not found (e.g. running as a standalone published binary).
     /// </summary>
     public static string? FindAddonSource()
     {
-        var assemblyDir = AppContext.BaseDirectory;
-        var dir = assemblyDir;
+        var dir = AppContext.BaseDirectory;
 
         while (dir != null)
         {
-            var candidate = Path.Combine(dir, "godot-project", "addons", AddonDirName);
+            var candidate = Path.Combine(dir, "src", "pmview-bridge-addon", "addons", AddonDirName);
             if (Directory.Exists(candidate) &&
                 File.Exists(Path.Combine(candidate, "plugin.cfg")))
                 return candidate;
@@ -68,13 +67,15 @@ public static class AddonInstaller
     }
 
     /// <summary>
-    /// Full addon installation: copies addon files (including lib/ DLLs)
-    /// and patches the target project's .csproj with assembly references.
-    /// Assumes DLLs are already staged in addonSourceDir/lib/.
+    /// Full addon installation: copies addon source files, builds and places DLLs
+    /// directly into the target project's lib/ directory, and patches the .csproj.
     /// </summary>
-    public static void InstallAddonWithLibraries(string addonSourceDir, string godotProjectRoot)
+    public static void InstallAddonWithLibraries(string addonSourceDir, string godotProjectRoot, string repoRoot)
     {
         CopyAddonTo(addonSourceDir, godotProjectRoot);
+
+        var targetLibDir = Path.Combine(godotProjectRoot, "addons", AddonDirName, "lib");
+        LibraryBuilder.PublishLibraries(repoRoot, targetLibDir);
 
         var csprojPath = CsprojPatcher.FindTargetCsproj(godotProjectRoot);
         if (csprojPath != null)

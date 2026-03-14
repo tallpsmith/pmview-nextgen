@@ -9,7 +9,7 @@ namespace PmviewHostProjector;
 public static class LibraryBuilder
 {
     private const string RepoMarkerDir = "src";
-    private const string RepoMarkerFile = "godot-project";
+    private const string RepoMarkerFile = "pmview-nextgen.sln";
 
     private static readonly string[] ExpectedDlls =
     {
@@ -20,7 +20,7 @@ public static class LibraryBuilder
 
     /// <summary>
     /// Walks up from startPath looking for the repo root (contains both
-    /// "src" directory and "godot-project" directory).
+    /// "src" directory and "pmview-nextgen.sln" file).
     /// </summary>
     public static string? FindRepoRoot(string startPath)
     {
@@ -31,7 +31,7 @@ public static class LibraryBuilder
         while (dir != null)
         {
             if (Directory.Exists(Path.Combine(dir, RepoMarkerDir)) &&
-                Directory.Exists(Path.Combine(dir, RepoMarkerFile)))
+                File.Exists(Path.Combine(dir, RepoMarkerFile)))
                 return dir;
             dir = Path.GetDirectoryName(dir);
         }

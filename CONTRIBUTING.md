@@ -22,8 +22,8 @@ dotnet test pmview-nextgen.sln
 # Integration tests only
 dotnet test src/pcp-client-dotnet/PcpClient.sln --filter "Category=Integration"
 
-# Build the Godot project C# assemblies
-dotnet build godot-project/pmview-nextgen.sln
+# Build the addon C# assemblies (addon development workspace)
+dotnet build src/pmview-bridge-addon/pmview-nextgen.sln
 ```
 
 ## Dev Environment Stack
@@ -55,19 +55,14 @@ pmview-nextgen/
 │   └── pmview-host-projector/          # Host Projector: topology → .tscn generator
 │       ├── src/PmviewHostProjector/
 │       └── tests/PmviewHostProjector.Tests/
-├── godot-project/                      # Godot 4.4 project
-│   ├── addons/pmview-bridge/           # Self-contained addon (copy this dir to install)
-│   │   ├── *.cs                        # Bridge plugin (Poller, Binder, Bindable, Inspector)
-│   │   ├── lib/                        # Bundled DLLs (built by projector --install-addon)
-│   │   └── building_blocks/            # GroundedBar/Cylinder, GridLayout3D, ZoneLabel
-│   ├── scenes/                         # .tscn scene files
-│   ├── scripts/
-│   │   └── scenes/                     # Scene controllers (GDScript)
-│   ├── test/                           # gdUnit4 tests
-│   ├── pmview-nextgen.csproj
-│   └── pmview-nextgen.sln
+│   └── pmview-bridge-addon/            # Addon development workspace (Godot project)
+│       ├── addons/pmview-bridge/       # Self-contained addon (copied to target projects)
+│       │   ├── *.cs                    # Bridge plugin (Poller, Binder, Bindable, Inspector)
+│       │   └── building_blocks/        # GroundedBar/Cylinder, GridLayout3D, ZoneLabel
+│       ├── test/                       # gdUnit4 tests
+│       ├── pmview-nextgen.csproj
+│       └── pmview-nextgen.sln
 ├── dev-environment/                    # Docker compose stack
-├── prototypes/                         # Spike prototypes (validated, archived)
 ├── specs/                              # Feature specifications
 └── docs/                              # Design documents and plans
 ```
