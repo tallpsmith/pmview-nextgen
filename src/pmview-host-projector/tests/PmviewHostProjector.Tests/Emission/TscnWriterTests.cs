@@ -716,10 +716,8 @@ public class TscnWriterTests
     [Fact]
     public void Write_RotatedZone_LeftLabel_OffsetAlongZAxis()
     {
-        // Zone Ry(90°): local +Z → world +X, local -X → world +Z (toward camera).
-        // "Left" of a bar means lower world X = lower local Z, so offset goes on local Z not local X.
-        // pos.Z=1.9 chosen so (1.9f - 0.9f) = 1.0f exactly (clean float arithmetic).
-        // Basis (0,1,0, 0,0,1, 1,0,0): vertical label facing camera (+Z), text reads up world-Y axis.
+        // Zone Ry(-90°) basis rows: world_x = -local_z, world_z = local_x.
+        // "Left" in world (-X) = local +Z direction, so offset goes on local +Z.
         var layout = new SceneLayout("testhost", [
             new PlacedZone("System", "System", Vec3.Zero, null, null, null,
                 [new PlacedShape("System_User", ShapeType.Bar, new Vec3(0, 0, 1.9f),
@@ -730,18 +728,19 @@ public class TscnWriterTests
                 RotateYNinetyDeg: true)
         ]);
         var tscn = TscnWriter.Write(layout);
-        // localX stays at 0 (pos.X), localZ = pos.Z - 0.9 = 1.0
-        Assert.Contains("Transform3D(0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0.01, 1)", tscn);
+        // localX stays at 0 (pos.X), localZ = pos.Z + 0.9 = 2.8
+        Assert.Contains("Transform3D(0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0.01, 2.8)", tscn);
     }
 
     [Fact]
     public void Write_RotatedZone_RightLabel_OffsetAlongZAxis()
     {
-        // "Right" of a bar means higher world X = higher local Z, so offset goes on local Z.
-        // Basis (1,0,0, 0,0,1, 0,-1,0): flat on floor, reads along world +X (same as upright Front).
+        // Zone Ry(-90°) basis rows: world_x = -local_z, world_z = local_x.
+        // "Right" in world (+X) = local -Z direction, so offset goes on local -Z.
+        // pos.Z=1.8 chosen so (1.8f - 0.9f) = 0.9f exactly (clean float arithmetic).
         var layout = new SceneLayout("testhost", [
             new PlacedZone("System", "System", Vec3.Zero, null, null, null,
-                [new PlacedShape("System_Used", ShapeType.Bar, new Vec3(3f, 0, 1.2f),
+                [new PlacedShape("System_Used", ShapeType.Bar, new Vec3(3f, 0, 1.8f),
                     "mem.util.used", null, "Used",
                     new RgbColour(0.133f, 0.773f, 0.369f),
                     0f, 16_000_000_000f, 0.2f, 5.0f,
@@ -749,15 +748,15 @@ public class TscnWriterTests
                 RotateYNinetyDeg: true)
         ]);
         var tscn = TscnWriter.Write(layout);
-        // localX stays at 3 (pos.X), localZ = pos.Z + 0.9 = 2.1
-        Assert.Contains("Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 3, 0.01, 2.1)", tscn);
+        // localX stays at 3 (pos.X), localZ = pos.Z - 0.9 = 0.9
+        Assert.Contains("Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 3, 0.01, 0.9)", tscn);
     }
 
     [Fact]
     public void Write_RotatedZone_FrontLabel_UsesCameraFacingBasis()
     {
-        // Default/Front placement in a rotated zone: label in front of bar toward camera (local -X).
-        // Basis (0,-1,0, 0,0,1, -1,0,0): vertical label facing camera, text reads down world-Y axis.
+        // Zone Ry(-90°) basis rows: world_z = local_x.
+        // "Front" (toward camera = world +Z) = local +X direction, so offset goes on local +X.
         var layout = new SceneLayout("testhost", [
             new PlacedZone("System", "System", Vec3.Zero, null, null, null,
                 [new PlacedShape("System_1m", ShapeType.Bar, new Vec3(0, 0, 4f),
@@ -767,16 +766,16 @@ public class TscnWriterTests
                 RotateYNinetyDeg: true)
         ]);
         var tscn = TscnWriter.Write(layout);
-        // localX = pos.X - 0.6 = -0.6, localZ stays at pos.Z = 4
-        Assert.Contains("Transform3D(0, -1, 0, 0, 0, 1, -1, 0, 0, -0.6, 0.01, 4)", tscn);
+        // localX = pos.X + 0.6 = 0.6, localZ stays at pos.Z = 4
+        Assert.Contains("Transform3D(0, -1, 0, 0, 0, 1, -1, 0, 0, 0.6, 0.01, 4)", tscn);
     }
 
     [Fact]
-    public void Write_RotatedZoneLabel_UsesCounterRotationAndSwappedAxes()
+    public void Write_RotatedZoneLabel_PlacedOnForegroundSide()
     {
-        // Zone Ry(90°): zone title uses the same camera-facing vertical basis as Front labels.
-        // - localZ centres along world-X spread: max(shapeZ) / 2 = 2.4 / 2 = 1.2
-        // - localX places label in front (world +Z = local -X): min(shapeX) - 1.0 = 0 - 1.0 = -1.0
+        // Zone Ry(-90°) basis rows: world_z = local_x, world_x = -local_z.
+        // Zone label goes in front (world +Z = local +X): max(shapeX) + 1.0 = 0 + 1.0 = 1.0
+        // localZ centres along world-X spread: max(shapeZ) / 2 = 2.4 / 2 = 1.2
         var layout = new SceneLayout("testhost", [
             new PlacedZone("System", "System", Vec3.Zero, null, null, null,
                 [
@@ -790,7 +789,7 @@ public class TscnWriterTests
                 RotateYNinetyDeg: true)
         ]);
         var tscn = TscnWriter.Write(layout);
-        Assert.Contains("Transform3D(0, -1, 0, 0, 0, 1, -1, 0, 0, -1, 0.01, 1.2)", tscn);
+        Assert.Contains("Transform3D(0, -1, 0, 0, 0, 1, -1, 0, 0, 1, 0.01, 1.2)", tscn);
     }
 
     [Fact]

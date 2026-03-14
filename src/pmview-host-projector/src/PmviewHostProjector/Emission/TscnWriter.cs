@@ -373,11 +373,10 @@ public static class TscnWriter
 
         if (zone.RotateYNinetyDeg)
         {
-            // Zone is Ry(90°): local +Z → world +X, local -X → world +Z (toward camera).
-            // Centre label over world-X spread (= local Z span); place in front (local -X).
+            // Zone Ry(-90°) basis rows: world_x = -local_z, world_z = local_x.
+            // "In front" (world +Z) = local +X; centre label over world-X spread (= local Z span).
             labelLocalZ = zone.Items.Count > 0 ? zone.Items.Max(s => s.LocalPosition.Z) / 2f : 0f;
-            labelLocalX = zone.Items.Count > 0 ? zone.Items.Min(s => s.LocalPosition.X) - 1.0f : -1.0f;
-            // Vertical label facing camera (+Z), matching the Front/default shape label basis.
+            labelLocalX = zone.Items.Count > 0 ? zone.Items.Max(s => s.LocalPosition.X) + 1.0f : 1.0f;
             basisStr = "0, -1, 0, 0, 0, 1, -1, 0, 0";
         }
         else
@@ -527,14 +526,13 @@ public static class TscnWriter
 
         if (rotateYNinetyDeg)
         {
-            // Zone is Ry(90°): local +Z → world +X, local -X → world +Z (toward camera).
-            // Left/Right offsets work along local Z (= world X); Front moves toward camera (local -X).
-            // Each placement gets a distinct basis matching the hand-edited reference scene.
+            // Zone Ry(-90°) basis rows: world_x = -local_z, world_z = local_x.
+            // Left (world -X) = local +Z; Right (world +X) = local -Z; Front (world +Z) = local +X.
             (labelX, labelZ) = shape.LabelPlacement switch
             {
-                LabelPlacement.Left  => (pos.X,        pos.Z - 0.9f),
-                LabelPlacement.Right => (pos.X,        pos.Z + 0.9f),
-                _                    => (pos.X - 0.6f, pos.Z),
+                LabelPlacement.Left  => (pos.X,        pos.Z + 0.9f),
+                LabelPlacement.Right => (pos.X,        pos.Z - 0.9f),
+                _                    => (pos.X + 0.6f, pos.Z),
             };
             transform = shape.LabelPlacement switch
             {
