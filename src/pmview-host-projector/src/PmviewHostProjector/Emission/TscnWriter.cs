@@ -287,7 +287,7 @@ public static class TscnWriter
         sb.AppendLine($"[node name=\"{zone.Name}Label\" type=\"Label3D\" parent=\"{zone.Name}\"]");
         sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, {F(centreX)}, 0.01, {F(labelZ)})");
         sb.AppendLine("pixel_size = 0.01");
-        sb.AppendLine("font_size = 32");
+        sb.AppendLine("font_size = 56");
         sb.AppendLine($"text = \"{zone.ZoneLabel}\"");
         sb.AppendLine("horizontal_alignment = 1");
         sb.AppendLine();
@@ -359,8 +359,8 @@ public static class TscnWriter
             var x = i * colSpacing;
             sb.AppendLine($"[node name=\"{zone.Name}ColLabel{i}\" type=\"Label3D\" parent=\"{zone.Name}\"]");
             sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, {F(x)}, 0.01, {F(z)})");
-            sb.AppendLine("pixel_size = 0.008");
-            sb.AppendLine("font_size = 24");
+            sb.AppendLine("pixel_size = 0.01");
+            sb.AppendLine("font_size = 40");
             sb.AppendLine($"text = \"{zone.MetricLabels[i]}\"");
             sb.AppendLine("horizontal_alignment = 1");
             sb.AppendLine();
@@ -384,8 +384,8 @@ public static class TscnWriter
             var z = -(i * rowSpacing);
             sb.AppendLine($"[node name=\"{zone.Name}RowLabel{i}\" type=\"Label3D\" parent=\"{zone.Name}\"]");
             sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, {F(x)}, 0.01, {F(z)})");
-            sb.AppendLine("pixel_size = 0.008");
-            sb.AppendLine("font_size = 24");
+            sb.AppendLine("pixel_size = 0.01");
+            sb.AppendLine("font_size = 40");
             sb.AppendLine($"text = \"{zone.InstanceLabels[i]}\"");
             sb.AppendLine("horizontal_alignment = 1");
             sb.AppendLine();
@@ -397,8 +397,8 @@ public static class TscnWriter
         var pos = shape.LocalPosition;
         sb.AppendLine($"[node name=\"{shape.NodeName}Label\" type=\"Label3D\" parent=\"{zoneName}\"]");
         sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, {F(pos.X)}, 0.01, 0.6)");
-        sb.AppendLine("pixel_size = 0.008");
-        sb.AppendLine("font_size = 24");
+        sb.AppendLine("pixel_size = 0.01");
+        sb.AppendLine("font_size = 40");
         sb.AppendLine($"text = \"{shape.DisplayLabel}\"");
         sb.AppendLine("horizontal_alignment = 1");
         sb.AppendLine();

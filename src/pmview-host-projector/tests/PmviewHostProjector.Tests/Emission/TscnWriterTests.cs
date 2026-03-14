@@ -140,7 +140,7 @@ public class TscnWriterTests
         var tscn = TscnWriter.Write(MinimalLayout());
         Assert.Contains("Label3D", tscn);
         Assert.Contains("text = \"CPU\"", tscn);
-        Assert.Contains("font_size = 32", tscn);
+        Assert.Contains("font_size = 56", tscn);   // was font_size = 32
         Assert.Contains("pixel_size = 0.01", tscn);
         Assert.Contains("horizontal_alignment = 1", tscn);
     }
@@ -406,6 +406,60 @@ public class TscnWriterTests
     {
         var tscn = TscnWriter.Write(MinimalLayout());
         Assert.Contains("Endpoint = \"http://localhost:44322\"", tscn);
+    }
+
+    [Fact]
+    public void Write_ShapeLabel_HasIncreasedFontSize()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("Load", "Load", Vec3.Zero, null, null, null,
+                [new PlacedShape("Load_1m", ShapeType.Bar, new Vec3(0, 0, 0),
+                    "kernel.all.load", "1 minute", "1m",
+                    new RgbColour(0.388f, 0.400f, 0.945f),
+                    0f, 10f, 0.2f, 5.0f)])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("[node name=\"Load_1mLabel\" type=\"Label3D\"", tscn);
+        Assert.Contains("font_size = 40", tscn);
+        Assert.Contains("pixel_size = 0.01", tscn);
+    }
+
+    [Fact]
+    public void Write_GridColumnHeader_HasIncreasedFontSize()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("Per_CPU", "Per-CPU", new Vec3(0, 0, -8),
+                3, 1.5f, 2.0f,
+                [new PlacedShape("PerCPU_cpu0_User", ShapeType.Bar, Vec3.Zero,
+                    "kernel.percpu.cpu.user", "cpu0", "cpu0",
+                    new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f)],
+                GroundWidth: 5f, GroundDepth: 8f,
+                MetricLabels: ["User", "Sys", "Nice"],
+                InstanceLabels: ["cpu0"])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("Per_CPUColLabel0", tscn);
+        Assert.DoesNotContain("font_size = 24", tscn);
+        Assert.Contains("font_size = 40", tscn);
+    }
+
+    [Fact]
+    public void Write_GridRowHeader_HasIncreasedFontSize()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("Per_CPU", "Per-CPU", new Vec3(0, 0, -8),
+                3, 1.5f, 2.0f,
+                [new PlacedShape("PerCPU_cpu0_User", ShapeType.Bar, Vec3.Zero,
+                    "kernel.percpu.cpu.user", "cpu0", "cpu0",
+                    new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f)],
+                GroundWidth: 5f, GroundDepth: 8f,
+                MetricLabels: ["User"],
+                InstanceLabels: ["cpu0", "cpu1"])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("Per_CPURowLabel0", tscn);
+        Assert.DoesNotContain("font_size = 24", tscn);
+        Assert.Contains("font_size = 40", tscn);
     }
 
     [Fact]
