@@ -47,7 +47,7 @@ jobs:
           godot-net: true
           dotnet-version: net9.0
           paths: test/e2e/
-          project_dir: 'godot-project/'
+          project_dir: 'src/pmview-bridge-addon/'
           timeout: 15
 
       - name: Tear down PCP stack
