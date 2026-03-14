@@ -9,10 +9,11 @@ public class LinuxProfileTests
     private readonly IReadOnlyList<ZoneDefinition> _zones = LinuxProfile.GetZones();
 
     [Fact]
-    public void GetZones_ReturnsFourForegroundZones()
+    public void GetZones_ReturnsFiveForegroundZones()
     {
+        // System, Cpu-Split (comparison), Disk, Net-In, Net-Out = 5
         var foreground = _zones.Where(z => z.Row == ZoneRow.Foreground).ToList();
-        Assert.Equal(4, foreground.Count);
+        Assert.Equal(5, foreground.Count);
     }
 
     [Fact]
@@ -23,10 +24,10 @@ public class LinuxProfileTests
     }
 
     [Fact]
-    public void GetZones_ForegroundOrder_IsSystemDiskNetInNetOut()
+    public void GetZones_ForegroundOrder_IsSystemCpuSplitDiskNetInNetOut()
     {
         var names = _zones.Where(z => z.Row == ZoneRow.Foreground).Select(z => z.Name).ToList();
-        Assert.Equal(new[] { "System", "Disk", "Net-In", "Net-Out" }, names);
+        Assert.Equal(new[] { "System", "Cpu-Split", "Disk", "Net-In", "Net-Out" }, names);
     }
 
     [Fact]

@@ -9,17 +9,18 @@ public class HostProfileProviderTests
     private readonly HostProfileProvider _provider = new();
 
     [Fact]
-    public void GetProfile_Linux_ReturnsEightZones()
+    public void GetProfile_Linux_ReturnsNineZones()
     {
+        // 5 foreground (System, Cpu-Split, Disk, Net-In, Net-Out) + 4 background = 9
         var zones = _provider.GetProfile(HostOs.Linux);
-        Assert.Equal(8, zones.Count);
+        Assert.Equal(9, zones.Count);
     }
 
     [Fact]
-    public void GetProfile_MacOs_ReturnsEightZones()
+    public void GetProfile_MacOs_ReturnsNineZones()
     {
         var zones = _provider.GetProfile(HostOs.MacOs);
-        Assert.Equal(8, zones.Count);
+        Assert.Equal(9, zones.Count);
     }
 
     [Fact]

@@ -31,11 +31,26 @@ public record MetricShapeMapping(
     float SourceRangeMax,
     float TargetRangeMin,
     float TargetRangeMax,
-    string? InstanceName = null);
+    string? InstanceName = null,
+    Vec3? Position = null,
+    LabelPlacement LabelPlacement = LabelPlacement.Front);
+
+/// <summary>
+/// Declares that a named subset of this zone's metrics should be emitted as a
+/// vertically-stacked group (StackGroupNode) rather than individual shapes.
+/// MetricLabels must match MetricShapeMapping.Label values in the parent zone's Metrics list,
+/// in the desired bottom-to-top render order.
+/// </summary>
+public record MetricStackGroupDefinition(
+    string GroupName,
+    StackMode Mode,
+    IReadOnlyList<string> MetricLabels);
 
 public record ZoneDefinition(
     string Name,
     ZoneRow Row,
     ZoneType Type,
     IReadOnlyList<MetricShapeMapping> Metrics,
-    string? InstanceMetricSource);
+    string? InstanceMetricSource = null,
+    bool RotateYNinetyDeg = false,
+    IReadOnlyList<MetricStackGroupDefinition>? StackGroups = null);

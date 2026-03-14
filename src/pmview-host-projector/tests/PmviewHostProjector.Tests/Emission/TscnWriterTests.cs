@@ -191,9 +191,106 @@ public class TscnWriterTests
                 GroundWidth: 4.6f, GroundDepth: 2.0f)
         ]);
         var tscn = TscnWriter.Write(layout);
-        // Label should be at X = 1.5 (centre of 0..3.0 span), Z = 1.5
+        // Label at X = 1.5 (centre of 0..3.0 span), Z = maxShapeZ(0) + 1.0 = 1.0
         Assert.Contains("text = \"Load\"", tscn);
-        Assert.Contains("1.5, 0.01, 1.5", tscn);
+        Assert.Contains("1.5, 0.01, 1", tscn);
+    }
+
+    [Fact]
+    public void Write_ZoneLabel_IsPlacedOneUnitBeyondDeepestShape()
+    {
+        // Shapes at Z=0 and Z=2.4 → label should be at Z = 2.4 + 1.0 = 3.4
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("System", "System", Vec3.Zero, null, null, null,
+                [
+                    new PlacedShape("Sys_A", ShapeType.Bar, new Vec3(0, 0, 0),
+                        "kernel.all.cpu.user", null, "User",
+                        new RgbColour(1f, 0f, 0f), 0f, 100f, 0.2f, 5.0f),
+                    new PlacedShape("Sys_B", ShapeType.Bar, new Vec3(0, 0, 2.4f),
+                        "kernel.all.cpu.sys", null, "Sys",
+                        new RgbColour(1f, 0f, 0f), 0f, 100f, 0.2f, 5.0f),
+                ])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("0, 0.01, 3.4", tscn);
+    }
+
+    [Fact]
+    public void Write_LeftPlacementLabel_HasZAxisAlignedFlatOnFloorTransform()
+    {
+        // Left labels align with the Z axis → Ry(-90°) flat: Transform3D(0, 0, 1, -1, 0, 0, 0, -1, 0, ...)
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("System", "System", Vec3.Zero, null, null, null,
+                [new PlacedShape("System_User", ShapeType.Bar, new Vec3(0, 0, 1.2f),
+                    "kernel.all.cpu.user", null, "User",
+                    new RgbColour(0.976f, 0.451f, 0.086f),
+                    0f, 100f, 0.2f, 5.0f,
+                    LabelPlacement: LabelPlacement.Left)])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("Transform3D(0, 0, 1, -1, 0, 0, 0, -1, 0, -0.9, 0.01, 1.2)", tscn);
+    }
+
+    [Fact]
+    public void Write_RightPlacementLabel_HasZAxisAlignedFlatOnFloorTransform()
+    {
+        // Right labels align with the Z axis → Ry(-90°) flat: Transform3D(0, 0, 1, -1, 0, 0, 0, -1, 0, ...)
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("System", "System", Vec3.Zero, null, null, null,
+                [new PlacedShape("System_Used", ShapeType.Bar, new Vec3(3f, 0, 1.2f),
+                    "mem.util.used", null, "Used",
+                    new RgbColour(0.133f, 0.773f, 0.369f),
+                    0f, 16_000_000_000f, 0.2f, 5.0f,
+                    LabelPlacement: LabelPlacement.Right)])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("Transform3D(0, 0, 1, -1, 0, 0, 0, -1, 0, 3.9, 0.01, 1.2)", tscn);
+    }
+
+    [Fact]
+    public void Write_FrontPlacementLabel_KeepsXAxisAlignedFlatOnFloorTransform()
+    {
+        // Front labels (default) keep the standard flat transform reading along X
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("System", "System", Vec3.Zero, null, null, null,
+                [new PlacedShape("System_1m", ShapeType.Bar, new Vec3(0, 0, 4f),
+                    "kernel.all.load", "1 minute", "1m",
+                    new RgbColour(0.388f, 0.400f, 0.945f),
+                    0f, 10f, 0.2f, 5.0f,
+                    LabelPlacement: LabelPlacement.Front)])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0.01, 4.6)", tscn);
+    }
+
+    [Fact]
+    public void Write_RotatedZone_EmitsYRotationTransform()
+    {
+        // Ry(90°) rotation: Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, tx, 0, tz)
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("System", "System", new Vec3(2f, 0, 0), null, null, null,
+                [new PlacedShape("System_User", ShapeType.Bar, Vec3.Zero,
+                    "kernel.all.cpu.user", null, null,
+                    new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f)],
+                RotateYNinetyDeg: true)
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 2, 0, 0)", tscn);
+    }
+
+    [Fact]
+    public void Write_RotatedZoneAtOrigin_StillEmitsYRotationTransform()
+    {
+        // Even at origin, a rotated zone must emit its rotation matrix
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("System", "System", Vec3.Zero, null, null, null,
+                [new PlacedShape("System_User", ShapeType.Bar, Vec3.Zero,
+                    "kernel.all.cpu.user", null, null,
+                    new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f)],
+                RotateYNinetyDeg: true)
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 0, 0, 0)", tscn);
     }
 
     [Fact]
@@ -487,6 +584,54 @@ public class TscnWriterTests
     }
 
     [Fact]
+    public void Write_ShapeWithLeftLabelPlacement_PlacesLabelLeftOfShape()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("System", "System", Vec3.Zero, null, null, null,
+                [new PlacedShape("System_User", ShapeType.Bar, new Vec3(0, 0, 1.2f),
+                    "kernel.all.cpu.user", null, "User",
+                    new RgbColour(0.976f, 0.451f, 0.086f),
+                    0f, 100f, 0.2f, 5.0f,
+                    LabelPlacement: LabelPlacement.Left)])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        // Label at (X - 0.9, 0.01, Z) — to the left of the shape, same Z
+        Assert.Contains("-0.9, 0.01, 1.2", tscn);
+    }
+
+    [Fact]
+    public void Write_ShapeWithRightLabelPlacement_PlacesLabelRightOfShape()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("System", "System", Vec3.Zero, null, null, null,
+                [new PlacedShape("System_Used", ShapeType.Bar, new Vec3(3f, 0, 1.2f),
+                    "mem.util.used", null, "Used",
+                    new RgbColour(0.133f, 0.773f, 0.369f),
+                    0f, 16_000_000_000f, 0.2f, 5.0f,
+                    LabelPlacement: LabelPlacement.Right)])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        // Label at (X + 0.9, 0.01, Z) — to the right of the shape, same Z
+        Assert.Contains("3.9, 0.01, 1.2", tscn);
+    }
+
+    [Fact]
+    public void Write_ShapeFrontLabel_WithNonZeroShapeZ_IncludesShapeZInLabelPosition()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("System", "System", Vec3.Zero, null, null, null,
+                [new PlacedShape("System_1m", ShapeType.Bar, new Vec3(0, 0, 4f),
+                    "kernel.all.load", "1 minute", "1m",
+                    new RgbColour(0.388f, 0.400f, 0.945f),
+                    0f, 10f, 0.2f, 5.0f,
+                    LabelPlacement: LabelPlacement.Front)])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        // Label at (X, 0.01, shapeZ + 0.6) — in front of the shape in Z
+        Assert.Contains("0, 0.01, 4.6", tscn);
+    }
+
+    [Fact]
     public void Write_HasTimestampLabelNode()
     {
         var tscn = TscnWriter.Write(MinimalLayout());
@@ -569,6 +714,86 @@ public class TscnWriterTests
     }
 
     [Fact]
+    public void Write_RotatedZone_LeftLabel_OffsetAlongZAxis()
+    {
+        // Zone Ry(90°): local +Z → world +X, local -X → world +Z (toward camera).
+        // "Left" of a bar means lower world X = lower local Z, so offset goes on local Z not local X.
+        // pos.Z=1.9 chosen so (1.9f - 0.9f) = 1.0f exactly (clean float arithmetic).
+        // Basis (0,1,0, 0,0,1, 1,0,0): vertical label facing camera (+Z), text reads up world-Y axis.
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("System", "System", Vec3.Zero, null, null, null,
+                [new PlacedShape("System_User", ShapeType.Bar, new Vec3(0, 0, 1.9f),
+                    "kernel.all.cpu.user", null, "User",
+                    new RgbColour(0.976f, 0.451f, 0.086f),
+                    0f, 100f, 0.2f, 5.0f,
+                    LabelPlacement: LabelPlacement.Left)],
+                RotateYNinetyDeg: true)
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        // localX stays at 0 (pos.X), localZ = pos.Z - 0.9 = 1.0
+        Assert.Contains("Transform3D(0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0.01, 1)", tscn);
+    }
+
+    [Fact]
+    public void Write_RotatedZone_RightLabel_OffsetAlongZAxis()
+    {
+        // "Right" of a bar means higher world X = higher local Z, so offset goes on local Z.
+        // Basis (1,0,0, 0,0,1, 0,-1,0): flat on floor, reads along world +X (same as upright Front).
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("System", "System", Vec3.Zero, null, null, null,
+                [new PlacedShape("System_Used", ShapeType.Bar, new Vec3(3f, 0, 1.2f),
+                    "mem.util.used", null, "Used",
+                    new RgbColour(0.133f, 0.773f, 0.369f),
+                    0f, 16_000_000_000f, 0.2f, 5.0f,
+                    LabelPlacement: LabelPlacement.Right)],
+                RotateYNinetyDeg: true)
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        // localX stays at 3 (pos.X), localZ = pos.Z + 0.9 = 2.1
+        Assert.Contains("Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 3, 0.01, 2.1)", tscn);
+    }
+
+    [Fact]
+    public void Write_RotatedZone_FrontLabel_UsesCameraFacingBasis()
+    {
+        // Default/Front placement in a rotated zone: label in front of bar toward camera (local -X).
+        // Basis (0,-1,0, 0,0,1, -1,0,0): vertical label facing camera, text reads down world-Y axis.
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("System", "System", Vec3.Zero, null, null, null,
+                [new PlacedShape("System_1m", ShapeType.Bar, new Vec3(0, 0, 4f),
+                    "kernel.all.load", "1 minute", "1m",
+                    new RgbColour(0.388f, 0.400f, 0.945f),
+                    0f, 10f, 0.2f, 5.0f)],
+                RotateYNinetyDeg: true)
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        // localX = pos.X - 0.6 = -0.6, localZ stays at pos.Z = 4
+        Assert.Contains("Transform3D(0, -1, 0, 0, 0, 1, -1, 0, 0, -0.6, 0.01, 4)", tscn);
+    }
+
+    [Fact]
+    public void Write_RotatedZoneLabel_UsesCounterRotationAndSwappedAxes()
+    {
+        // Zone Ry(90°): zone title uses the same camera-facing vertical basis as Front labels.
+        // - localZ centres along world-X spread: max(shapeZ) / 2 = 2.4 / 2 = 1.2
+        // - localX places label in front (world +Z = local -X): min(shapeX) - 1.0 = 0 - 1.0 = -1.0
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("System", "System", Vec3.Zero, null, null, null,
+                [
+                    new PlacedShape("Sys_A", ShapeType.Bar, new Vec3(0, 0, 0),
+                        "kernel.all.cpu.user", null, null,
+                        new RgbColour(1f, 0f, 0f), 0f, 100f, 0.2f, 5.0f),
+                    new PlacedShape("Sys_B", ShapeType.Bar, new Vec3(0, 0, 2.4f),
+                        "kernel.all.cpu.sys", null, null,
+                        new RgbColour(1f, 0f, 0f), 0f, 100f, 0.2f, 5.0f),
+                ],
+                RotateYNinetyDeg: true)
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("Transform3D(0, -1, 0, 0, 0, 1, -1, 0, 0, -1, 0.01, 1.2)", tscn);
+    }
+
+    [Fact]
     public void Write_LoadSteps_WithBezel_IncludesBezelSubResources()
     {
         // Zone with GroundWidth > 0 produces 2 sub_resources: BoxMesh + StandardMaterial3D.
@@ -584,5 +809,102 @@ public class TscnWriterTests
         ]);
         var tscn = TscnWriter.Write(layout);
         Assert.Contains("load_steps=12 ", tscn);
+    }
+
+    // --- PlacedStack emission tests ---
+
+    private static SceneLayout LayoutWithCpuStack() =>
+        new("testhost", [
+            new PlacedZone("CPU", "CPU", Vec3.Zero, null, null, null,
+            [
+                new PlacedStack("CpuStack", Vec3.Zero,
+                [
+                    new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
+                        "kernel.all.cpu.user", null, "User",
+                        new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f),
+                    new PlacedShape("CPU_Sys", ShapeType.Bar, Vec3.Zero,
+                        "kernel.all.cpu.sys", null, "Sys",
+                        new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f),
+                    new PlacedShape("CPU_Nice", ShapeType.Bar, Vec3.Zero,
+                        "kernel.all.cpu.nice", null, "Nice",
+                        new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f),
+                ], StackMode.Proportional)
+            ])
+        ]);
+
+    [Fact]
+    public void Write_PlacedStack_EmitsStackGroupNode_WithScript()
+    {
+        var tscn = TscnWriter.Write(LayoutWithCpuStack());
+        Assert.Contains("[node name=\"CpuStack\" type=\"Node3D\" parent=\"CPU\"]", tscn);
+        Assert.Contains("stack_group_node.gd", tscn);
+    }
+
+    [Fact]
+    public void Write_PlacedStack_StackModeProportional_EmitsZero()
+    {
+        // GDScript enum: PROPORTIONAL = 0, NORMALISED = 1
+        var tscn = TscnWriter.Write(LayoutWithCpuStack());
+        Assert.Contains("stack_mode = 0", tscn);
+    }
+
+    [Fact]
+    public void Write_PlacedStack_StackModeNormalised_EmitsOne()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone("CPU", "CPU", Vec3.Zero, null, null, null,
+            [
+                new PlacedStack("CpuStack", Vec3.Zero,
+                [
+                    new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
+                        "kernel.all.cpu.user", null, null,
+                        new RgbColour(1f, 0f, 0f), 0f, 100f, 0.2f, 5.0f),
+                ], StackMode.Normalised)
+            ])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("stack_mode = 1", tscn);
+    }
+
+    [Fact]
+    public void Write_PlacedStack_EmitsEachMemberBarWithPcpBindable()
+    {
+        var tscn = TscnWriter.Write(LayoutWithCpuStack());
+        // Each member is a child of the StackGroupNode
+        Assert.Contains("parent=\"CPU/CpuStack\"", tscn);
+        Assert.Contains("[node name=\"CPU_User\"", tscn);
+        Assert.Contains("[node name=\"CPU_Sys\"", tscn);
+        Assert.Contains("[node name=\"CPU_Nice\"", tscn);
+        Assert.Contains("MetricName = \"kernel.all.cpu.user\"", tscn);
+        Assert.Contains("MetricName = \"kernel.all.cpu.sys\"", tscn);
+        Assert.Contains("MetricName = \"kernel.all.cpu.nice\"", tscn);
+    }
+
+    [Fact]
+    public void Write_PlacedStack_MemberPcpBindables_AreChildrenOfStack()
+    {
+        var tscn = TscnWriter.Write(LayoutWithCpuStack());
+        Assert.Contains("[node name=\"PcpBindable\" type=\"Node\" parent=\"CPU/CpuStack/CPU_User\"]", tscn);
+        Assert.Contains("[node name=\"PcpBindable\" type=\"Node\" parent=\"CPU/CpuStack/CPU_Sys\"]", tscn);
+        Assert.Contains("[node name=\"PcpBindable\" type=\"Node\" parent=\"CPU/CpuStack/CPU_Nice\"]", tscn);
+    }
+
+    [Fact]
+    public void Write_PlacedStack_RegistersStackGroupScript_AsExtResource()
+    {
+        var tscn = TscnWriter.Write(LayoutWithCpuStack());
+        Assert.Contains("res://addons/pmview-bridge/building_blocks/stack_group_node.gd", tscn);
+    }
+
+    [Fact]
+    public void Write_LoadSteps_WithPlacedStack_CountsCorrectly()
+    {
+        // Stack with 3 members:
+        // ext_resources (7): controller, metric_poller, scene_binder, bar_scene, bindable, binding_res, stack_group_script
+        // sub_resources (3): one binding per member
+        // bezel (0), ambient (2), WorldEnv (1)
+        // = 7 + 3 + 0 + 2 + 1 = 13
+        var tscn = TscnWriter.Write(LayoutWithCpuStack());
+        Assert.Contains("load_steps=13 ", tscn);
     }
 }

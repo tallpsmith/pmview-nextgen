@@ -56,25 +56,38 @@ public static class TscnWriter
 
         foreach (var zone in layout.Zones)
         {
-            foreach (var shape in zone.Shapes)
+            if (zone.GridColumns.HasValue)
+                registry.Require("grid_script", "Script", "res://addons/pmview-bridge/building_blocks/grid_layout_3d.gd");
+
+            foreach (var item in zone.Items)
             {
-                var sceneId = SceneExtResourceId(shape.Shape);
-                registry.Require(sceneId, "PackedScene", SceneExtResourcePath(shape.Shape));
-                registry.Require("bindable_script", "Script", "res://addons/pmview-bridge/PcpBindable.cs");
-                registry.Require("binding_res_script", "Script", "res://addons/pmview-bridge/PcpBindingResource.cs");
+                var shapes = item switch
+                {
+                    PlacedStack stack => stack.Members,
+                    PlacedShape shape => (IReadOnlyList<PlacedShape>)[shape],
+                    _                 => []
+                };
 
-                if (zone.GridColumns.HasValue)
-                    registry.Require("grid_script", "Script", "res://addons/pmview-bridge/building_blocks/grid_layout_3d.gd");
+                if (item is PlacedStack)
+                    registry.Require("stack_group_script", "Script",
+                        "res://addons/pmview-bridge/building_blocks/stack_group_node.gd");
 
-                list.Add(new SubResourceEntry(
-                    Id: SubResourceId(shape.NodeName),
-                    MetricName: shape.MetricName,
-                    InstanceName: shape.InstanceName,
-                    SourceRangeMin: shape.SourceRangeMin,
-                    SourceRangeMax: shape.SourceRangeMax,
-                    TargetRangeMin: shape.TargetRangeMin,
-                    TargetRangeMax: shape.TargetRangeMax
-                ));
+                foreach (var shape in shapes)
+                {
+                    var sceneId = SceneExtResourceId(shape.Shape);
+                    registry.Require(sceneId, "PackedScene", SceneExtResourcePath(shape.Shape));
+                    registry.Require("bindable_script", "Script", "res://addons/pmview-bridge/PcpBindable.cs");
+                    registry.Require("binding_res_script", "Script", "res://addons/pmview-bridge/PcpBindingResource.cs");
+
+                    list.Add(new SubResourceEntry(
+                        Id: SubResourceId(shape.NodeName),
+                        MetricName: shape.MetricName,
+                        InstanceName: shape.InstanceName,
+                        SourceRangeMin: shape.SourceRangeMin,
+                        SourceRangeMax: shape.SourceRangeMax,
+                        TargetRangeMin: shape.TargetRangeMin,
+                        TargetRangeMax: shape.TargetRangeMax));
+                }
             }
         }
 
@@ -311,12 +324,19 @@ public static class TscnWriter
             WriteGridRowHeaders(sb, zone);
         }
 
-        foreach (var shape in zone.Shapes)
+        foreach (var item in zone.Items)
         {
-            WriteShape(sb, shape, zone, registry, subResources);
-
-            if (!zone.GridColumns.HasValue && shape.DisplayLabel is not null)
-                WriteShapeLabel(sb, shape, zone.Name);
+            switch (item)
+            {
+                case PlacedStack stack:
+                    WriteStack(sb, stack, zone, registry, subResources);
+                    break;
+                case PlacedShape shape:
+                    WriteShape(sb, shape, zone, registry, subResources);
+                    if (!zone.GridColumns.HasValue && shape.DisplayLabel is not null)
+                        WriteShapeLabel(sb, shape, zone.Name, zone.RotateYNinetyDeg);
+                    break;
+            }
         }
     }
 
@@ -325,7 +345,10 @@ public static class TscnWriter
         var pos = zone.Position;
         sb.AppendLine($"[node name=\"{zone.Name}\" type=\"Node3D\" parent=\".\"]");
 
-        if (pos.X != 0f || pos.Y != 0f || pos.Z != 0f)
+        if (zone.RotateYNinetyDeg)
+            // Ry(90°): local +Z → world +X, local +X → world -Z
+            sb.AppendLine($"transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, {F(pos.X)}, {F(pos.Y)}, {F(pos.Z)})");
+        else if (pos.X != 0f || pos.Y != 0f || pos.Z != 0f)
             sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, {F(pos.X)}, {F(pos.Y)}, {F(pos.Z)})");
 
         if (zone.GridColumns.HasValue)
@@ -345,13 +368,27 @@ public static class TscnWriter
 
     private static void WriteZoneLabelNode(StringBuilder sb, PlacedZone zone)
     {
-        var centreX = zone.Shapes.Count > 0
-            ? zone.Shapes.Max(s => s.LocalPosition.X) / 2f
-            : 0f;
-        var labelZ = 1.5f;
+        float labelLocalX, labelLocalZ;
+        string basisStr;
+
+        if (zone.RotateYNinetyDeg)
+        {
+            // Zone is Ry(90°): local +Z → world +X, local -X → world +Z (toward camera).
+            // Centre label over world-X spread (= local Z span); place in front (local -X).
+            labelLocalZ = zone.Items.Count > 0 ? zone.Items.Max(s => s.LocalPosition.Z) / 2f : 0f;
+            labelLocalX = zone.Items.Count > 0 ? zone.Items.Min(s => s.LocalPosition.X) - 1.0f : -1.0f;
+            // Vertical label facing camera (+Z), matching the Front/default shape label basis.
+            basisStr = "0, -1, 0, 0, 0, 1, -1, 0, 0";
+        }
+        else
+        {
+            labelLocalX = zone.Items.Count > 0 ? zone.Items.Max(s => s.LocalPosition.X) / 2f : 0f;
+            labelLocalZ = zone.Items.Count > 0 ? zone.Items.Max(s => s.LocalPosition.Z) + 1.0f : 1.0f;
+            basisStr = "1, 0, 0, 0, 0, 1, 0, -1, 0";
+        }
 
         sb.AppendLine($"[node name=\"{zone.Name}Label\" type=\"Label3D\" parent=\"{zone.Name}\"]");
-        sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, {F(centreX)}, 0.01, {F(labelZ)})");
+        sb.AppendLine($"transform = Transform3D({basisStr}, {F(labelLocalX)}, 0.01, {F(labelLocalZ)})");
         sb.AppendLine("pixel_size = 0.01");
         sb.AppendLine("font_size = 56");
         sb.AppendLine($"text = \"{zone.ZoneLabel}\"");
@@ -377,8 +414,8 @@ public static class TscnWriter
         }
         else
         {
-            centreX = zone.Shapes.Count > 0 ? zone.Shapes.Max(s => s.LocalPosition.X) / 2f : 0f;
-            centreZ = 0f;
+            centreX = zone.Items.Count > 0 ? zone.Items.Max(s => s.LocalPosition.X) / 2f : 0f;
+            centreZ = zone.Items.Count > 0 ? zone.Items.Max(s => s.LocalPosition.Z) / 2f : 0f;
         }
 
         sb.AppendLine($"[node name=\"{zone.Name}Ground\" type=\"MeshInstance3D\" parent=\"{zone.Name}\"]");
@@ -389,11 +426,12 @@ public static class TscnWriter
     }
 
     private static void WriteShape(StringBuilder sb, PlacedShape shape, PlacedZone zone,
-        ExtResourceRegistry registry, List<SubResourceEntry> subResources)
+        ExtResourceRegistry registry, List<SubResourceEntry> subResources,
+        string? parentOverride = null)
     {
         var sceneId = SceneExtResourceId(shape.Shape);
         var pos = shape.LocalPosition;
-        var zonePath = zone.Name;
+        var zonePath = parentOverride ?? zone.Name;
         var shapePath = $"{zonePath}/{shape.NodeName}";
 
         sb.AppendLine($"[node name=\"{shape.NodeName}\" parent=\"{zonePath}\" instance=ExtResource(\"{sceneId}\")]");
@@ -410,6 +448,28 @@ public static class TscnWriter
         sb.AppendLine($"PcpBindings = Array[ExtResource(\"binding_res_script\")]([SubResource(\"{subResId}\")])");
 
         sb.AppendLine();
+    }
+
+    private static void WriteStack(StringBuilder sb, PlacedStack stack, PlacedZone zone,
+        ExtResourceRegistry registry, List<SubResourceEntry> subResources)
+    {
+        var pos = stack.LocalPosition;
+        var stackPath = $"{zone.Name}/{stack.GroupName}";
+
+        sb.AppendLine($"[node name=\"{stack.GroupName}\" type=\"Node3D\" parent=\"{zone.Name}\"]");
+        sb.AppendLine("script = ExtResource(\"stack_group_script\")");
+
+        // StackMode enum value: 0 = PROPORTIONAL, 1 = NORMALISED (mirrors GDScript enum order).
+        var modeValue = stack.Mode == StackMode.Proportional ? 0 : 1;
+        sb.AppendLine($"stack_mode = {modeValue}");
+
+        if (pos.X != 0f || pos.Y != 0f || pos.Z != 0f)
+            sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, {F(pos.X)}, {F(pos.Y)}, {F(pos.Z)})");
+
+        sb.AppendLine();
+
+        foreach (var member in stack.Members)
+            WriteShape(sb, member, zone, registry, subResources, parentOverride: stackPath);
     }
 
     private static void WriteGridColumnHeaders(StringBuilder sb, PlacedZone zone)
@@ -458,11 +518,47 @@ public static class TscnWriter
         }
     }
 
-    private static void WriteShapeLabel(StringBuilder sb, PlacedShape shape, string zoneName)
+    private static void WriteShapeLabel(StringBuilder sb, PlacedShape shape, string zoneName,
+        bool rotateYNinetyDeg = false)
     {
         var pos = shape.LocalPosition;
+        float labelX, labelZ;
+        string transform;
+
+        if (rotateYNinetyDeg)
+        {
+            // Zone is Ry(90°): local +Z → world +X, local -X → world +Z (toward camera).
+            // Left/Right offsets work along local Z (= world X); Front moves toward camera (local -X).
+            // Each placement gets a distinct basis matching the hand-edited reference scene.
+            (labelX, labelZ) = shape.LabelPlacement switch
+            {
+                LabelPlacement.Left  => (pos.X,        pos.Z - 0.9f),
+                LabelPlacement.Right => (pos.X,        pos.Z + 0.9f),
+                _                    => (pos.X - 0.6f, pos.Z),
+            };
+            transform = shape.LabelPlacement switch
+            {
+                // Left: vertical label facing camera, text reads up world-Y axis
+                LabelPlacement.Left  => "0, 1, 0, 0, 0, 1, 1, 0, 0",
+                // Right: flat on floor, reads along world +X (same as upright Front)
+                LabelPlacement.Right => "1, 0, 0, 0, 0, 1, 0, -1, 0",
+                // Front/default: vertical label facing camera, text reads down world-Y axis
+                _                    => "0, -1, 0, 0, 0, 1, -1, 0, 0",
+            };
+        }
+        else
+        {
+            (labelX, labelZ, transform) = shape.LabelPlacement switch
+            {
+                // Left/Right labels align with the Z axis — Ry(-90°) flat: text reads along local +Z
+                LabelPlacement.Left  => (pos.X - 0.9f, pos.Z,        "0, 0, 1, -1, 0, 0, 0, -1, 0"),
+                LabelPlacement.Right => (pos.X + 0.9f, pos.Z,        "0, 0, 1, -1, 0, 0, 0, -1, 0"),
+                // Front labels align with the X axis — standard flat: text reads along local +X
+                _                    => (pos.X,         pos.Z + 0.6f, "1, 0, 0, 0, 0, 1, 0, -1, 0"),
+            };
+        }
         sb.AppendLine($"[node name=\"{shape.NodeName}Label\" type=\"Label3D\" parent=\"{zoneName}\"]");
-        sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, {F(pos.X)}, 0.01, 0.6)");
+        sb.AppendLine($"transform = Transform3D({transform}, {F(labelX)}, 0.01, {F(labelZ)})");
         sb.AppendLine("pixel_size = 0.01");
         sb.AppendLine("font_size = 40");
         sb.AppendLine($"text = \"{shape.DisplayLabel}\"");
