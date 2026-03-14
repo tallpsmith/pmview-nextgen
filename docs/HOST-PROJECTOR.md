@@ -59,7 +59,11 @@ Foreground zones use larger individual shapes for at-a-glance reading. Backgroun
 | Flag | Description |
 |------|-------------|
 | `--pmproxy <url>` | pmproxy base URL (required) |
-| `-o <path>` | Output `.tscn` path (required) |
-| `--install-addon` | Build and install the pmview-bridge addon into the target project |
+| `-o <path>` | Path to the output `.tscn` file — must be inside an existing Godot project directory |
+| `--install-addon` | Seed the target Godot project with the `pmview-bridge` addon (see below) |
 
 The projector requires pmproxy to be reachable at generation time — it queries the REST API to discover actual topology (number of CPUs, disk names, network interfaces) so the scene is sized correctly.
+
+### `--install-addon`
+
+Use this flag the first time you target a new Godot project to install the `pmview-bridge` addon and its .NET dependencies. It is idempotent — safe to run on subsequent generations if you want to pick up addon updates, it will not corrupt an already-working project.

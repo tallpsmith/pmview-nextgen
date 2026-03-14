@@ -2,14 +2,15 @@
 
 ## Overview
 
-pmview-nextgen has two distinct phases: **build time** (topology discovery + scene generation) and **runtime** (Godot running the generated scene with live metric updates).
+`pmview-nextgen` has two distinct phases: **build time** (topology discovery + scene generation) and **runtime** (Godot running the generated scene with live metric updates).
 
 ```mermaid
 graph TD
+    pmproxy["pmproxy (PCP daemon)"]
+
     subgraph "Build Time"
         Projector["Host Projector (CLI)"]
-        pmproxy_build["pmproxy"]
-        Projector -- "discovers topology" --> pmproxy_build
+        Projector -- "discovers topology" --> pmproxy
         Projector -- "generates" --> Scenes
     end
 
@@ -27,8 +28,7 @@ graph TD
         Projector --> Client
     end
 
-    pmproxy_run["pmproxy (PCP daemon)"]
-    Client -- "REST API" --> pmproxy_run
+    Client -- "REST API" --> pmproxy
 ```
 
 ## Layers
@@ -50,15 +50,15 @@ From scene surface down to the wire:
 - The Bridge Plugin is the only Godot-dependent layer — kept thin by design
 - Scenes are GDScript: lightweight controllers, no business logic
 
-## Data Flow
+## Runtime Data Flow
 
-```
-pmproxy REST API
-    → PcpClient (HTTP/JSON)
-    → PcpGodotBridge (maps values through binding ranges)
-    → MetricPoller (polls on interval, fires signals)
-    → SceneBinder (routes values to PcpBindable nodes)
-    → Node3D properties / @export vars (visual update)
+```mermaid
+graph LR
+    pmproxy["pmproxy"] -->|REST API| Client["PcpClient"]
+    Client -->|raw value| Bridge["PcpGodotBridge<br/><small>range mapping</small>"]
+    Bridge -->|mapped value| Poller["MetricPoller<br/><small>polls on interval</small>"]
+    Poller -->|signal| Binder["SceneBinder"]
+    Binder -->|updates| Node["Node3D properties<br/>/ @export vars"]
 ```
 
 ## Project Structure

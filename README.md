@@ -2,7 +2,7 @@
 
 **Bringing Performance Monitoring to Life**
 
-pmview-nextgen transforms system performance metrics into living, breathing 3D environments. Inspired by the original PCP pmview, it restores humanity to system monitoring — bridging how systems naturally behave (alive, flowing, rhythmic) with how human brains naturally comprehend (spatial, environmental, emotional).
+`pmview-nextgen` transforms system performance metrics into living, breathing 3D environments. Inspired by the original PCP pmview, it restores humanity to system monitoring — bridging how systems naturally behave (alive, flowing, rhythmic) with how human brains naturally comprehend (spatial, environmental, emotional).
 
 > **"Make people see their system alive and say 'oh wow'"**
 
@@ -16,7 +16,9 @@ pmview-nextgen transforms system performance metrics into living, breathing 3D e
 
 ## Quick Start
 
-**Prerequisites:** [.NET 9.0+ SDK](https://dotnet.microsoft.com/download/dotnet/9.0), [Godot 4.6+](https://godotengine.org/download) with .NET/Mono support, Docker or Podman
+**Prerequisites:** [.NET 9.0+ SDK](https://dotnet.microsoft.com/download/dotnet/9.0), [Godot 4.6+](https://godotengine.org/download) with .NET/Mono support
+
+The quick start below uses the bundled dev stack for synthetic metric data (requires Docker or Podman). If you have a real PCP/pmproxy endpoint, skip the `docker compose` step and point `--pmproxy` at it directly.
 
 ```bash
 git clone https://github.com/tallpsmith/pmview-nextgen.git
@@ -51,7 +53,7 @@ The generated host view covers 8 metric zones across foreground and background r
 
 ## Heritage
 
-This project modernizes the original [PCP pmview](https://pcp.io/), which visualized system metrics as 3D shapes — colored cylinders for disks, cubes for CPU/Memory/Load. pmview-nextgen takes this concept to the next level with game-like, living, breathing worlds.
+This project modernizes the original [PCP pmview](https://pcp.io/), which visualized system metrics as 3D shapes — colored cylinders for disks, cubes for CPU/Memory/Load. `pmview-nextgen` takes this concept to the next level with game-like, living, breathing worlds.
 
 ## Documentation
 
