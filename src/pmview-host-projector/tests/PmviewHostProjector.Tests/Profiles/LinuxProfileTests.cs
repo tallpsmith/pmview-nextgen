@@ -78,6 +78,17 @@ public class LinuxProfileTests
     }
 
     [Fact]
+    public void SystemZone_AllMetrics_TargetRange_IsPointTwoToFive()
+    {
+        var system = _zones.Single(z => z.Name == "System");
+        Assert.All(system.Metrics, m =>
+        {
+            Assert.Equal(0.2f, m.TargetRangeMin);
+            Assert.Equal(5.0f, m.TargetRangeMax);
+        });
+    }
+
+    [Fact]
     public void DiskTotalsZone_HasTwoCylinders()
     {
         var disk = _zones.Single(z => z.Name == "Disk");
