@@ -16,9 +16,17 @@ public partial class SceneBinder : Node
 	[Signal]
 	public delegate void BindingErrorEventHandler(string message);
 
+	/// <summary>
+	/// Controls how quickly displayed values converge to polled targets.
+	/// Higher = faster. Uses frame-rate-independent exponential decay.
+	/// Default 5 gives a smooth ~0.2s response.
+	/// </summary>
+	[Export] public float SmoothSpeed { get; set; } = 5.0f;
+
 	private Node? _currentScene;
 	private readonly List<ActiveBinding> _activeBindings = new();
 	private readonly Dictionary<Node3D, float> _rotationSpeeds = new();
+	private readonly Dictionary<ActiveBinding, (float Current, float Target)> _smoothValues = new();
 
 	/// <summary>
 	/// A validated, resolved binding with a cached node reference.
@@ -38,6 +46,20 @@ public partial class SceneBinder : Node
 			if (IsInstanceValid(node))
 				node.RotateY(Mathf.DegToRad(degreesPerSecond) * (float)delta);
 		}
+
+		var smoothFactor = 1f - MathF.Exp(-(float)delta * SmoothSpeed);
+		foreach (var key in _smoothValues.Keys.ToList())
+		{
+			if (!IsInstanceValid(key.TargetNode))
+			{
+				_smoothValues.Remove(key);
+				continue;
+			}
+			var (current, target) = _smoothValues[key];
+			var next = Mathf.Lerp(current, target, smoothFactor);
+			_smoothValues[key] = (next, target);
+			ApplyBuiltInProperty(key.TargetNode, key.Resolved.Binding.Property, next);
+		}
 	}
 
 	/// <summary>
@@ -49,6 +71,7 @@ public partial class SceneBinder : Node
 	{
 		_activeBindings.Clear();
 		_rotationSpeeds.Clear();
+		_smoothValues.Clear();
 		_currentScene = sceneRoot;
 
 		var metricNames = new HashSet<string>();
@@ -127,7 +150,10 @@ public partial class SceneBinder : Node
 				$"(src [{binding.SourceRangeMin}-{binding.SourceRangeMax}] " +
 				$"-> tgt [{binding.TargetRangeMin}-{binding.TargetRangeMax}])");
 
-			ApplyProperty(active, (float)normalised);
+			if (IsSmoothable(active))
+				SetSmoothTarget(active, (float)normalised);
+			else
+				ApplyProperty(active, (float)normalised);
 		}
 	}
 
@@ -192,6 +218,7 @@ public partial class SceneBinder : Node
 	{
 		_activeBindings.Clear();
 		_rotationSpeeds.Clear();
+		_smoothValues.Clear();
 
 		foreach (var nodes in _instanceNodes.Values)
 		{
@@ -311,6 +338,28 @@ public partial class SceneBinder : Node
 			return instances[key].AsDouble();
 
 		return null;
+	}
+
+	/// <summary>
+	/// Smoothable: built-in scalar properties. rotation_speed is excluded because
+	/// it drives continuous delta rotation in _Process, not a target position.
+	/// Custom properties are left as immediate since their type is unknown.
+	/// </summary>
+	private static bool IsSmoothable(ActiveBinding active) =>
+		active.Resolved.Kind == PropertyKind.BuiltIn &&
+		active.Resolved.Binding.Property != "rotation_speed";
+
+	/// <summary>
+	/// On first call, snaps current to target (avoids lerping from 0 on scene load).
+	/// On subsequent calls, updates only the target; current position is preserved
+	/// so the next _Process frame continues from wherever the interpolation left off.
+	/// </summary>
+	private void SetSmoothTarget(ActiveBinding active, float target)
+	{
+		if (!_smoothValues.TryGetValue(active, out var existing))
+			_smoothValues[active] = (target, target);
+		else
+			_smoothValues[active] = (existing.Current, target);
 	}
 
 	private void ApplyProperty(ActiveBinding active, float value)

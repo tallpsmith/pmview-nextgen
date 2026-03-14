@@ -355,7 +355,89 @@ public partial class SceneBinderTests
 		await runner.AwaitIdleFrame();
 	}
 
+	// ── Smooth interpolation ─────────────────────────────────────────────
+
+	[TestCase]
+	[RequireGodotRuntime]
+	public async Task ApplyMetrics_SecondUpdate_DoesNotImmediatelyJumpToTarget()
+	{
+		var runner = ISceneRunner.Load("res://test/scenes/test_node3d.tscn");
+		var node3D = (Node3D)runner.Scene();
+		var binder = new SceneBinder();
+		runner.Scene().AddChild(binder);
+
+		var bindable = new PcpBindable();
+		var binding = new PcpBindingResource
+		{
+			MetricName = "test.metric",
+			TargetProperty = "height",
+			SourceRangeMin = 0f, SourceRangeMax = 100f,
+			TargetRangeMin = 0.2f, TargetRangeMax = 5.0f,
+			InitialValue = 0f
+		};
+		bindable.PcpBindings = new Godot.Collections.Array<PcpBindingResource> { binding };
+		node3D.AddChild(bindable);
+		binder.BindFromSceneProperties(node3D);
+
+		// First update: snaps since no prior smooth value (source 100 → target 5.0)
+		binder.ApplyMetrics(MakeSingularMetrics("test.metric", 100.0));
+		await runner.AwaitIdleFrame();
+		AssertThat(node3D.Scale.Y).IsEqualApprox(5.0f, 0.01f);
+
+		// Second update: target moves to 0.2 — should NOT immediately snap
+		binder.ApplyMetrics(MakeSingularMetrics("test.metric", 0.0));
+		AssertThat(node3D.Scale.Y).IsGreater(4.0f);
+	}
+
+	[TestCase]
+	[RequireGodotRuntime]
+	public async Task ApplyMetrics_AfterFrames_MovesValueTowardTarget()
+	{
+		var runner = ISceneRunner.Load("res://test/scenes/test_node3d.tscn");
+		var node3D = (Node3D)runner.Scene();
+		var binder = new SceneBinder();
+		runner.Scene().AddChild(binder);
+
+		var bindable = new PcpBindable();
+		var binding = new PcpBindingResource
+		{
+			MetricName = "test.metric",
+			TargetProperty = "height",
+			SourceRangeMin = 0f, SourceRangeMax = 100f,
+			TargetRangeMin = 0.2f, TargetRangeMax = 5.0f,
+			InitialValue = 0f
+		};
+		bindable.PcpBindings = new Godot.Collections.Array<PcpBindingResource> { binding };
+		node3D.AddChild(bindable);
+		binder.BindFromSceneProperties(node3D);
+
+		// First update: snap to high value
+		binder.ApplyMetrics(MakeSingularMetrics("test.metric", 100.0));
+		await runner.AwaitIdleFrame();
+
+		// Second update: target drops to minimum
+		binder.ApplyMetrics(MakeSingularMetrics("test.metric", 0.0));
+		var valueAfterUpdate = node3D.Scale.Y;
+
+		// Wait ~0.5 seconds worth of frames for interpolation to progress
+		await Task.Delay(500);
+		AssertThat(node3D.Scale.Y).IsLess(valueAfterUpdate);
+	}
+
 	// ── Helpers ──────────────────────────────────────────────────────────
+
+	private static Godot.Collections.Dictionary MakeSingularMetrics(
+		string metricName, double value)
+	{
+		return new Godot.Collections.Dictionary
+		{
+			[metricName] = new Godot.Collections.Dictionary
+			{
+				["instances"] = new Godot.Collections.Dictionary { [-1] = value },
+				["name_to_id"] = new Godot.Collections.Dictionary()
+			}
+		};
+	}
 
 	private static MetricBinding MakeBinding(int? instanceId, string? instanceName)
 	{
