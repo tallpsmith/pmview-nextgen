@@ -14,5 +14,5 @@ func _ready() -> void:
 
 	var metric_names: PackedStringArray = binder.BindFromSceneProperties(self)
 	poller.MetricNames = metric_names
-	poller.metrics_updated.connect(binder.ApplyMetrics)
+	poller.connect("MetricsUpdated", binder.ApplyMetrics)
 	poller.StartPolling()
