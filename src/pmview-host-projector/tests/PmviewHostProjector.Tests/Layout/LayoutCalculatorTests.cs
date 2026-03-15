@@ -51,7 +51,7 @@ public class LayoutCalculatorForegroundTests
     }
 
     [Fact]
-    public void Calculate_ForegroundZoneOrder_IsCpuLoadMemoryDiskNetInNetOut()
+    public void Calculate_ForegroundZoneOrder_ContainsExpectedZones()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
         var foregroundNames = layout.Zones
@@ -59,40 +59,41 @@ public class LayoutCalculatorForegroundTests
             .OrderBy(z => z.Position.X)
             .Select(z => z.Name)
             .ToList();
-        Assert.Contains("CPU", foregroundNames);
-        Assert.Contains("Load", foregroundNames);
-        Assert.Contains("Memory", foregroundNames);
+        Assert.Contains("System", foregroundNames);
+        Assert.Contains("Cpu-Split", foregroundNames);
         Assert.Contains("Disk", foregroundNames);
         Assert.Contains("Net-In", foregroundNames);
         Assert.Contains("Net-Out", foregroundNames);
     }
 
     [Fact]
-    public void Calculate_CpuZone_HasThreeShapes_NoStacks()
+    public void Calculate_CpuSplitZone_HasThreeShapes_NoStacks()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var cpu = layout.Zones.Single(z => z.Name == "CPU");
-        Assert.Equal(3, cpu.Shapes.Count);
-        Assert.Empty(cpu.Items.OfType<PlacedStack>());
+        var cpuSplit = layout.Zones.Single(z => z.Name == "Cpu-Split");
+        Assert.Equal(3, cpuSplit.Shapes.Count);
+        Assert.Empty(cpuSplit.Items.OfType<PlacedStack>());
     }
 
     [Fact]
-    public void Calculate_LoadZone_HasThreeShapes_WithInstanceNames()
+    public void Calculate_SystemZone_HasLoadShapes_WithInstanceNames()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var load = layout.Zones.Single(z => z.Name == "Load");
-        Assert.Equal(3, load.Shapes.Count);
-        var instanceNames = load.Shapes.Select(s => s.InstanceName).ToList();
+        var system = layout.Zones.Single(z => z.Name == "System");
+        var loadShapes = system.Shapes.Where(s => s.InstanceName != null).ToList();
+        Assert.Equal(3, loadShapes.Count);
+        var instanceNames = loadShapes.Select(s => s.InstanceName).ToList();
         Assert.Equal(new[] { "1 minute", "5 minute", "15 minute" }, instanceNames);
     }
 
     [Fact]
-    public void Calculate_MemoryZone_HasThreeShapes_SourceRangeMaxFromPhysmem()
+    public void Calculate_SystemZone_MemoryShapes_SourceRangeMaxFromPhysmem()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var memory = layout.Zones.Single(z => z.Name == "Memory");
-        Assert.Equal(3, memory.Shapes.Count);
-        Assert.All(memory.Shapes, s => Assert.Equal(16_000_000_000f, s.SourceRangeMax));
+        var system = layout.Zones.Single(z => z.Name == "System");
+        var memShapes = system.Shapes.Where(s => s.MetricName.StartsWith("mem.")).ToList();
+        Assert.Equal(3, memShapes.Count);
+        Assert.All(memShapes, s => Assert.Equal(16_000_000_000f, s.SourceRangeMax));
     }
 
     [Fact]
@@ -140,56 +141,56 @@ public class LayoutCalculatorForegroundTests
     }
 
     [Fact]
-    public void Calculate_SimpleZones_HaveNoRotation()
+    public void Calculate_NonRotatedZones_HaveNoRotation()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var cpu = layout.Zones.Single(z => z.Name == "CPU");
-        var load = layout.Zones.Single(z => z.Name == "Load");
-        var memory = layout.Zones.Single(z => z.Name == "Memory");
-        Assert.False(cpu.RotateYNinetyDeg);
-        Assert.False(load.RotateYNinetyDeg);
-        Assert.False(memory.RotateYNinetyDeg);
+        var disk = layout.Zones.Single(z => z.Name == "Disk");
+        var netIn = layout.Zones.Single(z => z.Name == "Net-In" && !z.HasGrid);
+        var netOut = layout.Zones.Single(z => z.Name == "Net-Out" && !z.HasGrid);
+        Assert.False(disk.RotateYNinetyDeg);
+        Assert.False(netIn.RotateYNinetyDeg);
+        Assert.False(netOut.RotateYNinetyDeg);
     }
 
     [Fact]
-    public void Calculate_SimpleZones_HaveEmptyInstanceLabels()
+    public void Calculate_ForegroundZones_HaveEmptyInstanceLabels()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var cpu = layout.Zones.Single(z => z.Name == "CPU");
-        Assert.Empty(cpu.InstanceLabels ?? []);
+        var system = layout.Zones.Single(z => z.Name == "System");
+        Assert.Empty(system.InstanceLabels ?? []);
     }
 
     [Fact]
-    public void Calculate_ForegroundZone_HasMetricLabels()
+    public void Calculate_CpuSplitZone_HasMetricLabels()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var cpu = layout.Zones.Single(z => z.Name == "CPU");
-        Assert.Equal(new[] { "User", "Sys", "Nice" }, cpu.MetricLabels);
+        var cpuSplit = layout.Zones.Single(z => z.Name == "Cpu-Split");
+        Assert.Equal(new[] { "User", "Sys", "Nice" }, cpuSplit.MetricLabels);
     }
 
     [Fact]
-    public void Calculate_ForegroundZone_GroundWidthIsNominalFromMetricCount()
+    public void Calculate_CpuSplitZone_GroundWidthIsNominalFromMetricCount()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var cpu = layout.Zones.Single(z => z.Name == "CPU");
-        // CPU has 3 metrics → nominal width = (3-1)*1.2 + 0.8 + 1.2 = 4.4
-        Assert.True(cpu.GroundWidth > 2f, $"CPU GroundWidth {cpu.GroundWidth} should reflect 3-metric zone");
+        var cpuSplit = layout.Zones.Single(z => z.Name == "Cpu-Split");
+        // Cpu-Split has 3 metrics → nominal width = (3-1)*1.2 + 0.8 + 1.2 = 4.4
+        Assert.True(cpuSplit.GroundWidth > 2f, $"Cpu-Split GroundWidth {cpuSplit.GroundWidth} should reflect 3-metric zone");
     }
 
     [Fact]
-    public void Calculate_ForegroundShapes_AllAtVec3Zero()
+    public void Calculate_DiskZone_ShapesAllAtVec3Zero()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var cpu = layout.Zones.Single(z => z.Name == "CPU");
-        Assert.All(cpu.Shapes, s => Assert.Equal(Vec3.Zero, s.LocalPosition));
+        var disk = layout.Zones.Single(z => z.Name == "Disk");
+        Assert.All(disk.Shapes, s => Assert.Equal(Vec3.Zero, s.LocalPosition));
     }
 
     [Fact]
-    public void Calculate_SimpleZones_ShapesAllAtOrigin()
+    public void Calculate_NetInZone_ShapesAllAtOrigin()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var cpu = layout.Zones.Single(z => z.Name == "CPU");
-        Assert.All(cpu.Shapes, s => Assert.Equal(Vec3.Zero, s.LocalPosition));
+        var netIn = layout.Zones.Single(z => z.Name == "Net-In" && !z.HasGrid);
+        Assert.All(netIn.Shapes, s => Assert.Equal(Vec3.Zero, s.LocalPosition));
     }
 }
 
