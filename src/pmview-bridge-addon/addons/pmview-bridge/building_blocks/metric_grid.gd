@@ -42,7 +42,10 @@ func _ready() -> void:
 	child_entered_tree.connect(_on_child_changed)
 	child_exiting_tree.connect(_on_child_changed)
 
-func _on_child_changed(_node: Node) -> void:
+func _on_child_changed(node: Node) -> void:
+	# Ignore header labels that _arrange itself creates/removes to avoid infinite loop.
+	if node is Label3D:
+		return
 	_arrange.call_deferred()
 
 func get_column_count() -> int:
