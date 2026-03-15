@@ -9,11 +9,11 @@ public class LinuxProfileTests
     private readonly IReadOnlyList<ZoneDefinition> _zones = LinuxProfile.GetZones();
 
     [Fact]
-    public void GetZones_ReturnsFiveForegroundZones()
+    public void GetZones_ReturnsSixForegroundZones()
     {
-        // System, Cpu-Split (comparison), Disk, Net-In, Net-Out = 5
+        // CPU, Load, Memory, Disk, Net-In, Net-Out = 6
         var foreground = _zones.Where(z => z.Row == ZoneRow.Foreground).ToList();
-        Assert.Equal(5, foreground.Count);
+        Assert.Equal(6, foreground.Count);
     }
 
     [Fact]
@@ -24,10 +24,10 @@ public class LinuxProfileTests
     }
 
     [Fact]
-    public void GetZones_ForegroundOrder_IsSystemCpuSplitDiskNetInNetOut()
+    public void GetZones_ForegroundOrder_IsCpuLoadMemoryDiskNetInNetOut()
     {
         var names = _zones.Where(z => z.Row == ZoneRow.Foreground).Select(z => z.Name).ToList();
-        Assert.Equal(new[] { "System", "Cpu-Split", "Disk", "Net-In", "Net-Out" }, names);
+        Assert.Equal(new[] { "CPU", "Load", "Memory", "Disk", "Net-In", "Net-Out" }, names);
     }
 
     [Fact]
@@ -38,55 +38,59 @@ public class LinuxProfileTests
     }
 
     [Fact]
-    public void SystemZone_HasNineMetrics_CpuLoadMemory()
+    public void CpuZone_HasThreeMetrics()
     {
-        var system = _zones.Single(z => z.Name == "System");
-        Assert.Equal(9, system.Metrics.Count);
-        var names = system.Metrics.Select(m => m.MetricName).ToList();
+        var cpu = _zones.Single(z => z.Name == "CPU");
+        Assert.Equal(3, cpu.Metrics.Count);
+        var names = cpu.Metrics.Select(m => m.MetricName).ToList();
         Assert.Contains("kernel.all.cpu.user", names);
         Assert.Contains("kernel.all.cpu.sys", names);
         Assert.Contains("kernel.all.cpu.nice", names);
-        Assert.Contains("kernel.all.load", names);
-        Assert.Contains("mem.util.used", names);
     }
 
     [Fact]
-    public void SystemZone_CpuMetrics_SourceRange_IsZeroToHundred()
+    public void CpuZone_SourceRange_IsZeroToHundred()
     {
-        var system = _zones.Single(z => z.Name == "System");
-        var cpuMetrics = system.Metrics.Where(m => m.MetricName.StartsWith("kernel.all.cpu.")).ToList();
-        Assert.Equal(3, cpuMetrics.Count);
-        Assert.All(cpuMetrics, m => { Assert.Equal(0f, m.SourceRangeMin); Assert.Equal(100f, m.SourceRangeMax); });
+        var cpu = _zones.Single(z => z.Name == "CPU");
+        Assert.All(cpu.Metrics, m => { Assert.Equal(0f, m.SourceRangeMin); Assert.Equal(100f, m.SourceRangeMax); });
     }
 
     [Fact]
-    public void SystemZone_LoadMetrics_HaveInstanceNames()
+    public void CpuZone_HasNoStackGroups()
     {
-        var system = _zones.Single(z => z.Name == "System");
-        var loadMetrics = system.Metrics.Where(m => m.MetricName == "kernel.all.load").ToList();
-        Assert.Equal(3, loadMetrics.Count);
-        var instanceNames = loadMetrics.Select(m => m.InstanceName).ToList();
+        var cpu = _zones.Single(z => z.Name == "CPU");
+        Assert.Null(cpu.StackGroups);
+    }
+
+    [Fact]
+    public void LoadZone_HasThreeMetrics_WithInstanceNames()
+    {
+        var load = _zones.Single(z => z.Name == "Load");
+        Assert.Equal(3, load.Metrics.Count);
+        var instanceNames = load.Metrics.Select(m => m.InstanceName).ToList();
         Assert.Equal(new[] { "1 minute", "5 minute", "15 minute" }, instanceNames);
     }
 
     [Fact]
-    public void SystemZone_MemoryMetrics_HaveZeroSourceRangeMax_AutoDetectedAtRuntime()
+    public void MemoryZone_HasThreeMetrics_WithZeroSourceRangeMax()
     {
-        var system = _zones.Single(z => z.Name == "System");
-        var memMetrics = system.Metrics.Where(m => m.MetricName.StartsWith("mem.")).ToList();
-        Assert.Equal(3, memMetrics.Count);
-        Assert.All(memMetrics, m => Assert.Equal(0f, m.SourceRangeMax));
+        var memory = _zones.Single(z => z.Name == "Memory");
+        Assert.Equal(3, memory.Metrics.Count);
+        Assert.All(memory.Metrics, m => Assert.Equal(0f, m.SourceRangeMax));
     }
 
     [Fact]
-    public void SystemZone_AllMetrics_TargetRange_IsPointTwoToFive()
+    public void AllForegroundZones_TargetRange_IsPointTwoToFive()
     {
-        var system = _zones.Single(z => z.Name == "System");
-        Assert.All(system.Metrics, m =>
+        var foreground = _zones.Where(z => z.Row == ZoneRow.Foreground);
+        foreach (var zone in foreground)
         {
-            Assert.Equal(0.2f, m.TargetRangeMin);
-            Assert.Equal(5.0f, m.TargetRangeMax);
-        });
+            Assert.All(zone.Metrics, m =>
+            {
+                Assert.Equal(0.2f, m.TargetRangeMin);
+                Assert.Equal(5.0f, m.TargetRangeMax);
+            });
+        }
     }
 
     [Fact]

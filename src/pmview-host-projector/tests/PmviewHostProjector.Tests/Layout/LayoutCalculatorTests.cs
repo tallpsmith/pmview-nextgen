@@ -59,39 +59,40 @@ public class LayoutCalculatorForegroundTests
             .OrderBy(z => z.Position.X)
             .Select(z => z.Name)
             .ToList();
-        Assert.Contains("System", foregroundNames);
-        Assert.Contains("Cpu-Split", foregroundNames);
+        Assert.Contains("CPU", foregroundNames);
+        Assert.Contains("Load", foregroundNames);
+        Assert.Contains("Memory", foregroundNames);
         Assert.Contains("Disk", foregroundNames);
         Assert.Contains("Net-In", foregroundNames);
         Assert.Contains("Net-Out", foregroundNames);
     }
 
     [Fact]
-    public void Calculate_CpuSplitZone_HasThreeShapes_NoStacks()
+    public void Calculate_CpuZone_HasThreeShapes_NoStacks()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var cpuSplit = layout.Zones.Single(z => z.Name == "Cpu-Split");
-        Assert.Equal(3, cpuSplit.Shapes.Count);
-        Assert.Empty(cpuSplit.Items.OfType<PlacedStack>());
+        var cpu = layout.Zones.Single(z => z.Name == "CPU");
+        Assert.Equal(3, cpu.Shapes.Count);
+        Assert.Empty(cpu.Items.OfType<PlacedStack>());
     }
 
     [Fact]
-    public void Calculate_SystemZone_HasLoadShapes_WithInstanceNames()
+    public void Calculate_LoadZone_HasThreeShapes_WithInstanceNames()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var system = layout.Zones.Single(z => z.Name == "System");
-        var loadShapes = system.Shapes.Where(s => s.InstanceName != null).ToList();
+        var load = layout.Zones.Single(z => z.Name == "Load");
+        var loadShapes = load.Shapes.Where(s => s.InstanceName != null).ToList();
         Assert.Equal(3, loadShapes.Count);
         var instanceNames = loadShapes.Select(s => s.InstanceName).ToList();
         Assert.Equal(new[] { "1 minute", "5 minute", "15 minute" }, instanceNames);
     }
 
     [Fact]
-    public void Calculate_SystemZone_MemoryShapes_SourceRangeMaxFromPhysmem()
+    public void Calculate_MemoryZone_SourceRangeMaxFromPhysmem()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var system = layout.Zones.Single(z => z.Name == "System");
-        var memShapes = system.Shapes.Where(s => s.MetricName.StartsWith("mem.")).ToList();
+        var memory = layout.Zones.Single(z => z.Name == "Memory");
+        var memShapes = memory.Shapes.Where(s => s.MetricName.StartsWith("mem.")).ToList();
         Assert.Equal(3, memShapes.Count);
         Assert.All(memShapes, s => Assert.Equal(16_000_000_000f, s.SourceRangeMax));
     }
@@ -156,25 +157,25 @@ public class LayoutCalculatorForegroundTests
     public void Calculate_ForegroundZones_HaveEmptyInstanceLabels()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var system = layout.Zones.Single(z => z.Name == "System");
-        Assert.Empty(system.InstanceLabels ?? []);
+        var cpu = layout.Zones.Single(z => z.Name == "CPU");
+        Assert.Empty(cpu.InstanceLabels ?? []);
     }
 
     [Fact]
-    public void Calculate_CpuSplitZone_HasMetricLabels()
+    public void Calculate_CpuZone_HasMetricLabels()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var cpuSplit = layout.Zones.Single(z => z.Name == "Cpu-Split");
-        Assert.Equal(new[] { "User", "Sys", "Nice" }, cpuSplit.MetricLabels);
+        var cpu = layout.Zones.Single(z => z.Name == "CPU");
+        Assert.Equal(new[] { "User", "Sys", "Nice" }, cpu.MetricLabels);
     }
 
     [Fact]
-    public void Calculate_CpuSplitZone_GroundWidthIsNominalFromMetricCount()
+    public void Calculate_CpuZone_GroundWidthIsNominalFromMetricCount()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var cpuSplit = layout.Zones.Single(z => z.Name == "Cpu-Split");
-        // Cpu-Split has 3 metrics → nominal width = (3-1)*1.2 + 0.8 + 1.2 = 4.4
-        Assert.True(cpuSplit.GroundWidth > 2f, $"Cpu-Split GroundWidth {cpuSplit.GroundWidth} should reflect 3-metric zone");
+        var cpu = layout.Zones.Single(z => z.Name == "CPU");
+        // CPU has 3 metrics → nominal width = (3-1)*1.2 + 0.8 + 1.2 = 4.4
+        Assert.True(cpu.GroundWidth > 2f, $"CPU GroundWidth {cpu.GroundWidth} should reflect 3-metric zone");
     }
 
     [Fact]
