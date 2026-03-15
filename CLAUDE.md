@@ -67,4 +67,21 @@ C# (.NET 8.0 LTS) for PcpClient library and Godot bridge; GDScript for scene log
 - 001-pcp-godot-bridge: Added C# (.NET 8.0 LTS) for PcpClient library and Godot bridge; GDScript for scene logic + Godot 4.4+ (Godot.NET.Sdk), System.Net.Http.HttpClient, System.Text.Json, Tomlyn (TOML parser)
 
 <!-- MANUAL ADDITIONS START -->
+
+## Pre-Push Checklist
+
+**MANDATORY before every `git push`:**
+
+1. **Run the local build and tests first.** Never push without a green local build:
+   ```bash
+   dotnet test pmview-nextgen.sln --filter "FullyQualifiedName!~Integration"
+   ```
+   If the build or any test fails, fix it before pushing.
+
+2. **Monitor GitHub CI after pushing.** Immediately after a successful push, launch a background agent to watch the GitHub Actions run for failures. Use the `gh` CLI to poll the workflow run status and report back if any jobs fail:
+   ```
+   Agent(subagent_type="general-purpose", run_in_background=true, prompt="Monitor the GitHub Actions CI run triggered by the push to branch '<branch-name>' in repo tallpsmith/pmview-nextgen. Use 'gh run list --branch <branch-name> --limit 1' to find the run, then poll with 'gh run watch <run-id>' or periodic 'gh run view <run-id>' until it completes. If any job fails, report the failing job name and the key error lines from the logs using 'gh run view <run-id> --log-failed'.")
+   ```
+   This ensures CI failures are caught and surfaced immediately rather than discovered later.
+
 <!-- MANUAL ADDITIONS END -->
