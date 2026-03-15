@@ -78,9 +78,13 @@ Column count and row count are computed from internal state, not set externally.
 - `instance_include_filter: String` — glob; if non-empty, only show matching instances
 - `instance_exclude_filter: String` — glob; hide matching instances (takes precedence)
 
+**@export data properties (set by projector, load-bearing for column/row count):**
+- `metric_labels: PackedStringArray` — column header texts; `get_column_count()` derives from this
+- `instance_labels: PackedStringArray` — row header texts; used for row headers on right edge
+
 **Read-only computed properties:**
-- `get_column_count() -> int`
-- `get_row_count() -> int`
+- `get_column_count() -> int` — derived from `metric_labels.size()`
+- `get_row_count() -> int` — derived from shape count / column count
 - `get_extent() -> Vector2` — footprint width and depth
 
 **Filtering:** filtered children are hidden (`visible = false`), not removed. Re-shown if filter changes. Glob matching only; regex deferred to future need.
