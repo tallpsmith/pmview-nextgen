@@ -74,7 +74,7 @@ services:
     image: quay.io/performancecopilot/pcp:latest
     privileged: true
     ports:
-      - "44322:44322"
+      - "54322:44322"
     environment:
       KEY_SERVERS: valkey:6379
     depends_on:
