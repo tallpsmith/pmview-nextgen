@@ -42,13 +42,13 @@ func _layout_proportional(children: Array) -> void:
 ## Preserves relative proportions; rescales all bars so they sum to target_height.
 func _layout_normalised(children: Array) -> void:
 	var bars: Array = children.filter(func(c): return c is Node3D)
-	var total_h := bars.reduce(func(acc, c): return acc + c.scale.y, 0.0)
+	var total_h: float = bars.reduce(func(acc, c): return acc + c.scale.y, 0.0)
 	if total_h < 0.001:
 		return  # avoid div/0 when system is idle
-	var scale_factor := target_height / total_h
+	var scale_factor: float = target_height / total_h
 	var offset := 0.0
 	for bar in bars:
-		var h := bar.scale.y * scale_factor
+		var h: float = bar.scale.y * scale_factor
 		bar.scale.y = h
 		bar.position.y = offset
 		offset += h
