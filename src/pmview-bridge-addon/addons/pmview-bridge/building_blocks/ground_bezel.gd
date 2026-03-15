@@ -9,7 +9,7 @@ extends MeshInstance3D
 		_apply_colour()
 
 ## Padding around the content extent on each side.
-@export var padding: float = 0.6:
+@export var padding: float = 0.4:
 	set(value):
 		padding = value
 		_rebuild_mesh()

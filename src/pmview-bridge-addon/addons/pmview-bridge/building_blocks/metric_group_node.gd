@@ -10,7 +10,7 @@ extends Node3D
 			_title_label.text = title_text
 
 ## Gap between the bezel front edge and the title label.
-@export var title_gap: float = 1.5
+@export var title_gap: float = 2.5
 
 ## Gap passed to MetricGrid for metric/instance label offset from bezel edge.
 @export var label_gap: float = 1.0:
@@ -40,7 +40,7 @@ func _create_title_label() -> void:
 	_title_label = Label3D.new()
 	_title_label.name = "TitleLabel"
 	_title_label.text = title_text
-	_title_label.font_size = 56
+	_title_label.font_size = 70
 	_title_label.pixel_size = 0.01
 	_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(_title_label)
@@ -48,12 +48,12 @@ func _create_title_label() -> void:
 func _update_title_position(extent: Vector2, grid: MetricGrid) -> void:
 	if _title_label == null:
 		return
-	var centre_x := extent.x / 2.0
+	var centre_x := extent.x / 2.0 - 0.4
 	var front_z := title_gap
 	_title_label.transform = Transform3D(
 		Vector3(1, 0, 0),
-		Vector3(0, 0, 1),
-		Vector3(0, -1, 0),
+		Vector3(0, 0, -1),
+		Vector3(0, 1, 0),
 		Vector3(centre_x, 0.01, front_z)
 	)
 
@@ -62,7 +62,9 @@ func _update_bezel(extent: Vector2, grid: MetricGrid) -> void:
 	if bezel == null:
 		return
 	bezel.resize(extent.x, extent.y)
-	bezel.position = Vector3(extent.x / 2.0, -0.01, -extent.y / 2.0 + 0.4)
+	# Centre bezel on the shape positions (shapes are placed at 0..N*spacing,
+	# so the visual centre is half a shape-width (0.4) inboard of extent/2).
+	bezel.position = Vector3(extent.x / 2.0 - 0.4, -0.01, -extent.y / 2.0 + 0.4)
 
 func _find_grid() -> MetricGrid:
 	for child in get_children():

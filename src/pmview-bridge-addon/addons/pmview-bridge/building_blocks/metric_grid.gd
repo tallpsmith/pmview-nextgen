@@ -15,7 +15,7 @@ extends Node3D
 		_arrange()
 
 ## Gap between back/right bezel edge and metric/instance labels.
-@export var label_gap: float = 1.0:
+@export var label_gap: float = 2.0:
 	set(value):
 		label_gap = value
 		_arrange()
@@ -141,14 +141,13 @@ func _rebuild_column_headers() -> void:
 		label.text = metric_labels[i]
 		label.font_size = 40
 		label.pixel_size = 0.01
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		# Perpendicular from back edge: flat on floor, text reads away from bezel (-Z).
-		# NOTE: label transforms need VERIFICATION IN GODOT before shipping.
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		var x := float(i) * column_spacing
+		# Flat-on-floor rotated 90° around Y — text reads in -Z ("branches" from back edge).
 		label.transform = Transform3D(
 			Vector3(0, 0, -1),
+			Vector3(-1, 0, 0),
 			Vector3(0, 1, 0),
-			Vector3(1, 0, 0),
 			Vector3(x, 0.01, z)
 		)
 		add_child(label)
@@ -173,13 +172,11 @@ func _rebuild_row_headers() -> void:
 		label.font_size = 40
 		label.pixel_size = 0.01
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		# Perpendicular from right edge: flat on floor, text reads away from bezel (+X).
-		# NOTE: label transforms need VERIFICATION IN GODOT before shipping.
 		var z := -float(i) * row_spacing
 		label.transform = Transform3D(
 			Vector3(1, 0, 0),
-			Vector3(0, 0, 1),
-			Vector3(0, -1, 0),
+			Vector3(0, 0, -1),
+			Vector3(0, 1, 0),
 			Vector3(x, 0.01, z)
 		)
 		add_child(label)
