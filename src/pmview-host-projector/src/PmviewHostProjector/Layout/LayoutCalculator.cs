@@ -41,9 +41,7 @@ public static class LayoutCalculator
 
         var (groundWidth, groundDepth) = ComputeGroundExtent(zone, topology, items);
 
-        var metricLabels = zone.Row == ZoneRow.Background
-            ? zone.Metrics.Select(m => m.Label).ToList()
-            : (IReadOnlyList<string>)[];
+        var metricLabels = zone.Metrics.Select(m => m.Label).ToList();
         var instanceLabels = zone.Row == ZoneRow.Background
             ? ResolveInstances(zone, topology).Select(ShortenInstanceName).ToList()
             : (IReadOnlyList<string>)[];
@@ -72,10 +70,9 @@ public static class LayoutCalculator
 
         if (zone.Row == ZoneRow.Foreground)
         {
-            var maxX  = items.Max(ItemFootprintMaxX);
-            var maxZ  = items.Max(ItemFootprintMaxZ);
-            var width = maxX + 0.8f + GroundPadding * 2;
-            var depth = maxZ + 0.8f + GroundPadding * 2;
+            // All shapes are at Vec3.Zero — use metric count for nominal extent.
+            var width = (zone.Metrics.Count - 1) * ShapeSpacing + 0.8f + GroundPadding * 2;
+            var depth = 0.8f + GroundPadding * 2;
             return (width, depth);
         }
         else
@@ -114,7 +111,7 @@ public static class LayoutCalculator
         for (int i = 0; i < zone.Metrics.Count; i++)
         {
             var metric  = zone.Metrics[i];
-            var localPos = metric.Position ?? new Vec3(i * ShapeSpacing, 0f, 0f);
+            var localPos = metric.Position ?? Vec3.Zero;
 
             if (!stackedLabels.TryGetValue(metric.Label, out var groupDef))
             {

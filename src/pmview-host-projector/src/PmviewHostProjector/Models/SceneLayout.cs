@@ -49,7 +49,7 @@ public record PlacedZone(
 {
     // Backward-compatible view: returns only PlacedShape items (not stacks).
     public IReadOnlyList<PlacedShape> Shapes => Items.OfType<PlacedShape>().ToList();
-    public bool HasGrid => MetricLabels is { Count: > 0 };
+    public bool HasGrid => ColumnSpacing.HasValue;
 }
 
 public record SceneLayout(

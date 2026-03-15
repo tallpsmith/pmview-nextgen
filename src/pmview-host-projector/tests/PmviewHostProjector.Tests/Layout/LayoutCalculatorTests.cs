@@ -152,24 +152,44 @@ public class LayoutCalculatorForegroundTests
     }
 
     [Fact]
-    public void Calculate_SimpleZones_HaveEmptyGridLabels()
+    public void Calculate_SimpleZones_HaveEmptyInstanceLabels()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
         var cpu = layout.Zones.Single(z => z.Name == "CPU");
-        Assert.Empty(cpu.MetricLabels ?? []);
         Assert.Empty(cpu.InstanceLabels ?? []);
     }
 
     [Fact]
-    public void Calculate_SimpleZones_ShapesHaveAutoSpacedPositions()
+    public void Calculate_ForegroundZone_HasMetricLabels()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
         var cpu = layout.Zones.Single(z => z.Name == "CPU");
-        var positions = cpu.Shapes.Select(s => s.LocalPosition.X).ToList();
-        // Auto-spacing: shapes at 0, 1.2, 2.4 (ShapeSpacing=1.2)
-        Assert.Equal(3, positions.Distinct().Count());
-        Assert.True(positions[1] > positions[0], "Second shape should be right of first");
-        Assert.True(positions[2] > positions[1], "Third shape should be right of second");
+        Assert.Equal(new[] { "User", "Sys", "Nice" }, cpu.MetricLabels);
+    }
+
+    [Fact]
+    public void Calculate_ForegroundZone_GroundWidthIsNominalFromMetricCount()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var cpu = layout.Zones.Single(z => z.Name == "CPU");
+        // CPU has 3 metrics → nominal width = (3-1)*1.2 + 0.8 + 1.2 = 4.4
+        Assert.True(cpu.GroundWidth > 2f, $"CPU GroundWidth {cpu.GroundWidth} should reflect 3-metric zone");
+    }
+
+    [Fact]
+    public void Calculate_ForegroundShapes_AllAtVec3Zero()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var cpu = layout.Zones.Single(z => z.Name == "CPU");
+        Assert.All(cpu.Shapes, s => Assert.Equal(Vec3.Zero, s.LocalPosition));
+    }
+
+    [Fact]
+    public void Calculate_SimpleZones_ShapesAllAtOrigin()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var cpu = layout.Zones.Single(z => z.Name == "CPU");
+        Assert.All(cpu.Shapes, s => Assert.Equal(Vec3.Zero, s.LocalPosition));
     }
 }
 
