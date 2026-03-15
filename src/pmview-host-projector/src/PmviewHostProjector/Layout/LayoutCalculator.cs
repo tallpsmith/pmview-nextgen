@@ -85,21 +85,6 @@ public static class LayoutCalculator
         }
     }
 
-    // Stacks occupy the X position of the group; shapes use their own X.
-    private static float ItemFootprintMaxX(PlacedItem item) => item switch
-    {
-        PlacedStack s => s.LocalPosition.X,
-        PlacedShape s => s.LocalPosition.X,
-        _             => 0f
-    };
-
-    private static float ItemFootprintMaxZ(PlacedItem item) => item switch
-    {
-        PlacedStack s => s.LocalPosition.Z,
-        PlacedShape s => s.LocalPosition.Z,
-        _             => 0f
-    };
-
     private static IReadOnlyList<PlacedItem> BuildForegroundItems(ZoneDefinition zone, HostTopology topology)
     {
         var items = new List<PlacedItem>();
@@ -227,7 +212,7 @@ public static class LayoutCalculator
 
     private static float ZoneWidth(PlacedZone zone)
     {
-        // Grid zones: shapes are at Vec3.Zero (positioned by GridLayout3D at runtime).
+        // Grid zones: shapes are at Vec3.Zero (positioned by MetricGrid at runtime).
         // Add RowHeaderReservation to account for right-side instance labels.
         if (zone.HasGrid && zone.GroundWidth > 0f)
             return zone.GroundWidth + RowHeaderReservation;
