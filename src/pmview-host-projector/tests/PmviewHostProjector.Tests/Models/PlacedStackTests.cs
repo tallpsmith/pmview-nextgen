@@ -34,7 +34,8 @@ public class PlacedStackTests
     {
         var shape = MakeShape("S1", "metric.a");
         var stack = new PlacedStack("G1", Vec3.Zero, [shape], StackMode.Proportional);
-        var zone = new PlacedZone("Z", "Z", Vec3.Zero, null, null, null, [shape, stack]);
+        var zone = new PlacedZone(Name: "Z", ZoneLabel: "Z", Position: Vec3.Zero,
+            ColumnSpacing: null, RowSpacing: null, Items: [shape, stack]);
 
         Assert.Equal(2, zone.Items.Count);
         Assert.Contains(zone.Items, i => i is PlacedShape);
@@ -46,7 +47,8 @@ public class PlacedStackTests
     {
         var shape = MakeShape("S1", "metric.a");
         var stack = new PlacedStack("G1", Vec3.Zero, [shape], StackMode.Proportional);
-        var zone = new PlacedZone("Z", "Z", Vec3.Zero, null, null, null, [shape, stack]);
+        var zone = new PlacedZone(Name: "Z", ZoneLabel: "Z", Position: Vec3.Zero,
+            ColumnSpacing: null, RowSpacing: null, Items: [shape, stack]);
 
         Assert.Single(zone.Shapes);
         Assert.IsType<PlacedShape>(zone.Shapes[0]);

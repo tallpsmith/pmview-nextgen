@@ -38,9 +38,8 @@ public record PlacedZone(
     string Name,
     string ZoneLabel,
     Vec3 Position,
-    int? GridColumns,
-    float? GridColumnSpacing,
-    float? GridRowSpacing,
+    float? ColumnSpacing,
+    float? RowSpacing,
     IReadOnlyList<PlacedItem> Items,
     float GroundWidth = 0f,
     float GroundDepth = 0f,
@@ -50,6 +49,7 @@ public record PlacedZone(
 {
     // Backward-compatible view: returns only PlacedShape items (not stacks).
     public IReadOnlyList<PlacedShape> Shapes => Items.OfType<PlacedShape>().ToList();
+    public bool HasGrid => MetricLabels is { Count: > 0 };
 }
 
 public record SceneLayout(

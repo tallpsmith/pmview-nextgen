@@ -56,7 +56,7 @@ public static class TscnWriter
 
         foreach (var zone in layout.Zones)
         {
-            if (zone.GridColumns.HasValue)
+            if (zone.HasGrid)
                 registry.Require("grid_script", "Script", "res://addons/pmview-bridge/building_blocks/grid_layout_3d.gd");
 
             foreach (var item in zone.Items)
@@ -318,7 +318,7 @@ public static class TscnWriter
         WriteZoneLabelNode(sb, zone);
         WriteGroundBezel(sb, zone, bezelResources);
 
-        if (zone.GridColumns.HasValue)
+        if (zone.HasGrid)
         {
             WriteGridColumnHeaders(sb, zone);
             WriteGridRowHeaders(sb, zone);
@@ -333,7 +333,7 @@ public static class TscnWriter
                     break;
                 case PlacedShape shape:
                     WriteShape(sb, shape, zone, registry, subResources);
-                    if (!zone.GridColumns.HasValue && shape.DisplayLabel is not null)
+                    if (!zone.HasGrid && shape.DisplayLabel is not null)
                         WriteShapeLabel(sb, shape, zone.Name, zone.RotateYNinetyDeg);
                     break;
             }
@@ -351,16 +351,16 @@ public static class TscnWriter
         else if (pos.X != 0f || pos.Y != 0f || pos.Z != 0f)
             sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, {F(pos.X)}, {F(pos.Y)}, {F(pos.Z)})");
 
-        if (zone.GridColumns.HasValue)
+        if (zone.HasGrid)
         {
             sb.AppendLine("script = ExtResource(\"grid_script\")");
-            sb.AppendLine($"columns = {zone.GridColumns.Value}");
+            sb.AppendLine($"columns = {zone.MetricLabels!.Count}");
 
-            if (zone.GridColumnSpacing.HasValue)
-                sb.AppendLine($"column_spacing = {F(zone.GridColumnSpacing.Value)}");
+            if (zone.ColumnSpacing.HasValue)
+                sb.AppendLine($"column_spacing = {F(zone.ColumnSpacing.Value)}");
 
-            if (zone.GridRowSpacing.HasValue)
-                sb.AppendLine($"row_spacing = {F(zone.GridRowSpacing.Value)}");
+            if (zone.RowSpacing.HasValue)
+                sb.AppendLine($"row_spacing = {F(zone.RowSpacing.Value)}");
         }
 
         sb.AppendLine();
@@ -376,13 +376,13 @@ public static class TscnWriter
             // Zone Ry(-90°) basis rows: world_x = -local_z, world_z = local_x.
             // "In front" (world +Z) = local +X; centre label over world-X spread (= local Z span).
             labelLocalZ = zone.Items.Count > 0 ? zone.Items.Max(s => s.LocalPosition.Z) / 2f : 0f;
-            labelLocalX = zone.Items.Count > 0 ? zone.Items.Max(s => s.LocalPosition.X) + 1.0f : 1.0f;
+            labelLocalX = zone.Items.Count > 0 ? zone.Items.Max(s => s.LocalPosition.X) + 1.5f : 1.5f;
             basisStr = "0, -1, 0, 0, 0, 1, -1, 0, 0";
         }
         else
         {
             labelLocalX = zone.Items.Count > 0 ? zone.Items.Max(s => s.LocalPosition.X) / 2f : 0f;
-            labelLocalZ = zone.Items.Count > 0 ? zone.Items.Max(s => s.LocalPosition.Z) + 1.0f : 1.0f;
+            labelLocalZ = zone.Items.Count > 0 ? zone.Items.Max(s => s.LocalPosition.Z) + 1.5f : 1.5f;
             basisStr = "1, 0, 0, 0, 0, 1, 0, -1, 0";
         }
 
@@ -401,13 +401,13 @@ public static class TscnWriter
         if (bezel is null) return;
 
         float centreX, centreZ;
-        if (zone.GridColumns.HasValue)
+        if (zone.HasGrid)
         {
             // Grid shapes are positioned by GridLayout3D at runtime — centre on the grid's visual extent
-            var cols = zone.GridColumns.Value;
-            var colSpacing = zone.GridColumnSpacing ?? 2.0f;
+            var cols = zone.MetricLabels!.Count;
+            var colSpacing = zone.ColumnSpacing ?? 2.0f;
             var rows = zone.InstanceLabels?.Count ?? 1;
-            var rowSpacing = zone.GridRowSpacing ?? 2.5f;
+            var rowSpacing = zone.RowSpacing ?? 2.5f;
             centreX = (cols - 1) * colSpacing / 2f;
             centreZ = -(rows - 1) * rowSpacing / 2f;
         }
@@ -474,10 +474,10 @@ public static class TscnWriter
     private static void WriteGridColumnHeaders(StringBuilder sb, PlacedZone zone)
     {
         if (zone.MetricLabels is null || zone.MetricLabels.Count == 0) return;
-        var colSpacing = zone.GridColumnSpacing ?? 2.0f;
+        var colSpacing = zone.ColumnSpacing ?? 2.0f;
         var rowCount = zone.InstanceLabels?.Count ?? 1;
-        var rowSpacing = zone.GridRowSpacing ?? 2.5f;
-        var z = -(rowCount - 1) * rowSpacing - 1.0f;
+        var rowSpacing = zone.RowSpacing ?? 2.5f;
+        var z = -(rowCount - 1) * rowSpacing - 1.5f;
 
         for (var i = 0; i < zone.MetricLabels.Count; i++)
         {
@@ -495,9 +495,9 @@ public static class TscnWriter
     private static void WriteGridRowHeaders(StringBuilder sb, PlacedZone zone)
     {
         if (zone.InstanceLabels is null || zone.InstanceLabels.Count == 0) return;
-        var rowSpacing = zone.GridRowSpacing ?? 2.5f;
+        var rowSpacing = zone.RowSpacing ?? 2.5f;
         var colCount = zone.MetricLabels?.Count ?? 1;
-        var colSpacing = zone.GridColumnSpacing ?? 2.0f;
+        var colSpacing = zone.ColumnSpacing ?? 2.0f;
         // ShapeWidth matches the grounded_bar default X scale (see building_blocks/grounded_bar.tscn)
         const float ShapeWidth = 0.8f;
         const float RightEdgeOffset = 0.5f;
@@ -528,11 +528,12 @@ public static class TscnWriter
         {
             // Zone Ry(-90°) basis rows: world_x = -local_z, world_z = local_x.
             // Left (world -X) = local +Z; Right (world +X) = local -Z; Front (world +Z) = local +X.
+            // Offset 1.3 places labels outside the bezel (0.4 half-shape + 0.6 padding + 0.3 gap).
             (labelX, labelZ) = shape.LabelPlacement switch
             {
-                LabelPlacement.Left  => (pos.X,        pos.Z + 0.9f),
-                LabelPlacement.Right => (pos.X,        pos.Z - 0.9f),
-                _                    => (pos.X + 0.6f, pos.Z),
+                LabelPlacement.Left  => (pos.X,        pos.Z + 1.3f),
+                LabelPlacement.Right => (pos.X,        pos.Z - 1.3f),
+                _                    => (pos.X + 1.3f, pos.Z),
             };
             transform = shape.LabelPlacement switch
             {
@@ -546,13 +547,14 @@ public static class TscnWriter
         }
         else
         {
+            // Offset 1.3 places labels outside the bezel (0.4 half-shape + 0.6 padding + 0.3 gap).
             (labelX, labelZ, transform) = shape.LabelPlacement switch
             {
                 // Left/Right labels align with the Z axis — Ry(-90°) flat: text reads along local +Z
-                LabelPlacement.Left  => (pos.X - 0.9f, pos.Z,        "0, 0, 1, -1, 0, 0, 0, -1, 0"),
-                LabelPlacement.Right => (pos.X + 0.9f, pos.Z,        "0, 0, 1, -1, 0, 0, 0, -1, 0"),
+                LabelPlacement.Left  => (pos.X - 1.3f, pos.Z,        "0, 0, 1, -1, 0, 0, 0, -1, 0"),
+                LabelPlacement.Right => (pos.X + 1.3f, pos.Z,        "0, 0, 1, -1, 0, 0, 0, -1, 0"),
                 // Front labels align with the X axis — standard flat: text reads along local +X
-                _                    => (pos.X,         pos.Z + 0.6f, "1, 0, 0, 0, 0, 1, 0, -1, 0"),
+                _                    => (pos.X,         pos.Z + 1.3f, "1, 0, 0, 0, 0, 1, 0, -1, 0"),
             };
         }
         sb.AppendLine($"[node name=\"{shape.NodeName}Label\" type=\"Label3D\" parent=\"{zoneName}\"]");

@@ -11,8 +11,8 @@ public static class LayoutCalculator
     private const float ShapeSpacing       = 1.2f;   // was 1.5f — tighter bar grouping
     private const float ZoneGap            = 2.0f;   // was 3.0f — less dead air between zones
     private const float BackgroundZOffset  = -8.0f;
-    private const float GridColumnSpacing  = 2.0f;
-    private const float GridRowSpacing     = 2.5f;
+    private const float ColumnSpacing  = 2.0f;
+    private const float RowSpacing     = 2.5f;
     private const long  FallbackMemoryBytes = 16_000_000_000L;
     private const float GroundPadding      = 0.6f;
     private const float RowHeaderReservation = 2.0f;
@@ -50,18 +50,17 @@ public static class LayoutCalculator
 
         // Position will be finalised by CenterRowOnXZero; use Zero for now.
         return new PlacedZone(
-            Name:              zone.Name,
-            ZoneLabel:         zone.Name,
-            Position:          Vec3.Zero,
-            GridColumns:       zone.Row == ZoneRow.Background ? zone.Metrics.Count : null,
-            GridColumnSpacing: zone.Row == ZoneRow.Background ? GridColumnSpacing : null,
-            GridRowSpacing:    zone.Row == ZoneRow.Background ? GridRowSpacing : null,
-            Items:             items,
-            GroundWidth:       groundWidth,
-            GroundDepth:       groundDepth,
-            MetricLabels:      metricLabels,
-            InstanceLabels:    instanceLabels,
-            RotateYNinetyDeg:  zone.RotateYNinetyDeg);
+            Name:             zone.Name,
+            ZoneLabel:        zone.Name,
+            Position:         Vec3.Zero,
+            ColumnSpacing:    zone.Row == ZoneRow.Background ? ColumnSpacing : null,
+            RowSpacing:       zone.Row == ZoneRow.Background ? RowSpacing : null,
+            Items:            items,
+            GroundWidth:      groundWidth,
+            GroundDepth:      groundDepth,
+            MetricLabels:     metricLabels,
+            InstanceLabels:   instanceLabels,
+            RotateYNinetyDeg: zone.RotateYNinetyDeg);
     }
 
     private static (float Width, float Depth) ComputeGroundExtent(
@@ -83,8 +82,8 @@ public static class LayoutCalculator
         {
             var cols  = zone.Metrics.Count;
             var rows  = ResolveInstances(zone, topology).Count;
-            var width = (cols - 1) * GridColumnSpacing + 0.8f + GroundPadding * 2;
-            var depth = (rows - 1) * GridRowSpacing    + 0.8f + GroundPadding * 2;
+            var width = (cols - 1) * ColumnSpacing + 0.8f + GroundPadding * 2;
+            var depth = (rows - 1) * RowSpacing    + 0.8f + GroundPadding * 2;
             return (width, depth);
         }
     }
@@ -233,7 +232,7 @@ public static class LayoutCalculator
     {
         // Grid zones: shapes are at Vec3.Zero (positioned by GridLayout3D at runtime).
         // Add RowHeaderReservation to account for right-side instance labels.
-        if (zone.GridColumns.HasValue && zone.GroundWidth > 0f)
+        if (zone.HasGrid && zone.GroundWidth > 0f)
             return zone.GroundWidth + RowHeaderReservation;
         if (zone.Items.Count == 0) return 0f;
         // Rotated zones (Ry 90°): local Z becomes world X, so visual width = GroundDepth.

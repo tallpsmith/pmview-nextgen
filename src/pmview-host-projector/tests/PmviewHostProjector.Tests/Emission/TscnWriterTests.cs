@@ -8,9 +8,10 @@ public class TscnWriterTests
 {
     private static SceneLayout MinimalLayout() =>
         new("testhost", [
-            new PlacedZone("CPU", "CPU", new Vec3(0, 0, 0),
-                null, null, null,
-                [
+            new PlacedZone(
+                Name: "CPU", ZoneLabel: "CPU", Position: new Vec3(0, 0, 0),
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [
                     new PlacedShape("CPU_User", ShapeType.Bar, new Vec3(0, 0, 0),
                         "kernel.all.cpu.user", null, null,
                         new RgbColour(0.976f, 0.451f, 0.086f),
@@ -94,8 +95,10 @@ public class TscnWriterTests
     public void Write_CylinderShape_UsesGroundedCylinder_WithBuildingBlocksPath()
     {
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("Disk", "Disk", Vec3.Zero, null, null, null,
-                [new PlacedShape("Disk_Read", ShapeType.Cylinder, Vec3.Zero,
+            new PlacedZone(
+                Name: "Disk", ZoneLabel: "Disk", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("Disk_Read", ShapeType.Cylinder, Vec3.Zero,
                     "disk.all.read_bytes", null, null,
                     new RgbColour(0.961f, 0.620f, 0.043f),
                     0f, 500_000_000f, 0.2f, 5.0f)])
@@ -108,8 +111,10 @@ public class TscnWriterTests
     public void Write_InstanceBinding_HasInstanceName()
     {
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("Load", "Load", Vec3.Zero, null, null, null,
-                [new PlacedShape("Load_1min", ShapeType.Bar, Vec3.Zero,
+            new PlacedZone(
+                Name: "Load", ZoneLabel: "Load", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("Load_1min", ShapeType.Bar, Vec3.Zero,
                     "kernel.all.load", "1 minute", null,
                     new RgbColour(0.388f, 0.400f, 0.945f),
                     0f, 10f, 0.2f, 5.0f)])
@@ -122,12 +127,14 @@ public class TscnWriterTests
     public void Write_GridZone_HasGridLayout3DScript()
     {
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("Per_CPU", "Per-CPU", new Vec3(0, 0, -8),
-                3, 1.5f, 2.0f,
-                [new PlacedShape("PerCPU_cpu0_User", ShapeType.Bar, Vec3.Zero,
+            new PlacedZone(
+                Name: "Per_CPU", ZoneLabel: "Per-CPU", Position: new Vec3(0, 0, -8),
+                ColumnSpacing: 1.5f, RowSpacing: 2.0f,
+                Items: [new PlacedShape("PerCPU_cpu0_User", ShapeType.Bar, Vec3.Zero,
                     "kernel.percpu.cpu.user", "cpu0", "cpu0",
                     new RgbColour(0.976f, 0.451f, 0.086f),
-                    0f, 100f, 0.2f, 5.0f)])
+                    0f, 100f, 0.2f, 5.0f)],
+                MetricLabels: ["User", "Sys", "Nice"])
         ]);
         var tscn = TscnWriter.Write(layout);
         Assert.Contains("res://addons/pmview-bridge/building_blocks/grid_layout_3d.gd", tscn);
@@ -149,8 +156,10 @@ public class TscnWriterTests
     public void Write_ZoneTransformHasPosition()
     {
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("CPU", "CPU", new Vec3(2.5f, 0, 0), null, null, null,
-                [new PlacedShape("CPU_User", ShapeType.Bar, new Vec3(1.0f, 0, 0),
+            new PlacedZone(
+                Name: "CPU", ZoneLabel: "CPU", Position: new Vec3(2.5f, 0, 0),
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("CPU_User", ShapeType.Bar, new Vec3(1.0f, 0, 0),
                     "kernel.all.cpu.user", null, null,
                     new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f)])
         ]);
@@ -162,8 +171,10 @@ public class TscnWriterTests
     public void Write_ShapeNode_EmitsColourProperty()
     {
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("CPU", "CPU", Vec3.Zero, null, null, null,
-                [new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
+            new PlacedZone(
+                Name: "CPU", ZoneLabel: "CPU", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
                     "kernel.all.cpu.user", null, null,
                     new RgbColour(0.976f, 0.451f, 0.086f),
                     0f, 100f, 0.2f, 5.0f)])
@@ -176,8 +187,10 @@ public class TscnWriterTests
     public void Write_ZoneLabel_CentredOnShapeSpan()
     {
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("Load", "Load", Vec3.Zero, null, null, null,
-                [
+            new PlacedZone(
+                Name: "Load", ZoneLabel: "Load", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [
                     new PlacedShape("Load_1m", ShapeType.Bar, new Vec3(0, 0, 0),
                         "kernel.all.load", "1 minute", "1m",
                         new RgbColour(0.388f, 0.400f, 0.945f), 0f, 10f, 0.2f, 5.0f),
@@ -191,18 +204,20 @@ public class TscnWriterTests
                 GroundWidth: 4.6f, GroundDepth: 2.0f)
         ]);
         var tscn = TscnWriter.Write(layout);
-        // Label at X = 1.5 (centre of 0..3.0 span), Z = maxShapeZ(0) + 1.0 = 1.0
+        // Label at X = 1.5 (centre of 0..3.0 span), Z = maxShapeZ(0) + 1.5 = 1.5
         Assert.Contains("text = \"Load\"", tscn);
-        Assert.Contains("1.5, 0.01, 1", tscn);
+        Assert.Contains("1.5, 0.01, 1.5", tscn);
     }
 
     [Fact]
-    public void Write_ZoneLabel_IsPlacedOneUnitBeyondDeepestShape()
+    public void Write_ZoneLabel_IsPlacedBeyondBezelEdge()
     {
-        // Shapes at Z=0 and Z=2.4 → label should be at Z = 2.4 + 1.0 = 3.4
+        // Shapes at Z=0 and Z=2.4 → label should be at Z = 2.4 + 1.5 = 3.9
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("System", "System", Vec3.Zero, null, null, null,
-                [
+            new PlacedZone(
+                Name: "System", ZoneLabel: "System", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [
                     new PlacedShape("Sys_A", ShapeType.Bar, new Vec3(0, 0, 0),
                         "kernel.all.cpu.user", null, "User",
                         new RgbColour(1f, 0f, 0f), 0f, 100f, 0.2f, 5.0f),
@@ -212,7 +227,7 @@ public class TscnWriterTests
                 ])
         ]);
         var tscn = TscnWriter.Write(layout);
-        Assert.Contains("0, 0.01, 3.4", tscn);
+        Assert.Contains("0, 0.01, 3.9", tscn);
     }
 
     [Fact]
@@ -220,15 +235,17 @@ public class TscnWriterTests
     {
         // Left labels align with the Z axis → Ry(-90°) flat: Transform3D(0, 0, 1, -1, 0, 0, 0, -1, 0, ...)
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("System", "System", Vec3.Zero, null, null, null,
-                [new PlacedShape("System_User", ShapeType.Bar, new Vec3(0, 0, 1.2f),
+            new PlacedZone(
+                Name: "System", ZoneLabel: "System", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("System_User", ShapeType.Bar, new Vec3(0, 0, 1.2f),
                     "kernel.all.cpu.user", null, "User",
                     new RgbColour(0.976f, 0.451f, 0.086f),
                     0f, 100f, 0.2f, 5.0f,
                     LabelPlacement: LabelPlacement.Left)])
         ]);
         var tscn = TscnWriter.Write(layout);
-        Assert.Contains("Transform3D(0, 0, 1, -1, 0, 0, 0, -1, 0, -0.9, 0.01, 1.2)", tscn);
+        Assert.Contains("Transform3D(0, 0, 1, -1, 0, 0, 0, -1, 0, -1.3, 0.01, 1.2)", tscn);
     }
 
     [Fact]
@@ -236,15 +253,17 @@ public class TscnWriterTests
     {
         // Right labels align with the Z axis → Ry(-90°) flat: Transform3D(0, 0, 1, -1, 0, 0, 0, -1, 0, ...)
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("System", "System", Vec3.Zero, null, null, null,
-                [new PlacedShape("System_Used", ShapeType.Bar, new Vec3(3f, 0, 1.2f),
+            new PlacedZone(
+                Name: "System", ZoneLabel: "System", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("System_Used", ShapeType.Bar, new Vec3(3f, 0, 1.2f),
                     "mem.util.used", null, "Used",
                     new RgbColour(0.133f, 0.773f, 0.369f),
                     0f, 16_000_000_000f, 0.2f, 5.0f,
                     LabelPlacement: LabelPlacement.Right)])
         ]);
         var tscn = TscnWriter.Write(layout);
-        Assert.Contains("Transform3D(0, 0, 1, -1, 0, 0, 0, -1, 0, 3.9, 0.01, 1.2)", tscn);
+        Assert.Contains("Transform3D(0, 0, 1, -1, 0, 0, 0, -1, 0, 4.3, 0.01, 1.2)", tscn);
     }
 
     [Fact]
@@ -252,15 +271,17 @@ public class TscnWriterTests
     {
         // Front labels (default) keep the standard flat transform reading along X
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("System", "System", Vec3.Zero, null, null, null,
-                [new PlacedShape("System_1m", ShapeType.Bar, new Vec3(0, 0, 4f),
+            new PlacedZone(
+                Name: "System", ZoneLabel: "System", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("System_1m", ShapeType.Bar, new Vec3(0, 0, 4f),
                     "kernel.all.load", "1 minute", "1m",
                     new RgbColour(0.388f, 0.400f, 0.945f),
                     0f, 10f, 0.2f, 5.0f,
                     LabelPlacement: LabelPlacement.Front)])
         ]);
         var tscn = TscnWriter.Write(layout);
-        Assert.Contains("Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0.01, 4.6)", tscn);
+        Assert.Contains("Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0.01, 5.3)", tscn);
     }
 
     [Fact]
@@ -268,8 +289,10 @@ public class TscnWriterTests
     {
         // Ry(90°) rotation: Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, tx, 0, tz)
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("System", "System", new Vec3(2f, 0, 0), null, null, null,
-                [new PlacedShape("System_User", ShapeType.Bar, Vec3.Zero,
+            new PlacedZone(
+                Name: "System", ZoneLabel: "System", Position: new Vec3(2f, 0, 0),
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("System_User", ShapeType.Bar, Vec3.Zero,
                     "kernel.all.cpu.user", null, null,
                     new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f)],
                 RotateYNinetyDeg: true)
@@ -283,8 +306,10 @@ public class TscnWriterTests
     {
         // Even at origin, a rotated zone must emit its rotation matrix
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("System", "System", Vec3.Zero, null, null, null,
-                [new PlacedShape("System_User", ShapeType.Bar, Vec3.Zero,
+            new PlacedZone(
+                Name: "System", ZoneLabel: "System", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("System_User", ShapeType.Bar, Vec3.Zero,
                     "kernel.all.cpu.user", null, null,
                     new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f)],
                 RotateYNinetyDeg: true)
@@ -297,8 +322,10 @@ public class TscnWriterTests
     public void Write_EmitsGroundBezelMeshPerZone()
     {
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("CPU", "CPU", Vec3.Zero, null, null, null,
-                [new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
+            new PlacedZone(
+                Name: "CPU", ZoneLabel: "CPU", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
                     "kernel.all.cpu.user", null, null,
                     new RgbColour(0.976f, 0.451f, 0.086f),
                     0f, 100f, 0.2f, 5.0f)],
@@ -313,8 +340,10 @@ public class TscnWriterTests
     public void Write_GroundBezel_HasDarkGreyMaterial()
     {
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("CPU", "CPU", Vec3.Zero, null, null, null,
-                [new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
+            new PlacedZone(
+                Name: "CPU", ZoneLabel: "CPU", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
                     "kernel.all.cpu.user", null, null,
                     new RgbColour(0.976f, 0.451f, 0.086f),
                     0f, 100f, 0.2f, 5.0f)],
@@ -329,13 +358,17 @@ public class TscnWriterTests
     {
         // "Per-CPU" and "Network In" are real zone names — hyphens and spaces are invalid in Godot resource IDs.
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("Per-CPU", "Per-CPU", Vec3.Zero, null, null, null,
-                [new PlacedShape("PerCPU_User", ShapeType.Bar, Vec3.Zero,
+            new PlacedZone(
+                Name: "Per-CPU", ZoneLabel: "Per-CPU", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("PerCPU_User", ShapeType.Bar, Vec3.Zero,
                     "kernel.percpu.cpu.user", null, null,
                     new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f)],
                 GroundWidth: 5f, GroundDepth: 2f),
-            new PlacedZone("Network In", "Network In", Vec3.Zero, null, null, null,
-                [new PlacedShape("NetworkIn_Bytes", ShapeType.Bar, Vec3.Zero,
+            new PlacedZone(
+                Name: "Network In", ZoneLabel: "Network In", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("NetworkIn_Bytes", ShapeType.Bar, Vec3.Zero,
                     "network.interface.in.bytes", null, null,
                     new RgbColour(0.231f, 0.510f, 0.965f), 0f, 125_000_000f, 0.2f, 5.0f)],
                 GroundWidth: 2f, GroundDepth: 2f),
@@ -357,7 +390,10 @@ public class TscnWriterTests
     public void Write_ZeroGroundExtent_NoBezelEmitted()
     {
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("Empty", "Empty", Vec3.Zero, null, null, null, [],
+            new PlacedZone(
+                Name: "Empty", ZoneLabel: "Empty", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [],
                 GroundWidth: 0f, GroundDepth: 0f)
         ]);
         var tscn = TscnWriter.Write(layout);
@@ -368,8 +404,10 @@ public class TscnWriterTests
     public void Write_ForegroundShape_EmitsMetricLabel()
     {
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("Load", "Load", Vec3.Zero, null, null, null,
-                [new PlacedShape("Load_1m", ShapeType.Bar, new Vec3(0, 0, 0),
+            new PlacedZone(
+                Name: "Load", ZoneLabel: "Load", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("Load_1m", ShapeType.Bar, new Vec3(0, 0, 0),
                     "kernel.all.load", "1 minute", "1m",
                     new RgbColour(0.388f, 0.400f, 0.945f),
                     0f, 10f, 0.2f, 5.0f)])
@@ -383,9 +421,10 @@ public class TscnWriterTests
     public void Write_GridZone_EmitsColumnHeaderLabels()
     {
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("Per_CPU", "Per-CPU", new Vec3(0, 0, -8),
-                3, 1.5f, 2.0f,
-                [new PlacedShape("PerCPU_cpu0_User", ShapeType.Bar, Vec3.Zero,
+            new PlacedZone(
+                Name: "Per_CPU", ZoneLabel: "Per-CPU", Position: new Vec3(0, 0, -8),
+                ColumnSpacing: 1.5f, RowSpacing: 2.0f,
+                Items: [new PlacedShape("PerCPU_cpu0_User", ShapeType.Bar, Vec3.Zero,
                     "kernel.percpu.cpu.user", "cpu0", "cpu0",
                     new RgbColour(0.976f, 0.451f, 0.086f),
                     0f, 100f, 0.2f, 5.0f)],
@@ -403,9 +442,10 @@ public class TscnWriterTests
     public void Write_GridZone_EmitsRowHeaderLabels()
     {
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("Per_CPU", "Per-CPU", new Vec3(0, 0, -8),
-                3, 1.5f, 2.0f,
-                [new PlacedShape("PerCPU_cpu0_User", ShapeType.Bar, Vec3.Zero,
+            new PlacedZone(
+                Name: "Per_CPU", ZoneLabel: "Per-CPU", Position: new Vec3(0, 0, -8),
+                ColumnSpacing: 1.5f, RowSpacing: 2.0f,
+                Items: [new PlacedShape("PerCPU_cpu0_User", ShapeType.Bar, Vec3.Zero,
                     "kernel.percpu.cpu.user", "cpu0", "cpu0",
                     new RgbColour(0.976f, 0.451f, 0.086f),
                     0f, 100f, 0.2f, 5.0f)],
@@ -421,12 +461,13 @@ public class TscnWriterTests
     [Fact]
     public void Write_GridZone_ColumnHeaders_AreAtBackEdge_BeyondLastRow()
     {
-        // 2 instances, rowSpacing=2.0 → back edge Z = -(2-1)*2.0 - 1.0 = -3.0
+        // 2 instances, rowSpacing=2.0 → label Z = -(2-1)*2.0 - 1.5 = -3.5
         // 3 metrics, colSpacing=1.5 → columns at X = 0, 1.5, 3.0
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("Per_CPU", "Per-CPU", Vec3.Zero,
-                3, 1.5f, 2.0f,
-                [new PlacedShape("s1", ShapeType.Bar, Vec3.Zero,
+            new PlacedZone(
+                Name: "Per_CPU", ZoneLabel: "Per-CPU", Position: Vec3.Zero,
+                ColumnSpacing: 1.5f, RowSpacing: 2.0f,
+                Items: [new PlacedShape("s1", ShapeType.Bar, Vec3.Zero,
                     "kernel.percpu.cpu.user", "cpu0", "cpu0",
                     new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f)],
                 GroundWidth: 5f, GroundDepth: 8f,
@@ -435,10 +476,10 @@ public class TscnWriterTests
         ]);
         var tscn = TscnWriter.Write(layout);
 
-        // X=0, Z=-3 for User; X=1.5, Z=-3 for Sys; X=3, Z=-3 for Nice
-        Assert.Contains("0, 0.01, -3)", tscn);
-        Assert.Contains("1.5, 0.01, -3)", tscn);
-        Assert.Contains("3, 0.01, -3)", tscn);
+        // X=0, Z=-3.5 for User; X=1.5, Z=-3.5 for Sys; X=3, Z=-3.5 for Nice
+        Assert.Contains("0, 0.01, -3.5)", tscn);
+        Assert.Contains("1.5, 0.01, -3.5)", tscn);
+        Assert.Contains("3, 0.01, -3.5)", tscn);
         // Confirm old inside-bezel position is gone
         Assert.DoesNotContain("0.01, -0.8)", tscn);
     }
@@ -509,8 +550,10 @@ public class TscnWriterTests
     public void Write_ShapeLabel_HasIncreasedFontSize()
     {
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("Load", "Load", Vec3.Zero, null, null, null,
-                [new PlacedShape("Load_1m", ShapeType.Bar, new Vec3(0, 0, 0),
+            new PlacedZone(
+                Name: "Load", ZoneLabel: "Load", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("Load_1m", ShapeType.Bar, new Vec3(0, 0, 0),
                     "kernel.all.load", "1 minute", "1m",
                     new RgbColour(0.388f, 0.400f, 0.945f),
                     0f, 10f, 0.2f, 5.0f)])
@@ -525,9 +568,10 @@ public class TscnWriterTests
     public void Write_GridColumnHeader_HasIncreasedFontSize()
     {
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("Per_CPU", "Per-CPU", new Vec3(0, 0, -8),
-                3, 1.5f, 2.0f,
-                [new PlacedShape("PerCPU_cpu0_User", ShapeType.Bar, Vec3.Zero,
+            new PlacedZone(
+                Name: "Per_CPU", ZoneLabel: "Per-CPU", Position: new Vec3(0, 0, -8),
+                ColumnSpacing: 1.5f, RowSpacing: 2.0f,
+                Items: [new PlacedShape("PerCPU_cpu0_User", ShapeType.Bar, Vec3.Zero,
                     "kernel.percpu.cpu.user", "cpu0", "cpu0",
                     new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f)],
                 GroundWidth: 5f, GroundDepth: 8f,
@@ -544,9 +588,10 @@ public class TscnWriterTests
     public void Write_GridRowHeader_HasIncreasedFontSize()
     {
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("Per_CPU", "Per-CPU", new Vec3(0, 0, -8),
-                3, 1.5f, 2.0f,
-                [new PlacedShape("PerCPU_cpu0_User", ShapeType.Bar, Vec3.Zero,
+            new PlacedZone(
+                Name: "Per_CPU", ZoneLabel: "Per-CPU", Position: new Vec3(0, 0, -8),
+                ColumnSpacing: 1.5f, RowSpacing: 2.0f,
+                Items: [new PlacedShape("PerCPU_cpu0_User", ShapeType.Bar, Vec3.Zero,
                     "kernel.percpu.cpu.user", "cpu0", "cpu0",
                     new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f)],
                 GroundWidth: 5f, GroundDepth: 8f,
@@ -566,9 +611,10 @@ public class TscnWriterTests
         // → X = (3-1)*1.5 + 0.8 + 0.5 = 4.3
         // 2 instances, rowSpacing=2.0 → Z = 0 for cpu0, Z = -2 for cpu1
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("Per_CPU", "Per-CPU", Vec3.Zero,
-                3, 1.5f, 2.0f,
-                [new PlacedShape("s1", ShapeType.Bar, Vec3.Zero,
+            new PlacedZone(
+                Name: "Per_CPU", ZoneLabel: "Per-CPU", Position: Vec3.Zero,
+                ColumnSpacing: 1.5f, RowSpacing: 2.0f,
+                Items: [new PlacedShape("s1", ShapeType.Bar, Vec3.Zero,
                     "kernel.percpu.cpu.user", "cpu0", "cpu0",
                     new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f)],
                 GroundWidth: 5f, GroundDepth: 8f,
@@ -587,48 +633,54 @@ public class TscnWriterTests
     public void Write_ShapeWithLeftLabelPlacement_PlacesLabelLeftOfShape()
     {
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("System", "System", Vec3.Zero, null, null, null,
-                [new PlacedShape("System_User", ShapeType.Bar, new Vec3(0, 0, 1.2f),
+            new PlacedZone(
+                Name: "System", ZoneLabel: "System", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("System_User", ShapeType.Bar, new Vec3(0, 0, 1.2f),
                     "kernel.all.cpu.user", null, "User",
                     new RgbColour(0.976f, 0.451f, 0.086f),
                     0f, 100f, 0.2f, 5.0f,
                     LabelPlacement: LabelPlacement.Left)])
         ]);
         var tscn = TscnWriter.Write(layout);
-        // Label at (X - 0.9, 0.01, Z) — to the left of the shape, same Z
-        Assert.Contains("-0.9, 0.01, 1.2", tscn);
+        // Label at (X - 1.3, 0.01, Z) — outside the bezel, left of the shape, same Z
+        Assert.Contains("-1.3, 0.01, 1.2", tscn);
     }
 
     [Fact]
     public void Write_ShapeWithRightLabelPlacement_PlacesLabelRightOfShape()
     {
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("System", "System", Vec3.Zero, null, null, null,
-                [new PlacedShape("System_Used", ShapeType.Bar, new Vec3(3f, 0, 1.2f),
+            new PlacedZone(
+                Name: "System", ZoneLabel: "System", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("System_Used", ShapeType.Bar, new Vec3(3f, 0, 1.2f),
                     "mem.util.used", null, "Used",
                     new RgbColour(0.133f, 0.773f, 0.369f),
                     0f, 16_000_000_000f, 0.2f, 5.0f,
                     LabelPlacement: LabelPlacement.Right)])
         ]);
         var tscn = TscnWriter.Write(layout);
-        // Label at (X + 0.9, 0.01, Z) — to the right of the shape, same Z
-        Assert.Contains("3.9, 0.01, 1.2", tscn);
+        // Label at (X + 1.3, 0.01, Z) — outside the bezel, right of the shape, same Z
+        Assert.Contains("4.3, 0.01, 1.2", tscn);
     }
 
     [Fact]
     public void Write_ShapeFrontLabel_WithNonZeroShapeZ_IncludesShapeZInLabelPosition()
     {
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("System", "System", Vec3.Zero, null, null, null,
-                [new PlacedShape("System_1m", ShapeType.Bar, new Vec3(0, 0, 4f),
+            new PlacedZone(
+                Name: "System", ZoneLabel: "System", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("System_1m", ShapeType.Bar, new Vec3(0, 0, 4f),
                     "kernel.all.load", "1 minute", "1m",
                     new RgbColour(0.388f, 0.400f, 0.945f),
                     0f, 10f, 0.2f, 5.0f,
                     LabelPlacement: LabelPlacement.Front)])
         ]);
         var tscn = TscnWriter.Write(layout);
-        // Label at (X, 0.01, shapeZ + 0.6) — in front of the shape in Z
-        Assert.Contains("0, 0.01, 4.6", tscn);
+        // Label at (X, 0.01, shapeZ + 1.3) — outside the bezel, in front of the shape in Z
+        Assert.Contains("0, 0.01, 5.3", tscn);
     }
 
     [Fact]
@@ -718,9 +770,12 @@ public class TscnWriterTests
     {
         // Zone Ry(-90°) basis rows: world_x = -local_z, world_z = local_x.
         // "Left" in world (-X) = local +Z direction, so offset goes on local +Z.
+        // pos.Z=1.7 chosen so (1.7f + 1.3f) = 3.0f exactly (clean float arithmetic).
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("System", "System", Vec3.Zero, null, null, null,
-                [new PlacedShape("System_User", ShapeType.Bar, new Vec3(0, 0, 1.9f),
+            new PlacedZone(
+                Name: "System", ZoneLabel: "System", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("System_User", ShapeType.Bar, new Vec3(0, 0, 1.7f),
                     "kernel.all.cpu.user", null, "User",
                     new RgbColour(0.976f, 0.451f, 0.086f),
                     0f, 100f, 0.2f, 5.0f,
@@ -728,8 +783,8 @@ public class TscnWriterTests
                 RotateYNinetyDeg: true)
         ]);
         var tscn = TscnWriter.Write(layout);
-        // localX stays at 0 (pos.X), localZ = pos.Z + 0.9 = 2.8
-        Assert.Contains("Transform3D(0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0.01, 2.8)", tscn);
+        // localX stays at 0 (pos.X), localZ = pos.Z + 1.3 = 3.0
+        Assert.Contains("Transform3D(0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0.01, 3)", tscn);
     }
 
     [Fact]
@@ -739,8 +794,10 @@ public class TscnWriterTests
         // "Right" in world (+X) = local -Z direction, so offset goes on local -Z.
         // pos.Z=1.8 chosen so (1.8f - 0.9f) = 0.9f exactly (clean float arithmetic).
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("System", "System", Vec3.Zero, null, null, null,
-                [new PlacedShape("System_Used", ShapeType.Bar, new Vec3(3f, 0, 1.8f),
+            new PlacedZone(
+                Name: "System", ZoneLabel: "System", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("System_Used", ShapeType.Bar, new Vec3(3f, 0, 1.8f),
                     "mem.util.used", null, "Used",
                     new RgbColour(0.133f, 0.773f, 0.369f),
                     0f, 16_000_000_000f, 0.2f, 5.0f,
@@ -748,8 +805,8 @@ public class TscnWriterTests
                 RotateYNinetyDeg: true)
         ]);
         var tscn = TscnWriter.Write(layout);
-        // localX stays at 3 (pos.X), localZ = pos.Z - 0.9 = 0.9
-        Assert.Contains("Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 3, 0.01, 0.9)", tscn);
+        // localX stays at 3 (pos.X), localZ = pos.Z - 1.3 = 0.5
+        Assert.Contains("Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 3, 0.01, 0.5)", tscn);
     }
 
     [Fact]
@@ -758,27 +815,31 @@ public class TscnWriterTests
         // Zone Ry(-90°) basis rows: world_z = local_x.
         // "Front" (toward camera = world +Z) = local +X direction, so offset goes on local +X.
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("System", "System", Vec3.Zero, null, null, null,
-                [new PlacedShape("System_1m", ShapeType.Bar, new Vec3(0, 0, 4f),
+            new PlacedZone(
+                Name: "System", ZoneLabel: "System", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("System_1m", ShapeType.Bar, new Vec3(0, 0, 4f),
                     "kernel.all.load", "1 minute", "1m",
                     new RgbColour(0.388f, 0.400f, 0.945f),
                     0f, 10f, 0.2f, 5.0f)],
                 RotateYNinetyDeg: true)
         ]);
         var tscn = TscnWriter.Write(layout);
-        // localX = pos.X + 0.6 = 0.6, localZ stays at pos.Z = 4
-        Assert.Contains("Transform3D(0, -1, 0, 0, 0, 1, -1, 0, 0, 0.6, 0.01, 4)", tscn);
+        // localX = pos.X + 1.3, localZ stays at pos.Z = 4
+        Assert.Contains("Transform3D(0, -1, 0, 0, 0, 1, -1, 0, 0, 1.3, 0.01, 4)", tscn);
     }
 
     [Fact]
     public void Write_RotatedZoneLabel_PlacedOnForegroundSide()
     {
         // Zone Ry(-90°) basis rows: world_z = local_x, world_x = -local_z.
-        // Zone label goes in front (world +Z = local +X): max(shapeX) + 1.0 = 0 + 1.0 = 1.0
+        // Zone label goes in front (world +Z = local +X): max(shapeX) + 1.5 = 0 + 1.5 = 1.5
         // localZ centres along world-X spread: max(shapeZ) / 2 = 2.4 / 2 = 1.2
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("System", "System", Vec3.Zero, null, null, null,
-                [
+            new PlacedZone(
+                Name: "System", ZoneLabel: "System", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [
                     new PlacedShape("Sys_A", ShapeType.Bar, new Vec3(0, 0, 0),
                         "kernel.all.cpu.user", null, null,
                         new RgbColour(1f, 0f, 0f), 0f, 100f, 0.2f, 5.0f),
@@ -789,7 +850,7 @@ public class TscnWriterTests
                 RotateYNinetyDeg: true)
         ]);
         var tscn = TscnWriter.Write(layout);
-        Assert.Contains("Transform3D(0, -1, 0, 0, 0, 1, -1, 0, 0, 1, 0.01, 1.2)", tscn);
+        Assert.Contains("Transform3D(0, -1, 0, 0, 0, 1, -1, 0, 0, 1.5, 0.01, 1.2)", tscn);
     }
 
     [Fact]
@@ -799,8 +860,10 @@ public class TscnWriterTests
         // ext_resources (6), sub_resources (1 binding), bezel (2), ambient (2), WorldEnv (1)
         // = 6 + 1 + 2 + 2 + 1 = 12
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("CPU", "CPU", Vec3.Zero, null, null, null,
-                [new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
+            new PlacedZone(
+                Name: "CPU", ZoneLabel: "CPU", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
                     "kernel.all.cpu.user", null, null,
                     new RgbColour(0.976f, 0.451f, 0.086f),
                     0f, 100f, 0.2f, 5.0f)],
@@ -814,21 +877,23 @@ public class TscnWriterTests
 
     private static SceneLayout LayoutWithCpuStack() =>
         new("testhost", [
-            new PlacedZone("CPU", "CPU", Vec3.Zero, null, null, null,
-            [
-                new PlacedStack("CpuStack", Vec3.Zero,
-                [
-                    new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
-                        "kernel.all.cpu.user", null, "User",
-                        new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f),
-                    new PlacedShape("CPU_Sys", ShapeType.Bar, Vec3.Zero,
-                        "kernel.all.cpu.sys", null, "Sys",
-                        new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f),
-                    new PlacedShape("CPU_Nice", ShapeType.Bar, Vec3.Zero,
-                        "kernel.all.cpu.nice", null, "Nice",
-                        new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f),
-                ], StackMode.Proportional)
-            ])
+            new PlacedZone(
+                Name: "CPU", ZoneLabel: "CPU", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [
+                    new PlacedStack("CpuStack", Vec3.Zero,
+                    [
+                        new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
+                            "kernel.all.cpu.user", null, "User",
+                            new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f),
+                        new PlacedShape("CPU_Sys", ShapeType.Bar, Vec3.Zero,
+                            "kernel.all.cpu.sys", null, "Sys",
+                            new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f),
+                        new PlacedShape("CPU_Nice", ShapeType.Bar, Vec3.Zero,
+                            "kernel.all.cpu.nice", null, "Nice",
+                            new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f),
+                    ], StackMode.Proportional)
+                ])
         ]);
 
     [Fact]
@@ -851,15 +916,17 @@ public class TscnWriterTests
     public void Write_PlacedStack_StackModeNormalised_EmitsOne()
     {
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("CPU", "CPU", Vec3.Zero, null, null, null,
-            [
-                new PlacedStack("CpuStack", Vec3.Zero,
-                [
-                    new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
-                        "kernel.all.cpu.user", null, null,
-                        new RgbColour(1f, 0f, 0f), 0f, 100f, 0.2f, 5.0f),
-                ], StackMode.Normalised)
-            ])
+            new PlacedZone(
+                Name: "CPU", ZoneLabel: "CPU", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [
+                    new PlacedStack("CpuStack", Vec3.Zero,
+                    [
+                        new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
+                            "kernel.all.cpu.user", null, null,
+                            new RgbColour(1f, 0f, 0f), 0f, 100f, 0.2f, 5.0f),
+                    ], StackMode.Normalised)
+                ])
         ]);
         var tscn = TscnWriter.Write(layout);
         Assert.Contains("stack_mode = 1", tscn);

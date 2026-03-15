@@ -10,8 +10,10 @@ public class SceneEmitterTests
     public void Emit_ProducesSceneWithCameraAndLight()
     {
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("CPU", "CPU", Vec3.Zero, null, null, null,
-                [new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
+            new PlacedZone(
+                Name: "CPU", ZoneLabel: "CPU", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
                     "kernel.all.cpu.user", null, null,
                     new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f)])
         ]);
@@ -33,8 +35,10 @@ public class SceneEmitterTests
     public void Emit_CameraTransform_IsNotIdentityRotation()
     {
         var layout = new SceneLayout("testhost", [
-            new PlacedZone("CPU", "CPU", Vec3.Zero, null, null, null,
-                [new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
+            new PlacedZone(
+                Name: "CPU", ZoneLabel: "CPU", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
                     "kernel.all.cpu.user", null, null,
                     new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f)])
         ]);
