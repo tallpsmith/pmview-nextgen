@@ -53,7 +53,7 @@ graph TD
 
 ## Prerequisites
 
-- [.NET 9.0+ SDK](https://dotnet.microsoft.com/download/dotnet/9.0) (the .NET 9 SDK builds our net8.0-targeted projects; Godot 4.6 requires it)
+- [.NET 10.0+ SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (builds net8.0-targeted Godot libraries and net10.0 CLI/tests)
 - [Godot 4.6+](https://godotengine.org/download) with .NET support (the Mono/C# flavour)
 - [Performance Co-Pilot (PCP)](https://pcp.io/) with pmproxy running (for live data)
 - Docker or Podman (for dev-environment stack)
@@ -65,21 +65,25 @@ graph TD
 git clone https://github.com/tallpsmith/pmview-nextgen.git
 cd pmview-nextgen
 
-# Build and test everything (384 tests across all libraries)
+# Build and test everything (~474 tests across all libraries)
 dotnet build pmview-nextgen.sln
 dotnet test pmview-nextgen.sln --filter "FullyQualifiedName!~Integration"
 
 # Start the dev-environment stack (PCP + pmproxy + synthetic data)
 cd dev-environment && docker compose up -d && cd ..
 
-# Generate into your own Godot project:
-# 1. Create the project in Godot, then Project → Tools → C# → Create C# Solution
-# 2. Run the projector (builds + bundles DLLs, installs addon, patches .csproj)
+# Scaffold a new Godot project + generate a host-view scene in one command:
+dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- \
+  --init --pmproxy http://localhost:44322 \
+  -o /path/to/my-new-project/scenes/host_view.tscn
+# Open in Godot, Build (Ctrl+B), and hit Play
+
+# Or scaffold the project first, then generate scenes into it:
+dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- \
+  init /path/to/my-new-project
 dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- \
   --pmproxy http://localhost:44322 \
-  --install-addon \
-  -o /path/to/my-godot-project/scenes/host_view.tscn
-# 3. Open in Godot, Build (Ctrl+B), enable plugin in Project Settings → Plugins
+  -o /path/to/my-new-project/scenes/host_view.tscn
 
 # Build the addon C# (addon development workspace)
 dotnet build src/pmview-bridge-addon/pmview-nextgen.sln
@@ -120,33 +124,32 @@ At runtime, **SceneBinder** discovers all PcpBindable nodes in the scene and wir
 
 ## Host Projector (Scene Generator)
 
-`pmview-host-projector` is a CLI tool that connects to a live pmproxy, discovers the host's metric topology (CPUs, disks, network interfaces, memory), and generates a complete Godot `.tscn` scene with PcpBindable bindings, layout, camera, and lighting.
+`pmview-host-projector` is a CLI tool that connects to a live pmproxy, discovers the host's metric topology (CPUs, disks, network interfaces, memory), and generates Godot `.tscn` scenes with PcpBindable bindings and layout.
 
-The generated scene references resources from the `pmview-bridge` addon (`addons/pmview-bridge/`), so **the target Godot project must have the addon installed**. Use `--install-addon` to copy it automatically, or generate into `src/pmview-bridge-addon/` which already has it.
+**Two modes of operation:**
 
-When using `--install-addon` with an external Godot project, the projector:
-1. Builds `PcpClient.dll`, `PcpGodotBridge.dll`, and `Tomlyn.dll` from source
-2. Bundles them into `addons/pmview-bridge/lib/` in the target project
-3. Patches the target `.csproj` with `<Reference>` entries pointing at the bundled DLLs
-
-**Important:** Create the C# solution in Godot first (Project → Tools → C# → Create C# Solution) so there's a `.csproj` to patch.
+- **`pmview init <dir>`** — scaffolds a complete Godot .NET project from scratch (project.godot, .csproj, .sln, addon with DLLs, main.tscn with dual-mode fly/orbit camera and lighting)
+- **`pmview generate`** — generates host-view scenes into an existing project. Use `--init` to auto-scaffold if needed.
 
 ```bash
-# Generate into your own Godot project (builds DLLs, installs addon, patches .csproj)
+# Scaffold + generate in one shot
 dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- \
-  --pmproxy http://myserver:44322 \
-  --install-addon \
-  -o /path/to/my-godot-project/scenes/host_view.tscn
+  --init --pmproxy http://myserver:44322 \
+  -o /path/to/my-project/scenes/host_view.tscn
 ```
 
-The generated scene includes 8 metric zones:
+Camera, lighting, and environment live in the project's `main.tscn` (shared across all views). Generated host-view scenes contain only metric groups, labels, and bindings.
+
+The generated scene includes 10 metric zones:
 
 | Zone | Row | Metrics |
 |------|-----|---------|
-| Disk | Foreground | Read/Write bytes (cylinders) |
+| CPU | Foreground | User/Sys/Nice (bars) |
 | Load | Foreground | 1/5/15 minute load averages (bars) |
 | Memory | Foreground | Used/Cached/Buffers (bars, auto-ranged to physical RAM) |
-| CPU | Foreground | User/Sys/Nice (bars) |
+| Disk | Foreground | Read/Write bytes (cylinders) |
+| Net-In | Foreground | Aggregate bytes/packets (bars) |
+| Net-Out | Foreground | Aggregate bytes/packets (bars) |
 | Per-CPU | Background | User/Sys/Nice per CPU core (grid) |
 | Per-Disk | Background | Read/Write per device (grid) |
 | Network In | Background | Bytes/Packets/Errors per interface (grid) |
@@ -171,7 +174,7 @@ pmview-nextgen/
 │   ├── addons/pmview-bridge/           # Self-contained addon (copied to target projects)
 │   │   ├── *.cs                        # Bridge plugin (Poller, Binder, Bindable, Inspector)
 │   │   ├── lib/                        # Bundled DLLs (built by projector --install-addon)
-│   │   └── building_blocks/            # GroundedBar/Cylinder, GridLayout3D, ZoneLabel
+│   │   └── building_blocks/            # GroundedBar/Cylinder, MetricGrid, MetricGroupNode, FlyOrbitCamera
 │   ├── test/                           # gdUnit4 tests
 │   ├── pmview-nextgen.csproj           # Godot C# project (needed to build addon)
 │   └── pmview-nextgen.sln              # Godot solution

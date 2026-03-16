@@ -1,3 +1,4 @@
+using System.Globalization;
 using PmviewHostProjector.Models;
 
 namespace PmviewHostProjector.Emission;
@@ -30,6 +31,8 @@ public record CameraSetup(Vec3 Position, Vec3 LookAtTarget);
 
 public static class WorldSetup
 {
+    private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+
     public static CameraSetup ComputeCamera(SceneBounds bounds)
     {
         var extent = Math.Max(bounds.Width, Math.Abs(bounds.Depth));
@@ -39,4 +42,23 @@ public static class WorldSetup
         var position = new Vec3(bounds.CentreX, height, bounds.MaxZ + distance);
         return new CameraSetup(position, target);
     }
+
+    public static string BuildLookAtTransform(Vec3 eye, Vec3 target)
+    {
+        var fwd = NormaliseVec(eye.X - target.X, eye.Y - target.Y, eye.Z - target.Z);
+        var right = NormaliseVec(fwd.Z, 0f, -fwd.X);
+        var up = (
+            X: fwd.Y * right.Z - fwd.Z * right.Y,
+            Y: fwd.Z * right.X - fwd.X * right.Z,
+            Z: fwd.X * right.Y - fwd.Y * right.X);
+        return $"Transform3D({F(right.X)}, {F(up.X)}, {F(fwd.X)}, {F(right.Y)}, {F(up.Y)}, {F(fwd.Y)}, {F(right.Z)}, {F(up.Z)}, {F(fwd.Z)}, {F(eye.X)}, {F(eye.Y)}, {F(eye.Z)})";
+    }
+
+    private static (float X, float Y, float Z) NormaliseVec(float x, float y, float z)
+    {
+        var len = MathF.Sqrt(x * x + y * y + z * z);
+        return len > 0f ? (x / len, y / len, z / len) : (0f, 0f, 1f);
+    }
+
+    private static string F(float value) => (value == 0f ? 0f : value).ToString(Inv);
 }
