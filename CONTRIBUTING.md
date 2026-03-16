@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- [.NET 9.0+ SDK](https://dotnet.microsoft.com/download/dotnet/9.0) — the .NET 9 SDK builds our net8.0-targeted libraries; Godot 4.6 requires it
+- [.NET 10.0+ SDK](https://dotnet.microsoft.com/download/dotnet/10.0) — builds net8.0-targeted Godot libraries and net10.0 CLI/tests
 - [Godot 4.6+](https://godotengine.org/download) with .NET support (the Mono/C# flavour)
 - [Performance Co-Pilot (PCP)](https://pcp.io/) with pmproxy running (for live data)
 - Docker or Podman (for the dev-environment stack)
@@ -58,7 +58,7 @@ pmview-nextgen/
 │   └── pmview-bridge-addon/            # Addon development workspace (Godot project)
 │       ├── addons/pmview-bridge/       # Self-contained addon (copied to target projects)
 │       │   ├── *.cs                    # Bridge plugin (Poller, Binder, Bindable, Inspector)
-│       │   └── building_blocks/        # GroundedBar/Cylinder, GridLayout3D, ZoneLabel
+│       │   └── building_blocks/        # GroundedBar/Cylinder, MetricGrid, MetricGroupNode, FlyOrbitCamera
 │       ├── test/                       # gdUnit4 tests
 │       ├── pmview-nextgen.csproj
 │       └── pmview-nextgen.sln

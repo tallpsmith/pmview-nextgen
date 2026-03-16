@@ -1,20 +1,21 @@
 # pmview-nextgen Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-03-05
+Last updated: 2026-03-16
 
 ## Active Technologies
-- C# (.NET 8.0 LTS) for EditorPlugin + bridge nodes; GDScript for scene controller integration + Godot 4.4+ (Godot.NET.Sdk), existing PcpClient + PcpGodotBridge libraries (002-editor-launch-config)
-- Godot ProjectSettings (`project.godot` file — automatic persistence) (002-editor-launch-config)
-- C# (.NET 8.0 LTS) for bridge nodes + resources; GDScript for scene controller + Godot 4.4+ (Godot.NET.Sdk), existing PcpClient + PcpGodotBridge libraries (003-editor-pcp-bindings)
-- Godot Custom Resources serialized inline in `.tscn` scene files (003-editor-pcp-bindings)
-
-- C# (.NET 8.0 LTS) for PcpClient library and Godot bridge; GDScript for scene logic + Godot 4.4+ (Godot.NET.Sdk), System.Net.Http.HttpClient, System.Text.Json, Tomlyn (TOML parser) (001-pcp-godot-bridge)
+- C# (.NET 8.0 LTS) for Godot bridge nodes/resources + PcpClient/PcpGodotBridge libraries
+- C# (.NET 10.0) for Host Projector CLI + all test projects
+- GDScript for scene controllers, camera, building blocks
+- Godot 4.6+ (Godot.NET.Sdk 4.6.1), System.Net.Http.HttpClient, System.Text.Json, Tomlyn
 
 ## Project Structure
 
 ```text
 src/
-tests/
+  pcp-client-dotnet/          # PcpClient: pmproxy HTTP/JSON client
+  pcp-godot-bridge/           # PcpGodotBridge: binding model + validation
+  pmview-host-projector/      # Host Projector CLI: topology → .tscn + project scaffolding
+  pmview-bridge-addon/        # Godot addon: bridge plugin + building blocks + gdUnit4 tests
 ```
 
 ## Environment
@@ -44,12 +45,20 @@ dotnet test src/pcp-client-dotnet/PcpClient.sln --filter "Category=Integration"
 # Build Godot addon C# (from the addon dev workspace)
 dotnet build src/pmview-bridge-addon/pmview-nextgen.sln
 
-# Generate a host-view scene into an external Godot project
+# Scaffold a new Godot project from scratch (project.godot, .csproj, .sln, main.tscn, addon)
 # Requires dev-environment stack running (podman compose up)
 dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- \
+  init /path/to/my-new-project
+
+# Generate a host-view scene into an existing Godot project
+dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- \
   --pmproxy http://localhost:44322 \
-  --install-addon \
   -o /path/to/my-godot-project/scenes/host_view.tscn
+
+# Generate + auto-scaffold if no project exists yet
+dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- \
+  --init --pmproxy http://localhost:44322 \
+  -o /path/to/my-new-project/scenes/host_view.tscn
 ```
 
 **Claude Code VM note:** The VM cannot reach the dev-environment Podman stack on the
@@ -58,13 +67,7 @@ This is the same filter used in GitHub Actions CI (no pmproxy in CI runners eith
 
 ## Code Style
 
-C# (.NET 8.0 LTS) for PcpClient library and Godot bridge; GDScript for scene logic: Follow standard conventions
-
-## Recent Changes
-- 003-editor-pcp-bindings: Added C# (.NET 8.0 LTS) for bridge nodes + resources; GDScript for scene controller + Godot 4.4+ (Godot.NET.Sdk), existing PcpClient + PcpGodotBridge libraries
-- 002-editor-launch-config: Added C# (.NET 8.0 LTS) for EditorPlugin + bridge nodes; GDScript for scene controller integration + Godot 4.4+ (Godot.NET.Sdk), existing PcpClient + PcpGodotBridge libraries
-
-- 001-pcp-godot-bridge: Added C# (.NET 8.0 LTS) for PcpClient library and Godot bridge; GDScript for scene logic + Godot 4.4+ (Godot.NET.Sdk), System.Net.Http.HttpClient, System.Text.Json, Tomlyn (TOML parser)
+C# (.NET 8.0) for Godot libraries, C# (.NET 10.0) for CLI/tests; GDScript for scene logic. Follow standard conventions.
 
 <!-- MANUAL ADDITIONS START -->
 
