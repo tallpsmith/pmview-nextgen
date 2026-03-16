@@ -12,6 +12,7 @@ public static class LinuxProfile
     private static readonly RgbColour Blue      = RgbColour.FromHex("#3b82f6");
     private static readonly RgbColour Rose      = RgbColour.FromHex("#f43f5e");
     private static readonly RgbColour Red       = RgbColour.FromHex("#ef4444");
+    private static readonly RgbColour Cyan      = RgbColour.FromHex("#22d3ee");
 
     public static IReadOnlyList<ZoneDefinition> GetZones() =>
     [
@@ -33,11 +34,12 @@ public static class LinuxProfile
         Type: ZoneType.Aggregate,
         Metrics:
         [
-            new("kernel.all.cpu.user", ShapeType.Bar, "User", Orange, 0f, 100f, 0.2f, 5.0f),
-            new("kernel.all.cpu.sys",  ShapeType.Bar, "Sys",  Orange, 0f, 100f, 0.2f, 5.0f),
-            new("kernel.all.cpu.nice", ShapeType.Bar, "Nice", Orange, 0f, 100f, 0.2f, 5.0f),
+            new("kernel.all.cpu.sys",  ShapeType.Bar, "Sys",  Red,   0f, 100f, 0.2f, 5.0f),
+            new("kernel.all.cpu.user", ShapeType.Bar, "User", Green, 0f, 100f, 0.2f, 5.0f),
+            new("kernel.all.cpu.nice", ShapeType.Bar, "Nice", Cyan,  0f, 100f, 0.2f, 5.0f),
         ],
-        InstanceMetricSource: null);
+        InstanceMetricSource: null,
+        StackGroups: [new MetricStackGroupDefinition("CPU", StackMode.Proportional, ["Sys", "User", "Nice"])]);
 
     private static ZoneDefinition LoadZone() => new(
         Name: "Load",
@@ -105,11 +107,12 @@ public static class LinuxProfile
         Type: ZoneType.PerInstance,
         Metrics:
         [
-            new("kernel.percpu.cpu.user", ShapeType.Bar, "User", Orange, 0f, 100f, 0.2f, 5.0f),
-            new("kernel.percpu.cpu.sys",  ShapeType.Bar, "Sys",  Orange, 0f, 100f, 0.2f, 5.0f),
-            new("kernel.percpu.cpu.nice", ShapeType.Bar, "Nice", Orange, 0f, 100f, 0.2f, 5.0f),
+            new("kernel.percpu.cpu.sys",  ShapeType.Bar, "Sys",  Red,   0f, 100f, 0.2f, 5.0f),
+            new("kernel.percpu.cpu.user", ShapeType.Bar, "User", Green, 0f, 100f, 0.2f, 5.0f),
+            new("kernel.percpu.cpu.nice", ShapeType.Bar, "Nice", Cyan,  0f, 100f, 0.2f, 5.0f),
         ],
-        InstanceMetricSource: "kernel.percpu.cpu.user");
+        InstanceMetricSource: "kernel.percpu.cpu.user",
+        StackGroups: [new MetricStackGroupDefinition("CPU", StackMode.Proportional, ["Sys", "User", "Nice"])]);
 
     private static ZoneDefinition PerDiskZone() => new(
         Name: "Per-Disk",

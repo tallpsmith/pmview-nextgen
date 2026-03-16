@@ -56,10 +56,49 @@ public class LinuxProfileTests
     }
 
     [Fact]
-    public void CpuZone_HasNoStackGroups()
+    public void CpuZone_HasStackGroups()
     {
         var cpu = _zones.Single(z => z.Name == "CPU");
-        Assert.Null(cpu.StackGroups);
+        Assert.NotNull(cpu.StackGroups);
+    }
+
+    [Fact]
+    public void CpuZone_HasOneStackGroup_WithThreeMembers()
+    {
+        var cpu = _zones.Single(z => z.Name == "CPU");
+        Assert.NotNull(cpu.StackGroups);
+        Assert.Single(cpu.StackGroups);
+        Assert.Equal(3, cpu.StackGroups[0].MetricLabels.Count);
+    }
+
+    [Fact]
+    public void CpuZone_StackGroup_OrderIsSysUserNice_ModeIsProportional()
+    {
+        var cpu = _zones.Single(z => z.Name == "CPU");
+        var group = cpu.StackGroups![0];
+        Assert.Equal(new[] { "Sys", "User", "Nice" }, group.MetricLabels);
+        Assert.Equal(StackMode.Proportional, group.Mode);
+    }
+
+    [Fact]
+    public void CpuZone_MetricColours_SysIsRed_UserIsGreen_NiceIsCyan()
+    {
+        var cpu = _zones.Single(z => z.Name == "CPU");
+        var sys  = cpu.Metrics.Single(m => m.Label == "Sys");
+        var user = cpu.Metrics.Single(m => m.Label == "User");
+        var nice = cpu.Metrics.Single(m => m.Label == "Nice");
+
+        // Sys = Red (#ef4444) — dominant red channel
+        var expectedRed = RgbColour.FromHex("#ef4444");
+        Assert.Equal(expectedRed, sys.DefaultColour);
+
+        // User = Green (#22c55e) — dominant green channel
+        var expectedGreen = RgbColour.FromHex("#22c55e");
+        Assert.Equal(expectedGreen, user.DefaultColour);
+
+        // Nice = Cyan (#22d3ee) — dominant green+blue channels
+        var expectedCyan = RgbColour.FromHex("#22d3ee");
+        Assert.Equal(expectedCyan, nice.DefaultColour);
     }
 
     [Fact]
@@ -120,6 +159,30 @@ public class LinuxProfileTests
     {
         var perCpu = _zones.Single(z => z.Name == "Per-CPU");
         Assert.Equal("kernel.percpu.cpu.user", perCpu.InstanceMetricSource);
+    }
+
+    [Fact]
+    public void PerCpuZone_HasOneStackGroup_MatchingAggregateZone()
+    {
+        var perCpu = _zones.Single(z => z.Name == "Per-CPU");
+        var cpu = _zones.Single(z => z.Name == "CPU");
+        Assert.NotNull(perCpu.StackGroups);
+        Assert.Single(perCpu.StackGroups);
+        Assert.Equal(cpu.StackGroups![0].MetricLabels, perCpu.StackGroups[0].MetricLabels);
+        Assert.Equal(cpu.StackGroups[0].Mode, perCpu.StackGroups[0].Mode);
+    }
+
+    [Fact]
+    public void PerCpuZone_MetricColours_MatchAggregateZone()
+    {
+        var perCpu = _zones.Single(z => z.Name == "Per-CPU");
+        var sys  = perCpu.Metrics.Single(m => m.Label == "Sys");
+        var user = perCpu.Metrics.Single(m => m.Label == "User");
+        var nice = perCpu.Metrics.Single(m => m.Label == "Nice");
+
+        Assert.Equal(RgbColour.FromHex("#ef4444"), sys.DefaultColour);
+        Assert.Equal(RgbColour.FromHex("#22c55e"), user.DefaultColour);
+        Assert.Equal(RgbColour.FromHex("#22d3ee"), nice.DefaultColour);
     }
 
     [Fact]

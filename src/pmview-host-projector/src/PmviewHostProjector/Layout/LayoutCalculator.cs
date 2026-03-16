@@ -41,7 +41,7 @@ public static class LayoutCalculator
 
         var (groundWidth, groundDepth) = ComputeGroundExtent(zone, topology, items);
 
-        var metricLabels = zone.Metrics.Select(m => m.Label).ToList();
+        var metricLabels = VisualColumnLabels(zone);
         var instanceLabels = zone.Row == ZoneRow.Background
             ? ResolveInstances(zone, topology).Select(ShortenInstanceName).ToList()
             : (IReadOnlyList<string>)[];
@@ -68,21 +68,63 @@ public static class LayoutCalculator
     {
         if (items.Count == 0) return (0f, 0f);
 
+        var visualColumns = VisualColumnCount(zone);
+
         if (zone.Row == ZoneRow.Foreground)
         {
-            // All shapes are at Vec3.Zero — use metric count for nominal extent.
-            var width = (zone.Metrics.Count - 1) * ShapeSpacing + 0.8f + GroundPadding * 2;
+            var width = (visualColumns - 1) * ShapeSpacing + 0.8f + GroundPadding * 2;
             var depth = 0.8f + GroundPadding * 2;
             return (width, depth);
         }
         else
         {
-            var cols  = zone.Metrics.Count;
             var rows  = ResolveInstances(zone, topology).Count;
-            var width = (cols - 1) * ColumnSpacing + 0.8f + GroundPadding * 2;
+            var width = (visualColumns - 1) * ColumnSpacing + 0.8f + GroundPadding * 2;
             var depth = (rows - 1) * RowSpacing    + 0.8f + GroundPadding * 2;
             return (width, depth);
         }
+    }
+
+    /// <summary>
+    /// Counts the number of visual columns: ungrouped metrics + one per stack group.
+    /// A stack group of 3 metrics occupies 1 column, not 3.
+    /// </summary>
+    private static int VisualColumnCount(ZoneDefinition zone)
+    {
+        if (zone.StackGroups is null or { Count: 0 })
+            return zone.Metrics.Count;
+
+        var stackedLabels = StackedMetricLabels(zone);
+        var ungrouped = zone.Metrics.Count(m => !stackedLabels.ContainsKey(m.Label));
+        return ungrouped + zone.StackGroups.Count;
+    }
+
+    /// <summary>
+    /// Returns column header labels matching visual columns: ungrouped metric labels
+    /// plus stack group names for grouped metrics, preserving declaration order.
+    /// </summary>
+    private static IReadOnlyList<string> VisualColumnLabels(ZoneDefinition zone)
+    {
+        if (zone.StackGroups is null or { Count: 0 })
+            return zone.Metrics.Select(m => m.Label).ToList();
+
+        var stackedLabels = StackedMetricLabels(zone);
+        var emittedGroups = new HashSet<string>();
+        var labels = new List<string>();
+
+        foreach (var metric in zone.Metrics)
+        {
+            if (!stackedLabels.TryGetValue(metric.Label, out var groupDef))
+            {
+                labels.Add(metric.Label);
+                continue;
+            }
+
+            if (emittedGroups.Add(groupDef.GroupName))
+                labels.Add(groupDef.GroupName);
+        }
+
+        return labels;
     }
 
     private static IReadOnlyList<PlacedItem> BuildForegroundItems(ZoneDefinition zone, HostTopology topology)
@@ -160,16 +202,20 @@ public static class LayoutCalculator
     private static IReadOnlyList<PlacedItem> BuildBackgroundShapes(ZoneDefinition zone, HostTopology topology)
     {
         var instances = ResolveInstances(zone, topology);
-        var shapes = new List<PlacedItem>();
+        var stackedLabels = StackedMetricLabels(zone);
+        var items = new List<PlacedItem>();
 
         foreach (var instance in instances)
         {
-            var shortName  = ShortenInstanceName(instance);
-            var safeName   = SanitiseNodeName(shortName);
+            var shortName = ShortenInstanceName(instance);
+            var safeName  = SanitiseNodeName(shortName);
+
+            // Track active stacks per instance, keyed by group name.
+            var activeStacks = new Dictionary<string, (MetricStackGroupDefinition Def, List<PlacedShape> Members)>();
 
             foreach (var metric in zone.Metrics)
             {
-                shapes.Add(new PlacedShape(
+                var shape = new PlacedShape(
                     NodeName:       SanitiseNodeName($"{zone.Name}_{safeName}_{metric.Label}"),
                     Shape:          metric.Shape,
                     LocalPosition:  Vec3.Zero,
@@ -180,10 +226,34 @@ public static class LayoutCalculator
                     SourceRangeMin: metric.SourceRangeMin,
                     SourceRangeMax: ResolveSourceRangeMax(metric, topology),
                     TargetRangeMin: metric.TargetRangeMin,
-                    TargetRangeMax: metric.TargetRangeMax));
+                    TargetRangeMax: metric.TargetRangeMax);
+
+                if (!stackedLabels.TryGetValue(metric.Label, out var groupDef))
+                {
+                    items.Add(shape);
+                    continue;
+                }
+
+                if (!activeStacks.TryGetValue(groupDef.GroupName, out var entry))
+                {
+                    entry = (groupDef, []);
+                    activeStacks[groupDef.GroupName] = entry;
+                }
+
+                entry.Members.Add(shape);
+                activeStacks[groupDef.GroupName] = entry;
+
+                if (metric.Label == groupDef.MetricLabels[^1])
+                {
+                    items.Add(new PlacedStack(
+                        GroupName:     SanitiseNodeName($"{zone.Name}_{safeName}_{groupDef.GroupName}"),
+                        LocalPosition: Vec3.Zero,
+                        Members:       entry.Members,
+                        Mode:          groupDef.Mode));
+                }
             }
         }
-        return shapes;
+        return items;
     }
 
     private static IReadOnlyList<PlacedZone> CenterRowOnXZero(
