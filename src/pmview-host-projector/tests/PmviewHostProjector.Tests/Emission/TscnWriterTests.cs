@@ -286,6 +286,16 @@ public class TscnWriterTests
         Assert.DoesNotContain("camera_orbit", tscn);
     }
 
+    [Fact]
+    public void Write_DoesNotEmitLightsOrEnvironment()
+    {
+        var tscn = TscnWriter.Write(MinimalLayout());
+        Assert.DoesNotContain("KeyLight", tscn);
+        Assert.DoesNotContain("FillLight", tscn);
+        Assert.DoesNotContain("WorldEnvironment", tscn);
+        Assert.DoesNotContain("world_env", tscn);
+    }
+
     // --- Controller / poller / binder tests ---
 
     [Fact]
@@ -393,18 +403,17 @@ public class TscnWriterTests
     // --- load_steps ---
 
     [Fact]
-    public void Write_LoadSteps_EqualsExtResourcesPlusSubResourcesPlusWorldEnv()
+    public void Write_LoadSteps_EqualsExtResourcesPlusSubResources()
     {
-        // MinimalLayout: 1 Bar shape, no camera.
+        // MinimalLayout: 1 Bar shape.
         // ext_resources (9): controller_script, metric_poller_script, scene_binder_script,
         //                     metric_group_script, metric_grid_script, ground_bezel_script,
         //                     bar_scene, bindable_script, binding_res_script
         // sub_resources (1): binding for CPU_User
         // ambient labels (2): TimestampLabel, HostnameLabel
-        // WorldEnvironment (1)
-        // = 9 + 1 + 2 + 1 = 13
+        // = 9 + 1 + 2 = 12
         var tscn = TscnWriter.Write(MinimalLayout());
-        Assert.Contains("load_steps=13 ", tscn);
+        Assert.Contains("load_steps=12 ", tscn);
     }
 
     // --- PlacedStack emission tests ---
@@ -502,9 +511,9 @@ public class TscnWriterTests
         //                      metric_group_script, metric_grid_script, ground_bezel_script,
         //                      bar_scene, bindable, binding_res, stack_group_script
         // sub_resources (3): one binding per member
-        // ambient (2), WorldEnv (1)
-        // = 10 + 3 + 2 + 1 = 16
+        // ambient (2)
+        // = 10 + 3 + 2 = 15
         var tscn = TscnWriter.Write(LayoutWithCpuStack());
-        Assert.Contains("load_steps=16 ", tscn);
+        Assert.Contains("load_steps=15 ", tscn);
     }
 }

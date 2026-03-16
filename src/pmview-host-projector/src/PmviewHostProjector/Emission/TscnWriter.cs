@@ -26,7 +26,6 @@ public static class TscnWriter
         WriteExtResources(sb, registry);
         WriteSubResources(sb, subResources);
         WriteAmbientSubResources(sb, ambientLabels);
-        WriteWorldEnvironmentSubResource(sb);
         WriteNodes(sb, layout, registry, subResources, ambientLabels, pmproxyEndpoint);
 
         return sb.ToString();
@@ -97,8 +96,7 @@ public static class TscnWriter
         List<SubResourceEntry> subResources,
         IReadOnlyList<AmbientLabelSpec> ambientLabels)
     {
-        // +1 for WorldEnvironment Environment sub_resource only.
-        var loadSteps = registry.Count + subResources.Count + ambientLabels.Count + 1;
+        var loadSteps = registry.Count + subResources.Count + ambientLabels.Count;
         sb.AppendLine($"[gd_scene load_steps={loadSteps} format=3]");
         sb.AppendLine();
     }
@@ -158,17 +156,6 @@ public static class TscnWriter
         }
     }
 
-    private static void WriteWorldEnvironmentSubResource(StringBuilder sb)
-    {
-        sb.AppendLine("[sub_resource type=\"Environment\" id=\"world_env\"]");
-        sb.AppendLine("background_mode = 1");
-        sb.AppendLine("background_color = Color(0.02, 0.02, 0.06, 1)");
-        sb.AppendLine("ambient_light_source = 1");
-        sb.AppendLine("ambient_light_color = Color(0.4, 0.4, 0.5, 1)");
-        sb.AppendLine("ambient_light_energy = 0.5");
-        sb.AppendLine();
-    }
-
     // --- nodes ---
 
     private static void WriteNodes(StringBuilder sb, SceneLayout layout, ExtResourceRegistry registry,
@@ -188,23 +175,6 @@ public static class TscnWriter
 
         sb.AppendLine("[node name=\"SceneBinder\" type=\"Node\" parent=\".\"]");
         sb.AppendLine("script = ExtResource(\"scene_binder_script\")");
-        sb.AppendLine();
-
-        sb.AppendLine("[node name=\"WorldEnvironment\" type=\"WorldEnvironment\" parent=\".\"]");
-        sb.AppendLine("environment = SubResource(\"world_env\")");
-        sb.AppendLine();
-
-        // Key light: front-above at ~45° pitch, illuminates camera-facing surfaces
-        sb.AppendLine("[node name=\"KeyLight\" type=\"DirectionalLight3D\" parent=\".\"]");
-        sb.AppendLine("transform = Transform3D(1, 0, 0, 0, 0.707, -0.707, 0, 0.707, 0.707, 0, 0, 0)");
-        sb.AppendLine("light_energy = 1.2");
-        sb.AppendLine("shadow_enabled = true");
-        sb.AppendLine();
-
-        // Fill light: from rear-above at ~30° pitch, lifts the back and side faces out of shadow
-        sb.AppendLine("[node name=\"FillLight\" type=\"DirectionalLight3D\" parent=\".\"]");
-        sb.AppendLine("transform = Transform3D(-1, 0, 0, 0, 0.866, 0.5, 0, 0.5, -0.866, 0, 0, 0)");
-        sb.AppendLine("light_energy = 0.5");
         sb.AppendLine();
 
         foreach (var zone in layout.Zones)
