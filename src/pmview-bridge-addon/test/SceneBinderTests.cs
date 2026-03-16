@@ -413,12 +413,14 @@ public partial class SceneBinderTests
 
 		// First update: snaps since no prior smooth value (source 100 → target 5.0)
 		binder.ApplyMetrics(MakeSingularMetrics("test.metric", 100.0));
-		await runner.AwaitIdleFrame();
+		binder.AdvanceInterpolations(0.016f); // apply the snapped value
 		AssertThat(node3D.Scale.Y).IsEqualApprox(5.0f, 0.01f);
 
 		// Second update: target moves to 0.2 — should NOT immediately snap
 		binder.ApplyMetrics(MakeSingularMetrics("test.metric", 0.0));
 		AssertThat(node3D.Scale.Y).IsGreater(4.0f);
+
+		await runner.AwaitIdleFrame();
 	}
 
 	[TestCase]
