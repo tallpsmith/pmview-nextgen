@@ -355,6 +355,38 @@ public partial class SceneBinderTests
 		await runner.AwaitIdleFrame();
 	}
 
+	// ── Deterministic animation advancement ─────────────────────────────
+
+	[TestCase]
+	[RequireGodotRuntime]
+	public async Task AdvanceRotations_AppliesDeltaScaledRotation()
+	{
+		var runner = ISceneRunner.Load("res://test/scenes/test_node3d.tscn");
+		var node3D = (Node3D)runner.Scene();
+		var binder = new SceneBinder();
+		runner.Scene().AddChild(binder);
+
+		var bindable = new PcpBindable();
+		var binding = new PcpBindingResource
+		{
+			MetricName = "test.metric",
+			TargetProperty = "rotation_speed",
+			SourceRangeMin = 0f, SourceRangeMax = 100f,
+			TargetRangeMin = 0f, TargetRangeMax = 360f,
+			InitialValue = 50f
+		};
+		bindable.PcpBindings = new Godot.Collections.Array<PcpBindingResource> { binding };
+		node3D.AddChild(bindable);
+		binder.BindFromSceneProperties(node3D);
+
+		var rotationBefore = node3D.Rotation.Y;
+		binder.AdvanceRotations(1.0f); // 1 second at 180 deg/s
+		var rotationAfter = node3D.Rotation.Y;
+
+		AssertThat(rotationAfter).IsNotEqual(rotationBefore);
+		await runner.AwaitIdleFrame();
+	}
+
 	// ── Smooth interpolation ─────────────────────────────────────────────
 
 	[TestCase]
