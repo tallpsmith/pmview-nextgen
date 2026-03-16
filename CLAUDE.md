@@ -88,3 +88,4 @@ C# (.NET 8.0) for Godot libraries, C# (.NET 10.0) for CLI/tests; GDScript for sc
    This ensures CI failures are caught and surfaced immediately rather than discovered later.
 
 <!-- MANUAL ADDITIONS END -->
+

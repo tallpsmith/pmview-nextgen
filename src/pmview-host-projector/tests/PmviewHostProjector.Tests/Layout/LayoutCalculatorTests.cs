@@ -68,12 +68,36 @@ public class LayoutCalculatorForegroundTests
     }
 
     [Fact]
-    public void Calculate_CpuZone_HasThreeShapes_NoStacks()
+    public void Calculate_CpuZone_HasOneStack_NoStandaloneShapes()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
         var cpu = layout.Zones.Single(z => z.Name == "CPU");
-        Assert.Equal(3, cpu.Shapes.Count);
-        Assert.Empty(cpu.Items.OfType<PlacedStack>());
+        Assert.Empty(cpu.Shapes);
+        Assert.Single(cpu.Items.OfType<PlacedStack>());
+    }
+
+    [Fact]
+    public void Calculate_CpuZone_HasOneStack_WithThreeMembers()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var cpu = layout.Zones.Single(z => z.Name == "CPU");
+        var stacks = cpu.Items.OfType<PlacedStack>().ToList();
+        Assert.Single(stacks);
+        Assert.Equal(3, stacks[0].Members.Count);
+    }
+
+    [Fact]
+    public void Calculate_CpuZone_StackMembers_HaveCorrectColours()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var cpu = layout.Zones.Single(z => z.Name == "CPU");
+        var stack = cpu.Items.OfType<PlacedStack>().Single();
+        var members = stack.Members;
+
+        // Bottom-to-top: Sys (red), User (green), Nice (cyan)
+        Assert.True(members[0].Colour.R > 0.9f, "Sys should be red");
+        Assert.True(members[1].Colour.G > 0.5f, "User should be green");
+        Assert.True(members[2].Colour.G > 0.5f && members[2].Colour.B > 0.5f, "Nice should be cyan");
     }
 
     [Fact]
@@ -162,20 +186,43 @@ public class LayoutCalculatorForegroundTests
     }
 
     [Fact]
-    public void Calculate_CpuZone_HasMetricLabels()
+    public void Calculate_CpuZone_MetricLabels_CollapsedToStackGroupName()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
         var cpu = layout.Zones.Single(z => z.Name == "CPU");
-        Assert.Equal(new[] { "User", "Sys", "Nice" }, cpu.MetricLabels);
+        // All 3 metrics are in one stack group "CPU" → 1 visual column label
+        Assert.Equal(new[] { "CPU" }, cpu.MetricLabels);
     }
 
     [Fact]
-    public void Calculate_CpuZone_GroundWidthIsNominalFromMetricCount()
+    public void Calculate_CpuZone_GroundWidthReflectsOneStackColumn()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
         var cpu = layout.Zones.Single(z => z.Name == "CPU");
-        // CPU has 3 metrics → nominal width = (3-1)*1.2 + 0.8 + 1.2 = 4.4
-        Assert.True(cpu.GroundWidth > 2f, $"CPU GroundWidth {cpu.GroundWidth} should reflect 3-metric zone");
+        // CPU has 3 metrics in 1 stack group = 1 visual column
+        // width = (1-1)*1.2 + 0.8 + 1.2 = 2.0
+        Assert.Equal(2.0f, cpu.GroundWidth, 0.01f);
+    }
+
+    [Fact]
+    public void Calculate_StackedForegroundZone_GroundWidthReflectsVisualColumns()
+    {
+        // 3 metrics in 1 stack group = 1 visual column, not 3.
+        var zone = new ZoneDefinition(
+            Name: "Test", Row: ZoneRow.Foreground, Type: ZoneType.Aggregate,
+            Metrics:
+            [
+                new("m.a", ShapeType.Bar, "A", new RgbColour(1, 0, 0), 0f, 100f, 0.2f, 5.0f),
+                new("m.b", ShapeType.Bar, "B", new RgbColour(0, 1, 0), 0f, 100f, 0.2f, 5.0f),
+                new("m.c", ShapeType.Bar, "C", new RgbColour(0, 0, 1), 0f, 100f, 0.2f, 5.0f),
+            ],
+            StackGroups: [new MetricStackGroupDefinition("Stack", StackMode.Proportional, ["A", "B", "C"])]);
+
+        var layout = LayoutCalculator.Calculate([zone], MakeTopology());
+        var placed = layout.Zones.Single(z => z.Name == "Test");
+
+        // 1 visual column: width = (1-1)*spacing + 0.8 + padding*2 = 2.0
+        Assert.Equal(2.0f, placed.GroundWidth, 0.01f);
     }
 
     [Fact]
@@ -215,19 +262,22 @@ public class LayoutCalculatorBackgroundTests
     }
 
     [Fact]
-    public void Calculate_PerCpuZone_MetricLabelsCountEqualsMetricCount()
+    public void Calculate_PerCpuZone_MetricLabelsCountEqualsVisualColumns()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology(cpus: 4));
         var perCpu = layout.Zones.Single(z => z.Name == "Per-CPU");
-        Assert.Equal(3, perCpu.MetricLabels?.Count);
+        // 3 metrics in 1 stack group = 1 visual column label
+        Assert.Equal(1, perCpu.MetricLabels?.Count);
     }
 
     [Fact]
-    public void Calculate_PerCpuZone_ShapeCountEqualsInstancesTimesMetrics()
+    public void Calculate_PerCpuZone_StackCountEqualsInstances()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology(cpus: 4));
         var perCpu = layout.Zones.Single(z => z.Name == "Per-CPU");
-        Assert.Equal(12, perCpu.Shapes.Count);
+        // With stacking: 4 stacks (1 per CPU), 0 standalone shapes
+        Assert.Empty(perCpu.Shapes);
+        Assert.Equal(4, perCpu.Items.OfType<PlacedStack>().Count());
     }
 
     [Fact]
@@ -235,17 +285,21 @@ public class LayoutCalculatorBackgroundTests
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology(cpus: 2));
         var perCpu = layout.Zones.Single(z => z.Name == "Per-CPU");
-        var names = perCpu.Shapes.Select(s => s.InstanceName).Distinct().ToList();
+        // Per-CPU is now stacked — instance names are on the stack members
+        var names = perCpu.Items.OfType<PlacedStack>()
+            .SelectMany(s => s.Members)
+            .Select(m => m.InstanceName)
+            .Distinct().ToList();
         Assert.Contains("cpu0", names);
         Assert.Contains("cpu1", names);
     }
 
     [Fact]
-    public void Calculate_BackgroundShapes_LocalPositionsAreZero()
+    public void Calculate_BackgroundItems_LocalPositionsAreZero()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
         var perCpu = layout.Zones.Single(z => z.Name == "Per-CPU");
-        Assert.All(perCpu.Shapes, s => Assert.Equal(Vec3.Zero, s.LocalPosition));
+        Assert.All(perCpu.Items, item => Assert.Equal(Vec3.Zero, item.LocalPosition));
     }
 
     [Fact]
@@ -292,11 +346,12 @@ public class LayoutCalculatorBackgroundTests
     }
 
     [Fact]
-    public void Calculate_PerCpuZone_HasMetricLabels()
+    public void Calculate_PerCpuZone_MetricLabels_CollapsedToStackGroupName()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology(cpus: 2));
         var perCpu = layout.Zones.Single(z => z.Name == "Per-CPU");
-        Assert.Equal(new[] { "User", "Sys", "Nice" }, perCpu.MetricLabels);
+        // All 3 metrics are in one stack group "CPU" → 1 visual column label
+        Assert.Equal(new[] { "CPU" }, perCpu.MetricLabels);
     }
 
     [Fact]
@@ -305,6 +360,58 @@ public class LayoutCalculatorBackgroundTests
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology(cpus: 2));
         var perCpu = layout.Zones.Single(z => z.Name == "Per-CPU");
         Assert.Equal(new[] { "cpu0", "cpu1" }, perCpu.InstanceLabels);
+    }
+
+    [Fact]
+    public void Calculate_PerCpuZone_WithStacking_EmitsOneStackPerInstance()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology(cpus: 4));
+        var perCpu = layout.Zones.Single(z => z.Name == "Per-CPU");
+        var stacks = perCpu.Items.OfType<PlacedStack>().ToList();
+        Assert.Equal(4, stacks.Count);
+        Assert.All(stacks, s => Assert.Equal(3, s.Members.Count));
+    }
+
+    [Fact]
+    public void Calculate_PerCpuZone_StackMembers_HaveInstanceNames()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology(cpus: 2));
+        var perCpu = layout.Zones.Single(z => z.Name == "Per-CPU");
+        var stacks = perCpu.Items.OfType<PlacedStack>().ToList();
+        Assert.Equal(2, stacks.Count);
+
+        // Each stack's members should all have the same instance name
+        foreach (var stack in stacks)
+        {
+            var instanceNames = stack.Members.Select(m => m.InstanceName).Distinct().ToList();
+            Assert.Single(instanceNames);
+        }
+
+        var allInstances = stacks.SelectMany(s => s.Members).Select(m => m.InstanceName).Distinct().ToList();
+        Assert.Contains("cpu0", allInstances);
+        Assert.Contains("cpu1", allInstances);
+    }
+
+    [Fact]
+    public void Calculate_StackedBackgroundZone_GroundWidthReflectsVisualColumns()
+    {
+        // 3 metrics in 1 stack group per instance = 1 visual column, not 3.
+        var zone = new ZoneDefinition(
+            Name: "TestBg", Row: ZoneRow.Background, Type: ZoneType.PerInstance,
+            Metrics:
+            [
+                new("kernel.percpu.cpu.sys",  ShapeType.Bar, "Sys",  new RgbColour(1, 0, 0), 0f, 100f, 0.2f, 5.0f),
+                new("kernel.percpu.cpu.user", ShapeType.Bar, "User", new RgbColour(0, 1, 0), 0f, 100f, 0.2f, 5.0f),
+                new("kernel.percpu.cpu.nice", ShapeType.Bar, "Nice", new RgbColour(0, 0, 1), 0f, 100f, 0.2f, 5.0f),
+            ],
+            InstanceMetricSource: "kernel.percpu.cpu.user",
+            StackGroups: [new MetricStackGroupDefinition("CPU", StackMode.Proportional, ["Sys", "User", "Nice"])]);
+
+        var layout = LayoutCalculator.Calculate([zone], MakeTopology(cpus: 2));
+        var placed = layout.Zones.Single(z => z.Name == "TestBg");
+
+        // 1 visual column: width = (1-1)*ColumnSpacing + 0.8 + padding*2 = 2.0
+        Assert.Equal(2.0f, placed.GroundWidth, 0.01f);
     }
 
     [Fact]
