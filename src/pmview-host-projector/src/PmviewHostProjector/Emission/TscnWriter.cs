@@ -14,15 +14,11 @@ public static class TscnWriter
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
     public static string Write(SceneLayout layout,
-        string pmproxyEndpoint = "http://localhost:44322",
-        CameraSetup? camera = null)
+        string pmproxyEndpoint = "http://localhost:44322")
     {
         var sb = new StringBuilder();
         var registry = new ExtResourceRegistry();
         RegisterControllerResources(registry);
-        if (camera != null)
-            registry.Require("camera_orbit_script", "Script",
-                "res://addons/pmview-bridge/camera_orbit.gd");
         var subResources = CollectSubResources(layout, registry);
         var ambientLabels = BuildAmbientLabels();
 
@@ -31,7 +27,7 @@ public static class TscnWriter
         WriteSubResources(sb, subResources);
         WriteAmbientSubResources(sb, ambientLabels);
         WriteWorldEnvironmentSubResource(sb);
-        WriteNodes(sb, layout, registry, subResources, ambientLabels, pmproxyEndpoint, camera);
+        WriteNodes(sb, layout, registry, subResources, ambientLabels, pmproxyEndpoint);
 
         return sb.ToString();
     }
@@ -178,7 +174,7 @@ public static class TscnWriter
     private static void WriteNodes(StringBuilder sb, SceneLayout layout, ExtResourceRegistry registry,
         List<SubResourceEntry> subResources,
         IReadOnlyList<AmbientLabelSpec> ambientLabels,
-        string pmproxyEndpoint, CameraSetup? camera)
+        string pmproxyEndpoint)
     {
         sb.AppendLine("[node name=\"HostView\" type=\"Node3D\"]");
         sb.AppendLine("script = ExtResource(\"controller_script\")");
@@ -215,9 +211,6 @@ public static class TscnWriter
             WriteZone(sb, zone, registry, subResources);
 
         WriteAmbientLabels(sb, ambientLabels);
-
-        if (camera != null)
-            WriteCameraNode(sb, camera);
     }
 
     private static void WriteAmbientLabels(StringBuilder sb,
@@ -255,34 +248,6 @@ public static class TscnWriter
             sb.AppendLine($"PcpBindings = Array[ExtResource(\"binding_res_script\")]([SubResource(\"{label.SubResourceId}\")])");
             sb.AppendLine();
         }
-    }
-
-    private static void WriteCameraNode(StringBuilder sb, CameraSetup camera)
-    {
-        var transform = BuildLookAtTransform(camera.Position, camera.LookAtTarget);
-        var c = camera.LookAtTarget;
-        sb.AppendLine("[node name=\"Camera3D\" type=\"Camera3D\" parent=\".\"]");
-        sb.AppendLine("script = ExtResource(\"camera_orbit_script\")");
-        sb.AppendLine($"transform = {transform}");
-        sb.AppendLine($"orbit_center = Vector3({F(c.X)}, {F(c.Y)}, {F(c.Z)})");
-        sb.AppendLine();
-    }
-
-    private static string BuildLookAtTransform(Vec3 eye, Vec3 target)
-    {
-        var fwd = Normalise(eye.X - target.X, eye.Y - target.Y, eye.Z - target.Z);
-        var right = Normalise(fwd.Z, 0f, -fwd.X);
-        var up = (
-            X: fwd.Y * right.Z - fwd.Z * right.Y,
-            Y: fwd.Z * right.X - fwd.X * right.Z,
-            Z: fwd.X * right.Y - fwd.Y * right.X);
-        return $"Transform3D({F(right.X)}, {F(up.X)}, {F(fwd.X)}, {F(right.Y)}, {F(up.Y)}, {F(fwd.Y)}, {F(right.Z)}, {F(up.Z)}, {F(fwd.Z)}, {F(eye.X)}, {F(eye.Y)}, {F(eye.Z)})";
-    }
-
-    private static (float X, float Y, float Z) Normalise(float x, float y, float z)
-    {
-        var len = MathF.Sqrt(x * x + y * y + z * z);
-        return len > 0f ? (x / len, y / len, z / len) : (0f, 0f, 1f);
     }
 
     private static void WriteZone(StringBuilder sb, PlacedZone zone,

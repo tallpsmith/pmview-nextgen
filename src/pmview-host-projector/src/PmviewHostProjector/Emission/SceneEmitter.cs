@@ -15,8 +15,6 @@ public static class SceneEmitter
     public static string Emit(SceneLayout layout,
         string pmproxyEndpoint = "http://localhost:44322")
     {
-        var bounds = SceneBounds.FromLayout(layout);
-        var camera = WorldSetup.ComputeCamera(bounds);
-        return TscnWriter.Write(layout, pmproxyEndpoint, camera);
+        return TscnWriter.Write(layout, pmproxyEndpoint);
     }
 }
