@@ -12,7 +12,6 @@ config_version=5
 
 config/name="pmview-nextgen"
 config/description="PCP performance metrics as living 3D environments"
-run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.6", "C#", "Forward Plus")
 
 [display]
