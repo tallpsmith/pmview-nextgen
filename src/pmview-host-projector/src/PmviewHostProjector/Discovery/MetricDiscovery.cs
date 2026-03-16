@@ -37,8 +37,8 @@ public static class MetricDiscovery
             Os: os,
             Hostname: hostname,
             CpuInstances: cpuDomain.Instances.Select(i => i.Name).ToList(),
-            DiskDevices: diskDomain.Instances.Select(i => i.Name).ToList(),
-            NetworkInterfaces: netDomain.Instances.Select(i => i.Name).ToList(),
+            DiskDevices: FilterDiskDevices(diskDomain.Instances.Select(i => i.Name)),
+            NetworkInterfaces: FilterNetworkInterfaces(netDomain.Instances.Select(i => i.Name)),
             PhysicalMemoryBytes: physmem);
     }
 
@@ -59,6 +59,20 @@ public static class MetricDiscovery
         if (iv.IsString) return null;
         return (long)(iv.Value * 1024);  // KB → bytes
     }
+
+    internal static IReadOnlyList<string> FilterDiskDevices(IEnumerable<string> devices) =>
+        devices
+            .Where(d => !d.StartsWith("loop", StringComparison.Ordinal))
+            .Where(d => !d.StartsWith("dm-",  StringComparison.Ordinal))
+            .ToList();
+
+    internal static IReadOnlyList<string> FilterNetworkInterfaces(IEnumerable<string> interfaces) =>
+        interfaces
+            .Where(i => i != "lo")
+            .Where(i => !i.StartsWith("veth", StringComparison.Ordinal))
+            .Where(i => !i.StartsWith("cni",  StringComparison.Ordinal))
+            .Where(i => !i.StartsWith("br-",  StringComparison.Ordinal))
+            .ToList();
 
     private static HostOs ParseOs(string sysname) => sysname switch
     {

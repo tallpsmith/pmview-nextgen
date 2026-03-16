@@ -355,6 +355,38 @@ public partial class SceneBinderTests
 		await runner.AwaitIdleFrame();
 	}
 
+	// ── Deterministic animation advancement ─────────────────────────────
+
+	[TestCase]
+	[RequireGodotRuntime]
+	public async Task AdvanceRotations_AppliesDeltaScaledRotation()
+	{
+		var runner = ISceneRunner.Load("res://test/scenes/test_node3d.tscn");
+		var node3D = (Node3D)runner.Scene();
+		var binder = new SceneBinder();
+		runner.Scene().AddChild(binder);
+
+		var bindable = new PcpBindable();
+		var binding = new PcpBindingResource
+		{
+			MetricName = "test.metric",
+			TargetProperty = "rotation_speed",
+			SourceRangeMin = 0f, SourceRangeMax = 100f,
+			TargetRangeMin = 0f, TargetRangeMax = 360f,
+			InitialValue = 50f
+		};
+		bindable.PcpBindings = new Godot.Collections.Array<PcpBindingResource> { binding };
+		node3D.AddChild(bindable);
+		binder.BindFromSceneProperties(node3D);
+
+		var rotationBefore = node3D.Rotation.Y;
+		binder.AdvanceRotations(1.0f); // 1 second at 180 deg/s
+		var rotationAfter = node3D.Rotation.Y;
+
+		AssertThat(rotationAfter).IsNotEqual(rotationBefore);
+		await runner.AwaitIdleFrame();
+	}
+
 	// ── Smooth interpolation ─────────────────────────────────────────────
 
 	[TestCase]
@@ -381,12 +413,14 @@ public partial class SceneBinderTests
 
 		// First update: snaps since no prior smooth value (source 100 → target 5.0)
 		binder.ApplyMetrics(MakeSingularMetrics("test.metric", 100.0));
-		await runner.AwaitIdleFrame();
+		binder.AdvanceInterpolations(0.016f); // apply the snapped value
 		AssertThat(node3D.Scale.Y).IsEqualApprox(5.0f, 0.01f);
 
 		// Second update: target moves to 0.2 — should NOT immediately snap
 		binder.ApplyMetrics(MakeSingularMetrics("test.metric", 0.0));
 		AssertThat(node3D.Scale.Y).IsGreater(4.0f);
+
+		await runner.AwaitIdleFrame();
 	}
 
 	[TestCase]
@@ -413,15 +447,19 @@ public partial class SceneBinderTests
 
 		// First update: snap to high value
 		binder.ApplyMetrics(MakeSingularMetrics("test.metric", 100.0));
-		await runner.AwaitIdleFrame();
+		binder.AdvanceInterpolations(0.016f);
 
 		// Second update: target drops to minimum
 		binder.ApplyMetrics(MakeSingularMetrics("test.metric", 0.0));
 		var valueAfterUpdate = node3D.Scale.Y;
 
-		// Wait ~0.5 seconds worth of frames for interpolation to progress
-		await Task.Delay(500);
+		// Simulate 0.5s of frames (5 × 100ms) — deterministic, no Task.Delay
+		for (int i = 0; i < 5; i++)
+			binder.AdvanceInterpolations(0.1f);
+
 		AssertThat(node3D.Scale.Y).IsLess(valueAfterUpdate);
+
+		await runner.AwaitIdleFrame();
 	}
 
 	// ── Text binding ───────────────────────────────────────────────────────

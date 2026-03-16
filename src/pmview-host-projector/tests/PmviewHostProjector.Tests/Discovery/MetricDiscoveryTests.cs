@@ -89,4 +89,49 @@ public class MetricDiscoveryTests
         var topology = await MetricDiscovery.DiscoverAsync(stub);
         Assert.Empty(topology.DiskDevices);
     }
+
+    [Fact]
+    public async Task DiscoverAsync_DiskDevices_ExcludesLoopDevices()
+    {
+        var stub = new StubPcpClient();
+        stub.SetFetchStringResult("kernel.uname.sysname", "Linux");
+        stub.SetFetchStringResult("kernel.uname.nodename", "host");
+        stub.SetInstanceDomain("disk.dev.read_bytes", "sda", "loop0", "loop1", "loop2");
+        var topology = await MetricDiscovery.DiscoverAsync(stub);
+        Assert.Equal(["sda"], topology.DiskDevices);
+    }
+
+    [Fact]
+    public async Task DiscoverAsync_DiskDevices_ExcludesDmDevices()
+    {
+        var stub = new StubPcpClient();
+        stub.SetFetchStringResult("kernel.uname.sysname", "Linux");
+        stub.SetFetchStringResult("kernel.uname.nodename", "host");
+        stub.SetInstanceDomain("disk.dev.read_bytes", "sda", "sdb", "dm-0", "dm-1");
+        var topology = await MetricDiscovery.DiscoverAsync(stub);
+        Assert.Equal(["sda", "sdb"], topology.DiskDevices);
+    }
+
+    [Fact]
+    public async Task DiscoverAsync_NetworkInterfaces_ExcludesLoopback()
+    {
+        var stub = new StubPcpClient();
+        stub.SetFetchStringResult("kernel.uname.sysname", "Linux");
+        stub.SetFetchStringResult("kernel.uname.nodename", "host");
+        stub.SetInstanceDomain("network.interface.in.bytes", "eth0", "lo");
+        var topology = await MetricDiscovery.DiscoverAsync(stub);
+        Assert.Equal(["eth0"], topology.NetworkInterfaces);
+    }
+
+    [Fact]
+    public async Task DiscoverAsync_NetworkInterfaces_ExcludesContainerInterfaces()
+    {
+        var stub = new StubPcpClient();
+        stub.SetFetchStringResult("kernel.uname.sysname", "Linux");
+        stub.SetFetchStringResult("kernel.uname.nodename", "host");
+        stub.SetInstanceDomain("network.interface.in.bytes",
+            "eth0", "lo", "veth1a2b3c", "cni-podman0", "br-abc123");
+        var topology = await MetricDiscovery.DiscoverAsync(stub);
+        Assert.Equal(["eth0"], topology.NetworkInterfaces);
+    }
 }

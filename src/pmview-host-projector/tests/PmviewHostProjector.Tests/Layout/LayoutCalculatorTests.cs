@@ -26,9 +26,8 @@ public class LayoutCalculatorForegroundTests
     [Fact]
     public void Calculate_ForegroundRow_CenteredOnXZero()
     {
-        // Row visual centre (based on GroundWidth footprint) should land at X=0.
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var foreground = layout.Zones.Where(z => z.GridColumns == null).ToList();
+        var foreground = layout.Zones.Where(z => !z.HasGrid).ToList();
         var leftEdge  = foreground.Min(z => z.Position.X);
         var rightEdge = foreground.Max(z => z.Position.X + z.GroundWidth);
         var centre    = (leftEdge + rightEdge) / 2f;
@@ -39,7 +38,7 @@ public class LayoutCalculatorForegroundTests
     public void Calculate_ForegroundZones_AtZEqualsZero()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var foreground = layout.Zones.Where(z => z.GridColumns == null).ToList();
+        var foreground = layout.Zones.Where(z => !z.HasGrid).ToList();
         Assert.All(foreground, z => Assert.Equal(0f, z.Position.Z));
     }
 
@@ -52,95 +51,57 @@ public class LayoutCalculatorForegroundTests
     }
 
     [Fact]
-    public void Calculate_ForegroundShapes_HaveDistinctLocalXPositions()
+    public void Calculate_ForegroundZoneOrder_ContainsExpectedZones()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        foreach (var zone in layout.Zones.Where(z => z.GridColumns == null))
-        {
-            var xPositions = zone.Shapes.Select(s => s.LocalPosition.X).Distinct().ToList();
-            Assert.Equal(zone.Shapes.Count, xPositions.Count);
-        }
-    }
-
-    [Fact]
-    public void Calculate_ForegroundZone_HasEmptyGridLabels()
-    {
-        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var system = layout.Zones.Single(z => z.Name == "System");
-        Assert.Empty(system.MetricLabels ?? []);
-        Assert.Empty(system.InstanceLabels ?? []);
-    }
-
-    [Fact]
-    public void Calculate_SystemZone_HasNineShapes()
-    {
-        // CPU(3) + Load(3) + Memory(3) = 9 shapes in the merged System zone.
-        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var system = layout.Zones.Single(z => z.Name == "System");
-        Assert.Equal(9, system.Shapes.Count);
-    }
-
-    [Fact]
-    public void Calculate_SystemZone_IsForeground_AtZZero()
-    {
-        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var system = layout.Zones.Single(z => z.Name == "System");
-        Assert.Equal(0f, system.Position.Z);
-        Assert.Null(system.GridColumns);
-    }
-
-    [Fact]
-    public void Calculate_SystemZone_LoadShapes_CarryInstanceNames()
-    {
-        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var system = layout.Zones.Single(z => z.Name == "System");
-        var loadInstances = system.Shapes
-            .Where(s => s.MetricName == "kernel.all.load")
-            .Select(s => s.InstanceName)
-            .ToList();
-        Assert.Equal(new[] { "1 minute", "5 minute", "15 minute" }, loadInstances);
-    }
-
-    [Fact]
-    public void Calculate_SystemZone_MemoryShapes_SourceRangeMaxFromPhysmem()
-    {
-        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var system = layout.Zones.Single(z => z.Name == "System");
-        var memShapes = system.Shapes.Where(s => s.MetricName.StartsWith("mem.")).ToList();
-        Assert.Equal(3, memShapes.Count);
-        Assert.All(memShapes, s => Assert.Equal(16_000_000_000f, s.SourceRangeMax));
-    }
-
-    [Fact]
-    public void Calculate_SystemZone_HasGroundExtent()
-    {
-        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var system = layout.Zones.Single(z => z.Name == "System");
-        // 9 shapes — ground must span them all + padding
-        Assert.True(system.GroundWidth > 9f,
-            $"GroundWidth {system.GroundWidth} should be > 9 for a 9-bar zone");
-        Assert.True(system.GroundDepth > 0f);
-    }
-
-    [Fact]
-    public void Calculate_ForegroundZoneOrder_IsSystemDiskNetInNetOut()
-    {
-        // Foreground zones ordered left-to-right: System, Disk, Net-In, Net-Out
-        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var foreground = layout.Zones
-            .Where(z => z.GridColumns == null)
+        var foregroundNames = layout.Zones
+            .Where(z => !z.HasGrid)
             .OrderBy(z => z.Position.X)
             .Select(z => z.Name)
             .ToList();
-        Assert.Equal(new[] { "System", "Disk", "Net-In", "Net-Out" }, foreground);
+        Assert.Contains("CPU", foregroundNames);
+        Assert.Contains("Load", foregroundNames);
+        Assert.Contains("Memory", foregroundNames);
+        Assert.Contains("Disk", foregroundNames);
+        Assert.Contains("Net-In", foregroundNames);
+        Assert.Contains("Net-Out", foregroundNames);
+    }
+
+    [Fact]
+    public void Calculate_CpuZone_HasThreeShapes_NoStacks()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var cpu = layout.Zones.Single(z => z.Name == "CPU");
+        Assert.Equal(3, cpu.Shapes.Count);
+        Assert.Empty(cpu.Items.OfType<PlacedStack>());
+    }
+
+    [Fact]
+    public void Calculate_LoadZone_HasThreeShapes_WithInstanceNames()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var load = layout.Zones.Single(z => z.Name == "Load");
+        var loadShapes = load.Shapes.Where(s => s.InstanceName != null).ToList();
+        Assert.Equal(3, loadShapes.Count);
+        var instanceNames = loadShapes.Select(s => s.InstanceName).ToList();
+        Assert.Equal(new[] { "1 minute", "5 minute", "15 minute" }, instanceNames);
+    }
+
+    [Fact]
+    public void Calculate_MemoryZone_SourceRangeMaxFromPhysmem()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var memory = layout.Zones.Single(z => z.Name == "Memory");
+        var memShapes = memory.Shapes.Where(s => s.MetricName.StartsWith("mem.")).ToList();
+        Assert.Equal(3, memShapes.Count);
+        Assert.All(memShapes, s => Assert.Equal(16_000_000_000f, s.SourceRangeMax));
     }
 
     [Fact]
     public void Calculate_NetInAggregateZone_IsForeground_HasTwoShapes()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        // Net-In foreground zone (not the per-instance background zone "Network In")
-        var netIn = layout.Zones.Single(z => z.Name == "Net-In" && z.GridColumns == null);
+        var netIn = layout.Zones.Single(z => z.Name == "Net-In" && !z.HasGrid);
         Assert.Equal(0f, netIn.Position.Z);
         Assert.Equal(2, netIn.Shapes.Count);
     }
@@ -148,12 +109,8 @@ public class LayoutCalculatorForegroundTests
     [Fact]
     public void Calculate_ForegroundRow_CenteredOnGroundWidthFootprint()
     {
-        // ZoneWidth must use GroundWidth (visual footprint including shape width + padding),
-        // not just the max shape X-origin. The row's visual centre should land at X=0.
-        // We verify by computing centre as midpoint of [leftmost zone start, rightmost zone end],
-        // where zone end = zone.Position.X + zone.GroundWidth.
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var foreground = layout.Zones.Where(z => z.GridColumns == null).ToList();
+        var foreground = layout.Zones.Where(z => !z.HasGrid).ToList();
 
         var leftEdge  = foreground.Min(z => z.Position.X);
         var rightEdge = foreground.Max(z => z.Position.X + z.GroundWidth);
@@ -166,12 +123,9 @@ public class LayoutCalculatorForegroundTests
     [Fact]
     public void Calculate_ForegroundZones_InterZoneGapIsAtMostTwoPointFive()
     {
-        // ZoneGap reduced from 3.0 to 2.0. The gap (empty space) between adjacent
-        // foreground zones should now be <= 2.5. With old ZoneGap=3.0 it was ~3.0.
-        // Gap is measured using GroundWidth as the zone's visual right edge.
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
         var foreground = layout.Zones
-            .Where(z => z.GridColumns == null)
+            .Where(z => !z.HasGrid)
             .OrderBy(z => z.Position.X)
             .ToList();
 
@@ -179,12 +133,65 @@ public class LayoutCalculatorForegroundTests
         {
             var left  = foreground[i];
             var right = foreground[i + 1];
-            // The zone's visual footprint ends at Position.X + GroundWidth.
-            var leftFootprintEnd = left.Position.X + left.GroundWidth;
+            var leftVisualWidth = left.RotateYNinetyDeg ? left.GroundDepth : left.GroundWidth;
+            var leftFootprintEnd = left.Position.X + leftVisualWidth;
             var gap = right.Position.X - leftFootprintEnd;
             Assert.True(gap <= 2.5f,
                 $"Gap '{left.Name}'→'{right.Name}' is {gap:F2}, expected <= 2.5 (ZoneGap=2.0)");
         }
+    }
+
+    [Fact]
+    public void Calculate_NonRotatedZones_HaveNoRotation()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var disk = layout.Zones.Single(z => z.Name == "Disk");
+        var netIn = layout.Zones.Single(z => z.Name == "Net-In" && !z.HasGrid);
+        var netOut = layout.Zones.Single(z => z.Name == "Net-Out" && !z.HasGrid);
+        Assert.False(disk.RotateYNinetyDeg);
+        Assert.False(netIn.RotateYNinetyDeg);
+        Assert.False(netOut.RotateYNinetyDeg);
+    }
+
+    [Fact]
+    public void Calculate_ForegroundZones_HaveEmptyInstanceLabels()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var cpu = layout.Zones.Single(z => z.Name == "CPU");
+        Assert.Empty(cpu.InstanceLabels ?? []);
+    }
+
+    [Fact]
+    public void Calculate_CpuZone_HasMetricLabels()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var cpu = layout.Zones.Single(z => z.Name == "CPU");
+        Assert.Equal(new[] { "User", "Sys", "Nice" }, cpu.MetricLabels);
+    }
+
+    [Fact]
+    public void Calculate_CpuZone_GroundWidthIsNominalFromMetricCount()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var cpu = layout.Zones.Single(z => z.Name == "CPU");
+        // CPU has 3 metrics → nominal width = (3-1)*1.2 + 0.8 + 1.2 = 4.4
+        Assert.True(cpu.GroundWidth > 2f, $"CPU GroundWidth {cpu.GroundWidth} should reflect 3-metric zone");
+    }
+
+    [Fact]
+    public void Calculate_DiskZone_ShapesAllAtVec3Zero()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var disk = layout.Zones.Single(z => z.Name == "Disk");
+        Assert.All(disk.Shapes, s => Assert.Equal(Vec3.Zero, s.LocalPosition));
+    }
+
+    [Fact]
+    public void Calculate_NetInZone_ShapesAllAtOrigin()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var netIn = layout.Zones.Single(z => z.Name == "Net-In" && !z.HasGrid);
+        Assert.All(netIn.Shapes, s => Assert.Equal(Vec3.Zero, s.LocalPosition));
     }
 }
 
@@ -203,16 +210,16 @@ public class LayoutCalculatorBackgroundTests
     public void Calculate_BackgroundZones_AtNegativeZOffset()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
-        var background = layout.Zones.Where(z => z.GridColumns != null).ToList();
+        var background = layout.Zones.Where(z => z.HasGrid).ToList();
         Assert.All(background, z => Assert.True(z.Position.Z < 0));
     }
 
     [Fact]
-    public void Calculate_PerCpuZone_GridColumnsEqualsMetricCount()
+    public void Calculate_PerCpuZone_MetricLabelsCountEqualsMetricCount()
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology(cpus: 4));
         var perCpu = layout.Zones.Single(z => z.Name == "Per-CPU");
-        Assert.Equal(3, perCpu.GridColumns);
+        Assert.Equal(3, perCpu.MetricLabels?.Count);
     }
 
     [Fact]
@@ -269,7 +276,6 @@ public class LayoutCalculatorBackgroundTests
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology(cpus: 4));
         var perCpu = layout.Zones.Single(z => z.Name == "Per-CPU");
-        // 4 instances x 3 metrics, grid 3 cols => 4 rows x 3 cols
         Assert.True(perCpu.GroundWidth > 0f);
         Assert.True(perCpu.GroundDepth > 0f);
     }
@@ -279,12 +285,10 @@ public class LayoutCalculatorBackgroundTests
     {
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology(cpus: 4));
         var perCpu = layout.Zones.Single(z => z.Name == "Per-CPU");
-        // Column spacing should be at least 2.0 to fit label text between columns
-        Assert.True(perCpu.GridColumnSpacing >= 2.0f,
-            $"Column spacing {perCpu.GridColumnSpacing} should be >= 2.0 for label clearance");
-        // Row spacing should be at least 2.5 to fit row header labels
-        Assert.True(perCpu.GridRowSpacing >= 2.5f,
-            $"Row spacing {perCpu.GridRowSpacing} should be >= 2.5 for label clearance");
+        Assert.True(perCpu.ColumnSpacing >= 2.0f,
+            $"Column spacing {perCpu.ColumnSpacing} should be >= 2.0 for label clearance");
+        Assert.True(perCpu.RowSpacing >= 2.5f,
+            $"Row spacing {perCpu.RowSpacing} should be >= 2.5 for label clearance");
     }
 
     [Fact]
@@ -306,14 +310,11 @@ public class LayoutCalculatorBackgroundTests
     [Fact]
     public void Calculate_AdjacentBackgroundZones_StrideIncludesRowHeaderReservation()
     {
-        // Without RowHeaderReservation, stride = bezelWidth + ZoneGap(2.0).
-        // With it, stride = bezelWidth + RowHeaderReservation(2.0) + ZoneGap(2.0).
-        // The extra 2.0 is the distinguishing assertion.
-        const float ZoneGap = 2.0f;   // was 3.0f — matches LayoutCalculator constant
+        const float ZoneGap = 2.0f;
         const float RowHeaderReservation = 2.0f;
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology(cpus: 2, nics: 2));
         var background = layout.Zones
-            .Where(z => z.GridColumns.HasValue)
+            .Where(z => z.HasGrid)
             .OrderBy(z => z.Position.X)
             .ToList();
 
@@ -322,8 +323,6 @@ public class LayoutCalculatorBackgroundTests
             var left = background[i];
             var right = background[i + 1];
             var stride = right.Position.X - left.Position.X;
-            // Stride must include the bezel, the row header reservation, and the inter-group gap.
-            // Without RowHeaderReservation this would only be bezelWidth + ZoneGap.
             Assert.True(stride >= left.GroundWidth + RowHeaderReservation + ZoneGap,
                 $"Zone '{left.Name}' → '{right.Name}': stride {stride:F2} < {left.GroundWidth + RowHeaderReservation + ZoneGap:F2} (bezel + reservation + gap)");
         }

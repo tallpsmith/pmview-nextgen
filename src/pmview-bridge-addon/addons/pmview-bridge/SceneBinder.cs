@@ -41,13 +41,38 @@ public partial class SceneBinder : Node
 
 	public override void _Process(double delta)
 	{
+		AdvanceAnimations((float)delta);
+	}
+
+	/// <summary>
+	/// Advances all animation state by the given time delta.
+	/// Called by _Process; also callable directly from tests for deterministic control.
+	/// </summary>
+	internal void AdvanceAnimations(float delta)
+	{
+		AdvanceRotations(delta);
+		AdvanceInterpolations(delta);
+	}
+
+	/// <summary>
+	/// Applies delta-scaled rotation to all nodes with active rotation_speed bindings.
+	/// </summary>
+	internal void AdvanceRotations(float delta)
+	{
 		foreach (var (node, degreesPerSecond) in _rotationSpeeds)
 		{
 			if (IsInstanceValid(node))
-				node.RotateY(Mathf.DegToRad(degreesPerSecond) * (float)delta);
+				node.RotateY(Mathf.DegToRad(degreesPerSecond) * delta);
 		}
+	}
 
-		var smoothFactor = 1f - MathF.Exp(-(float)delta * SmoothSpeed);
+	/// <summary>
+	/// Advances exponential-decay interpolation toward smooth targets
+	/// and applies the updated values to node properties.
+	/// </summary>
+	internal void AdvanceInterpolations(float delta)
+	{
+		var smoothFactor = 1f - MathF.Exp(-delta * SmoothSpeed);
 		foreach (var key in _smoothValues.Keys.ToList())
 		{
 			if (!IsInstanceValid(key.TargetNode))

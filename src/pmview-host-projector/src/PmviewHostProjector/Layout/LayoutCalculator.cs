@@ -11,8 +11,8 @@ public static class LayoutCalculator
     private const float ShapeSpacing       = 1.2f;   // was 1.5f — tighter bar grouping
     private const float ZoneGap            = 2.0f;   // was 3.0f — less dead air between zones
     private const float BackgroundZOffset  = -8.0f;
-    private const float GridColumnSpacing  = 2.0f;
-    private const float GridRowSpacing     = 2.5f;
+    private const float ColumnSpacing  = 2.0f;
+    private const float RowSpacing     = 2.5f;
     private const long  FallbackMemoryBytes = 16_000_000_000L;
     private const float GroundPadding      = 0.6f;
     private const float RowHeaderReservation = 2.0f;
@@ -35,45 +35,43 @@ public static class LayoutCalculator
 
     private static PlacedZone PlaceZone(ZoneDefinition zone, HostTopology topology)
     {
-        var shapes = zone.Row == ZoneRow.Foreground
-            ? BuildForegroundShapes(zone, topology)
+        var items = zone.Row == ZoneRow.Foreground
+            ? BuildForegroundItems(zone, topology)
             : BuildBackgroundShapes(zone, topology);
 
-        var (groundWidth, groundDepth) = ComputeGroundExtent(zone, topology, shapes);
+        var (groundWidth, groundDepth) = ComputeGroundExtent(zone, topology, items);
 
-        var metricLabels = zone.Row == ZoneRow.Background
-            ? zone.Metrics.Select(m => m.Label).ToList()
-            : (IReadOnlyList<string>)[];
+        var metricLabels = zone.Metrics.Select(m => m.Label).ToList();
         var instanceLabels = zone.Row == ZoneRow.Background
             ? ResolveInstances(zone, topology).Select(ShortenInstanceName).ToList()
             : (IReadOnlyList<string>)[];
 
         // Position will be finalised by CenterRowOnXZero; use Zero for now.
         return new PlacedZone(
-            Name:              zone.Name,
-            ZoneLabel:         zone.Name,
-            Position:          Vec3.Zero,
-            GridColumns:       zone.Row == ZoneRow.Background ? zone.Metrics.Count : null,
-            GridColumnSpacing: zone.Row == ZoneRow.Background ? GridColumnSpacing : null,
-            GridRowSpacing:    zone.Row == ZoneRow.Background ? GridRowSpacing : null,
-            Shapes:            shapes,
-            GroundWidth:       groundWidth,
-            GroundDepth:       groundDepth,
-            MetricLabels:      metricLabels,
-            InstanceLabels:    instanceLabels);
+            Name:             zone.Name,
+            ZoneLabel:        zone.Name,
+            Position:         Vec3.Zero,
+            ColumnSpacing:    zone.Row == ZoneRow.Background ? ColumnSpacing : null,
+            RowSpacing:       zone.Row == ZoneRow.Background ? RowSpacing : null,
+            Items:            items,
+            GroundWidth:      groundWidth,
+            GroundDepth:      groundDepth,
+            MetricLabels:     metricLabels,
+            InstanceLabels:   instanceLabels,
+            RotateYNinetyDeg: zone.RotateYNinetyDeg);
     }
 
     private static (float Width, float Depth) ComputeGroundExtent(
         ZoneDefinition zone,
         HostTopology topology,
-        IReadOnlyList<PlacedShape> shapes)
+        IReadOnlyList<PlacedItem> items)
     {
-        if (shapes.Count == 0) return (0f, 0f);
+        if (items.Count == 0) return (0f, 0f);
 
         if (zone.Row == ZoneRow.Foreground)
         {
-            var maxX  = shapes.Max(s => s.LocalPosition.X);
-            var width = maxX + 0.8f + GroundPadding * 2;
+            // All shapes are at Vec3.Zero — use metric count for nominal extent.
+            var width = (zone.Metrics.Count - 1) * ShapeSpacing + 0.8f + GroundPadding * 2;
             var depth = 0.8f + GroundPadding * 2;
             return (width, depth);
         }
@@ -81,39 +79,88 @@ public static class LayoutCalculator
         {
             var cols  = zone.Metrics.Count;
             var rows  = ResolveInstances(zone, topology).Count;
-            var width = (cols - 1) * GridColumnSpacing + 0.8f + GroundPadding * 2;
-            var depth = (rows - 1) * GridRowSpacing    + 0.8f + GroundPadding * 2;
+            var width = (cols - 1) * ColumnSpacing + 0.8f + GroundPadding * 2;
+            var depth = (rows - 1) * RowSpacing    + 0.8f + GroundPadding * 2;
             return (width, depth);
         }
     }
 
-    private static IReadOnlyList<PlacedShape> BuildForegroundShapes(ZoneDefinition zone, HostTopology topology)
+    private static IReadOnlyList<PlacedItem> BuildForegroundItems(ZoneDefinition zone, HostTopology topology)
     {
-        var shapes = new List<PlacedShape>();
+        var items = new List<PlacedItem>();
+        var stackedLabels = StackedMetricLabels(zone);
+
+        // Track active stacks: label → PlacedStack being built.
+        var activeStacks = new Dictionary<string, (MetricStackGroupDefinition Def, List<PlacedShape> Members, Vec3 Position)>();
+
         for (int i = 0; i < zone.Metrics.Count; i++)
         {
-            var metric = zone.Metrics[i];
-            var localX = i * ShapeSpacing;
-            shapes.Add(new PlacedShape(
-                NodeName:       SanitiseNodeName($"{zone.Name}_{metric.Label}"),
-                Shape:          metric.Shape,
-                LocalPosition:  new Vec3(localX, 0f, 0f),
-                MetricName:     metric.MetricName,
-                InstanceName:   metric.InstanceName,
-                DisplayLabel:   metric.Label,
-                Colour:         metric.DefaultColour,
-                SourceRangeMin: metric.SourceRangeMin,
-                SourceRangeMax: ResolveSourceRangeMax(metric, topology),
-                TargetRangeMin: metric.TargetRangeMin,
-                TargetRangeMax: metric.TargetRangeMax));
+            var metric  = zone.Metrics[i];
+            var localPos = metric.Position ?? Vec3.Zero;
+
+            if (!stackedLabels.TryGetValue(metric.Label, out var groupDef))
+            {
+                // Ungrouped metric → standalone PlacedShape.
+                items.Add(BuildShape(zone.Name, metric, localPos, topology));
+                continue;
+            }
+
+            // Stacked metric — accumulate into the group.
+            if (!activeStacks.TryGetValue(groupDef.GroupName, out var entry))
+            {
+                // First member encountered for this group — record the group's position.
+                entry = (groupDef, [], localPos);
+                activeStacks[groupDef.GroupName] = entry;
+            }
+
+            // All members sit at Y=0 inside the StackGroupNode's local space.
+            entry.Members.Add(BuildShape(zone.Name, metric, Vec3.Zero, topology));
+            activeStacks[groupDef.GroupName] = entry;
+
+            // If this is the last member in the group, seal it and emit one PlacedStack.
+            if (metric.Label == groupDef.MetricLabels[^1])
+            {
+                items.Add(new PlacedStack(
+                    GroupName:    SanitiseNodeName($"{zone.Name}_{groupDef.GroupName}"),
+                    LocalPosition: entry.Position,
+                    Members:      entry.Members,
+                    Mode:         groupDef.Mode));
+            }
         }
-        return shapes;
+
+        return items;
     }
 
-    private static IReadOnlyList<PlacedShape> BuildBackgroundShapes(ZoneDefinition zone, HostTopology topology)
+    private static PlacedShape BuildShape(string zoneName, MetricShapeMapping metric, Vec3 localPos, HostTopology topology) =>
+        new(
+            NodeName:       SanitiseNodeName($"{zoneName}_{metric.Label}"),
+            Shape:          metric.Shape,
+            LocalPosition:  localPos,
+            MetricName:     metric.MetricName,
+            InstanceName:   metric.InstanceName,
+            DisplayLabel:   metric.Label,
+            Colour:         metric.DefaultColour,
+            SourceRangeMin: metric.SourceRangeMin,
+            SourceRangeMax: ResolveSourceRangeMax(metric, topology),
+            TargetRangeMin: metric.TargetRangeMin,
+            TargetRangeMax: metric.TargetRangeMax,
+            LabelPlacement: metric.LabelPlacement);
+
+    // Returns a lookup from metric label → the stack group it belongs to (empty if no StackGroups).
+    private static Dictionary<string, MetricStackGroupDefinition> StackedMetricLabels(ZoneDefinition zone)
+    {
+        var result = new Dictionary<string, MetricStackGroupDefinition>();
+        if (zone.StackGroups is null) return result;
+        foreach (var group in zone.StackGroups)
+            foreach (var label in group.MetricLabels)
+                result[label] = group;
+        return result;
+    }
+
+    private static IReadOnlyList<PlacedItem> BuildBackgroundShapes(ZoneDefinition zone, HostTopology topology)
     {
         var instances = ResolveInstances(zone, topology);
-        var shapes = new List<PlacedShape>();
+        var shapes = new List<PlacedItem>();
 
         foreach (var instance in instances)
         {
@@ -165,11 +212,13 @@ public static class LayoutCalculator
 
     private static float ZoneWidth(PlacedZone zone)
     {
-        // Grid zones: shapes are at Vec3.Zero (positioned by GridLayout3D at runtime).
+        // Grid zones: shapes are at Vec3.Zero (positioned by MetricGrid at runtime).
         // Add RowHeaderReservation to account for right-side instance labels.
-        if (zone.GridColumns.HasValue && zone.GroundWidth > 0f)
+        if (zone.HasGrid && zone.GroundWidth > 0f)
             return zone.GroundWidth + RowHeaderReservation;
-        if (zone.Shapes.Count == 0) return 0f;
+        if (zone.Items.Count == 0) return 0f;
+        // Rotated zones (Ry 90°): local Z becomes world X, so visual width = GroundDepth.
+        if (zone.RotateYNinetyDeg) return zone.GroundDepth;
         // Use GroundWidth (visual footprint = shape origins + shape width + padding),
         // not just the rightmost shape X-origin, so centering reflects the actual extent.
         return zone.GroundWidth;
