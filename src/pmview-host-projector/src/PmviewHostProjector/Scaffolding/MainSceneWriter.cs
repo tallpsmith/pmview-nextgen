@@ -12,10 +12,11 @@ public static class MainSceneWriter
     {
         var sb = new StringBuilder();
 
-        // Header: 1 ext_resource (camera script) + 1 sub_resource (environment)
-        sb.AppendLine("[gd_scene load_steps=2 format=3]");
+        // Header: 2 ext_resources (controller + camera scripts) + 1 sub_resource (environment)
+        sb.AppendLine("[gd_scene load_steps=3 format=3]");
         sb.AppendLine();
 
+        sb.AppendLine("[ext_resource type=\"Script\" path=\"res://addons/pmview-bridge/main_scene_controller.gd\" id=\"main_controller_script\"]");
         sb.AppendLine("[ext_resource type=\"Script\" path=\"res://addons/pmview-bridge/building_blocks/fly_orbit_camera.gd\" id=\"fly_camera_script\"]");
         sb.AppendLine();
 
@@ -28,8 +29,9 @@ public static class MainSceneWriter
         sb.AppendLine("ambient_light_energy = 0.5");
         sb.AppendLine();
 
-        // Root node
+        // Root node — auto-loads host-view scenes from res://scenes/
         sb.AppendLine("[node name=\"Main\" type=\"Node3D\"]");
+        sb.AppendLine("script = ExtResource(\"main_controller_script\")");
         sb.AppendLine();
 
         // Camera

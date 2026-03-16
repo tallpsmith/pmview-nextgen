@@ -48,4 +48,12 @@ public class MainSceneWriterTests
         var tscn = MainSceneWriter.Write();
         Assert.Contains("[node name=\"Main\" type=\"Node3D\"]", tscn);
     }
+
+    [Fact]
+    public void Write_RootNodeHasMainControllerScript()
+    {
+        var tscn = MainSceneWriter.Write();
+        Assert.Contains("main_controller_script", tscn);
+        Assert.Contains("main_scene_controller.gd", tscn);
+    }
 }
