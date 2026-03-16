@@ -447,15 +447,19 @@ public partial class SceneBinderTests
 
 		// First update: snap to high value
 		binder.ApplyMetrics(MakeSingularMetrics("test.metric", 100.0));
-		await runner.AwaitIdleFrame();
+		binder.AdvanceInterpolations(0.016f);
 
 		// Second update: target drops to minimum
 		binder.ApplyMetrics(MakeSingularMetrics("test.metric", 0.0));
 		var valueAfterUpdate = node3D.Scale.Y;
 
-		// Wait ~0.5 seconds worth of frames for interpolation to progress
-		await Task.Delay(500);
+		// Simulate 0.5s of frames (5 × 100ms) — deterministic, no Task.Delay
+		for (int i = 0; i < 5; i++)
+			binder.AdvanceInterpolations(0.1f);
+
 		AssertThat(node3D.Scale.Y).IsLess(valueAfterUpdate);
+
+		await runner.AwaitIdleFrame();
 	}
 
 	// ── Text binding ───────────────────────────────────────────────────────
