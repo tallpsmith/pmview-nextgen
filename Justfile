@@ -2,17 +2,17 @@ set dotenv-load
 # do clean & generate
 doit: clean generate
 
-# Scaffold a new Godot project from scratch
+# Scaffold a new Godot project from scratch (--force to overwrite)
 init:
-	@dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- init $GODOT_PROJECT
+	@dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- init --force $GODOT_PROJECT
 
 # Generate a host-view scene into an existing Godot project
 generate:
 	@dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- --pmproxy http://$PMPROXY_HOST:$PMPROXY_PORT -o $GODOT_PROJECT/scenes/host_view.tscn
 
-# Scaffold + generate in one shot
+# Scaffold + generate in one shot (--force to overwrite existing project files)
 init-generate:
-	@dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- --init --pmproxy http://$PMPROXY_HOST:$PMPROXY_PORT -o $GODOT_PROJECT/scenes/host_view.tscn
+	@dotnet run --project src/pmview-host-projector/src/PmviewHostProjector -- --init --force --pmproxy http://$PMPROXY_HOST:$PMPROXY_PORT -o $GODOT_PROJECT/scenes/host_view.tscn
 
 # Remove any of the Add-on or generated host scenes
 clean:

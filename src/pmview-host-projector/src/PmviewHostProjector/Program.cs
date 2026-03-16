@@ -19,13 +19,16 @@ public class Program
 
     private static int RunInit(string[] args)
     {
-        var projectDir = args.Length > 1 ? Path.GetFullPath(args[1]) : Directory.GetCurrentDirectory();
+        var force = HasFlag(args, "--force");
+        var projectDir = args.Where(a => a != "init" && a != "--force").FirstOrDefault();
+        projectDir = projectDir != null ? Path.GetFullPath(projectDir) : Directory.GetCurrentDirectory();
 
         Console.WriteLine($"pmview init: scaffolding project in {projectDir}");
 
         try
         {
-            ProjectScaffolder.Scaffold(projectDir);
+            var result = ProjectScaffolder.Scaffold(projectDir, force);
+            LogScaffoldResult(result);
 
             var addonSource = AddonInstaller.FindAddonSource();
             if (addonSource != null)
@@ -38,8 +41,6 @@ public class Program
                 }
             }
 
-            Console.WriteLine("  project.godot created");
-            Console.WriteLine("  scenes/main.tscn created");
             Console.WriteLine("Project ready — open in Godot editor");
             return 0;
         }
@@ -55,6 +56,7 @@ public class Program
         var pmproxyUrl = GetArg(args, "--pmproxy") ?? "http://localhost:44322";
         var outputPath = Path.GetFullPath(ResolveOutputPath(GetArg(args, "-o") ?? GetArg(args, "--output") ?? "host-view.tscn"));
         var shouldInit = HasFlag(args, "--init");
+        var force = HasFlag(args, "--force");
         var installAddon = HasFlag(args, "--install-addon");
 
         Console.WriteLine($"pmview-host-projector: connecting to {pmproxyUrl}");
@@ -72,7 +74,8 @@ public class Program
                     : outputDir;
 
                 Console.WriteLine($"No project.godot found — initialising project at {godotRoot}");
-                ProjectScaffolder.Scaffold(godotRoot);
+                var result = ProjectScaffolder.Scaffold(godotRoot, force);
+                LogScaffoldResult(result);
 
                 var addonSource = AddonInstaller.FindAddonSource();
                 if (addonSource != null)
@@ -166,5 +169,15 @@ public class Program
         if (Directory.Exists(path) || !Path.HasExtension(path))
             return Path.Combine(path, "host-view.tscn");
         return path;
+    }
+
+    private static void LogScaffoldResult(ScaffoldResult result)
+    {
+        foreach (var file in result.Created)
+            Console.WriteLine($"  {file} created");
+        foreach (var file in result.Overwritten)
+            Console.WriteLine($"  {file} overwritten");
+        foreach (var file in result.Skipped)
+            Console.Error.WriteLine($"  {file} already exists — skipping (use --force to overwrite)");
     }
 }

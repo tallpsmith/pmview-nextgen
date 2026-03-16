@@ -11,7 +11,7 @@ enum Mode { ORBIT, FLY, TRANSITIONING }
 @export var fly_speed: float = 10.0
 @export var sprint_multiplier: float = 2.0
 @export var mouse_sensitivity: float = 0.002
-@export var transition_speed: float = 3.0
+@export var transition_speed: float = 0.3
 
 var _mode: Mode = Mode.ORBIT
 var _radius: float
@@ -34,7 +34,7 @@ func _ready() -> void:
 	_orbit_angle = atan2(position.z - orbit_center.z, position.x - orbit_center.x)
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and event.keycode == KEY_TAB:
+	if event is InputEventKey and event.pressed and event.physical_keycode == KEY_TAB:
 		_toggle_mode()
 		get_viewport().set_input_as_handled()
 	if _mode == Mode.FLY:
@@ -86,21 +86,21 @@ func _process_orbit(delta: float) -> void:
 
 func _process_fly(delta: float) -> void:
 	var speed := fly_speed
-	if Input.is_key_pressed(KEY_SHIFT):
+	if Input.is_physical_key_pressed(KEY_SHIFT):
 		speed *= sprint_multiplier
 
 	var input_dir := Vector3.ZERO
-	if Input.is_key_pressed(KEY_W):
+	if Input.is_physical_key_pressed(KEY_W):
 		input_dir.z -= 1.0
-	if Input.is_key_pressed(KEY_S):
+	if Input.is_physical_key_pressed(KEY_S):
 		input_dir.z += 1.0
-	if Input.is_key_pressed(KEY_A):
+	if Input.is_physical_key_pressed(KEY_A):
 		input_dir.x -= 1.0
-	if Input.is_key_pressed(KEY_D):
+	if Input.is_physical_key_pressed(KEY_D):
 		input_dir.x += 1.0
-	if Input.is_key_pressed(KEY_Q):
+	if Input.is_physical_key_pressed(KEY_Q):
 		input_dir.y -= 1.0
-	if Input.is_key_pressed(KEY_E):
+	if Input.is_physical_key_pressed(KEY_E):
 		input_dir.y += 1.0
 
 	# Build orientation from yaw/pitch
