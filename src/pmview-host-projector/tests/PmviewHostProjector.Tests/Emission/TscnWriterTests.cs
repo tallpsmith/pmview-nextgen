@@ -1,6 +1,8 @@
 using Xunit;
 using PmviewHostProjector.Emission;
+using PmviewHostProjector.Layout;
 using PmviewHostProjector.Models;
+using PmviewHostProjector.Profiles;
 
 namespace PmviewHostProjector.Tests.Emission;
 
@@ -586,5 +588,32 @@ public class TscnWriterTests
         Assert.DoesNotContain("binding_Net_Ghost", tscn);
         Assert.Contains("ghost = true", tscn);
         Assert.DoesNotContain("ghost = true", tscn.Split("Net_Bytes")[1].Split("Net_Ghost")[0]);
+    }
+
+    // --- macOS end-to-end integration test ---
+
+    [Fact]
+    public void Write_MacOsLayout_GhostNetworkShapes_AndDarwinMemoryMetrics()
+    {
+        var topology = new HostTopology(HostOs.MacOs, "macbook",
+            ["cpu0", "cpu1"], ["disk0"], ["en0"],
+            PhysicalMemoryBytes: 16_000_000_000L);
+        var zones = MacOsProfile.GetZones();
+        var layout = LayoutCalculator.Calculate(zones, topology);
+        var tscn = TscnWriter.Write(layout);
+
+        // Ghost shapes should have ghost = true
+        Assert.Contains("ghost = true", tscn);
+
+        // Memory zone should have Darwin-specific metrics
+        Assert.Contains("mem.util.wired", tscn);
+        Assert.Contains("mem.util.compressed", tscn);
+
+        // No binding for ghost network metrics
+        Assert.DoesNotContain("binding_Net_In_Bytes", tscn);
+        Assert.DoesNotContain("binding_Net_Out_Bytes", tscn);
+
+        // Real metrics should still have bindings
+        Assert.Contains("kernel.all.cpu.sys", tscn);
     }
 }
