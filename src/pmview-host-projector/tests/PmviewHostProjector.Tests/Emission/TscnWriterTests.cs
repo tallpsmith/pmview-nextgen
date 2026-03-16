@@ -516,4 +516,75 @@ public class TscnWriterTests
         var tscn = TscnWriter.Write(LayoutWithCpuStack());
         Assert.Contains("load_steps=15 ", tscn);
     }
+
+    // --- Placeholder / ghost shape tests ---
+
+    [Fact]
+    public void Write_PlaceholderShape_EmitsGhostProperty_NoBindingOrPcpBindable()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone(
+                Name: "Net", ZoneLabel: "Net-In", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("Net_Bytes", ShapeType.Bar, Vec3.Zero,
+                    "network.all.in.bytes", null, "Bytes",
+                    new RgbColour(0.5f, 0.5f, 0.5f),
+                    0f, 125_000_000f, 0.2f, 5.0f,
+                    IsPlaceholder: true)])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+
+        Assert.Contains("[node name=\"Net_Bytes\"", tscn);
+        Assert.Contains("ghost = true", tscn);
+        Assert.DoesNotContain("binding_Net_Bytes", tscn);
+    }
+
+    [Fact]
+    public void Write_PlaceholderShape_DoesNotInflateLoadSteps()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone(
+                Name: "Net", ZoneLabel: "Net-In", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("Net_Bytes", ShapeType.Bar, Vec3.Zero,
+                    "network.all.in.bytes", null, "Bytes",
+                    new RgbColour(0.5f, 0.5f, 0.5f),
+                    0f, 125_000_000f, 0.2f, 5.0f,
+                    IsPlaceholder: true)])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+
+        // ext_resources (9): controller, metric_poller, scene_binder,
+        //                     metric_group, metric_grid, ground_bezel,
+        //                     bar_scene, bindable_script, binding_res_script
+        // sub_resources (0): placeholder has no binding
+        // ambient (2): TimestampLabel, HostnameLabel
+        // = 9 + 0 + 2 = 11
+        Assert.Contains("load_steps=11 ", tscn);
+    }
+
+    [Fact]
+    public void Write_MixedLiveAndPlaceholder_OnlyLiveGetsBinding()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone(
+                Name: "Net", ZoneLabel: "Net-In", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [
+                    new PlacedShape("Net_Bytes", ShapeType.Bar, Vec3.Zero,
+                        "network.all.in.bytes", null, "Bytes",
+                        new RgbColour(0, 0, 1), 0f, 125_000_000f, 0.2f, 5.0f),
+                    new PlacedShape("Net_Ghost", ShapeType.Bar, Vec3.Zero,
+                        "network.all.in.packets", null, "Pkts",
+                        new RgbColour(0.5f, 0.5f, 0.5f), 0f, 100_000f, 0.2f, 5.0f,
+                        IsPlaceholder: true),
+                ])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+
+        Assert.Contains("binding_Net_Bytes", tscn);
+        Assert.DoesNotContain("binding_Net_Ghost", tscn);
+        Assert.Contains("ghost = true", tscn);
+        Assert.DoesNotContain("ghost = true", tscn.Split("Net_Bytes")[1].Split("Net_Ghost")[0]);
+    }
 }
