@@ -590,6 +590,44 @@ public class TscnWriterTests
         Assert.DoesNotContain("ghost = true", tscn.Split("Net_Bytes")[1].Split("Net_Ghost")[0]);
     }
 
+    // --- ZoneName emission ---
+
+    [Fact]
+    public void Write_SubResource_ContainsZoneName()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone(
+                Name: "TestZone", ZoneLabel: "Test Zone", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("TZ_Metric", ShapeType.Bar, Vec3.Zero,
+                    "test.metric.bytes", null, null,
+                    new RgbColour(0.5f, 0.5f, 0.5f),
+                    0f, 100f, 0.2f, 5.0f)])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("ZoneName = \"TestZone\"", tscn);
+    }
+
+    [Fact]
+    public void Write_SubResource_StackMembers_ContainZoneName()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone(
+                Name: "CPU", ZoneLabel: "CPU", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [
+                    new PlacedStack("CpuStack", Vec3.Zero,
+                    [
+                        new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
+                            "kernel.all.cpu.user", null, null,
+                            new RgbColour(1f, 0f, 0f), 0f, 100f, 0.2f, 5.0f),
+                    ], StackMode.Proportional)
+                ])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("ZoneName = \"CPU\"", tscn);
+    }
+
     // --- macOS end-to-end integration test ---
 
     [Fact]

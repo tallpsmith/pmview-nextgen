@@ -90,7 +90,8 @@ public static class TscnWriter
                         SourceRangeMin: shape.SourceRangeMin,
                         SourceRangeMax: shape.SourceRangeMax,
                         TargetRangeMin: shape.TargetRangeMin,
-                        TargetRangeMax: shape.TargetRangeMax));
+                        TargetRangeMax: shape.TargetRangeMax,
+                        ZoneName: zone.Name));
                 }
             }
         }
@@ -140,6 +141,7 @@ public static class TscnWriter
 
             sb.AppendLine("InstanceId = -1");
             sb.AppendLine($"InitialValue = {F(entry.TargetRangeMin)}");
+            sb.AppendLine($"ZoneName = \"{entry.ZoneName}\"");
             sb.AppendLine();
         }
     }
@@ -374,7 +376,8 @@ public static class TscnWriter
         float SourceRangeMin,
         float SourceRangeMax,
         float TargetRangeMin,
-        float TargetRangeMax);
+        float TargetRangeMax,
+        string ZoneName);
 
     private record AmbientLabelSpec(
         string NodeName,
