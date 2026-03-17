@@ -49,6 +49,12 @@ public static class RuntimeSceneBuilder
         }
 
         BuildAmbientLabels(root);
+
+        // Populate MetricNames from the layout so MetricPoller._Ready()
+        // auto-starts polling — avoids fragile cross-language method calls.
+        var metricNames = CollectMetricNames(layout);
+        root.GetNode("MetricPoller").Set("MetricNames", metricNames);
+
         return root;
     }
 
@@ -328,6 +334,37 @@ public static class RuntimeSceneBuilder
         var id = obj.GetInstanceId();
         obj.SetScript(GD.Load<Script>(scriptPath));
         return (T)GodotObject.InstanceFromId(id);
+    }
+
+    // ── metric name collection ──────────────────────────────────────────
+
+    private static string[] CollectMetricNames(SceneLayout layout)
+    {
+        var names = new HashSet<string>();
+
+        foreach (var zone in layout.Zones)
+            foreach (var item in zone.Items)
+                CollectFromItem(item, names);
+
+        names.Add("pmview.meta.timestamp");
+        names.Add("pmview.meta.hostname");
+
+        return names.ToArray();
+    }
+
+    private static void CollectFromItem(PlacedItem item, HashSet<string> names)
+    {
+        switch (item)
+        {
+            case PlacedShape shape when !shape.IsPlaceholder:
+                names.Add(shape.MetricName);
+                break;
+            case PlacedStack stack:
+                foreach (var member in stack.Members)
+                    if (!member.IsPlaceholder)
+                        names.Add(member.MetricName);
+                break;
+        }
     }
 
     // ── utilities ──────────────────────────────────────────────────────
