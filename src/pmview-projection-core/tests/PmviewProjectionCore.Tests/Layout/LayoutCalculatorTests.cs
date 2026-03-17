@@ -3,7 +3,7 @@ using PmviewProjectionCore.Layout;
 using PmviewProjectionCore.Models;
 using PmviewProjectionCore.Profiles;
 
-namespace PmviewHostProjector.Tests.Layout;
+namespace PmviewProjectionCore.Tests.Layout;
 
 public class LayoutCalculatorForegroundTests
 {

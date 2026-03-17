@@ -1,9 +1,9 @@
 using Xunit;
 using PmviewProjectionCore.Discovery;
 using PmviewProjectionCore.Models;
-using PmviewHostProjector.Tests.TestHelpers;
+using PmviewProjectionCore.Tests.TestHelpers;
 
-namespace PmviewHostProjector.Tests.Discovery;
+namespace PmviewProjectionCore.Tests.Discovery;
 
 public class MetricDiscoveryTests
 {

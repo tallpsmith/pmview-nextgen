@@ -1,7 +1,7 @@
 using Xunit;
 using PmviewProjectionCore.Models;
 
-namespace PmviewHostProjector.Tests.Models;
+namespace PmviewProjectionCore.Tests.Models;
 
 public class PlacedStackTests
 {

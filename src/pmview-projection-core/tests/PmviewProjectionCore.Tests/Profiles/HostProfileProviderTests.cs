@@ -2,7 +2,7 @@ using Xunit;
 using PmviewProjectionCore.Models;
 using PmviewProjectionCore.Profiles;
 
-namespace PmviewHostProjector.Tests.Profiles;
+namespace PmviewProjectionCore.Tests.Profiles;
 
 public class HostProfileProviderTests
 {

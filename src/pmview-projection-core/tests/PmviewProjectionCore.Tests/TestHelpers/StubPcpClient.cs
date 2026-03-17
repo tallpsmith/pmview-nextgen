@@ -1,6 +1,6 @@
 using PcpClient;
 
-namespace PmviewHostProjector.Tests.TestHelpers;
+namespace PmviewProjectionCore.Tests.TestHelpers;
 
 /// <summary>
 /// Hand-rolled stub for IPcpClient. Configure fetch/instance domain results
