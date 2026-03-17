@@ -1,3 +1,4 @@
+using System.Linq;
 using PmviewProjectionCore.Models;
 
 namespace PmviewProjectionCore.Profiles;
@@ -77,8 +78,8 @@ internal static class SharedZones
         Type: ZoneType.PerInstance,
         Metrics:
         [
-            new("disk.dev.read_bytes",  ShapeType.Cylinder, "Read",  DarkGreen, 0f, 500_000_000f, 0.2f, 5.0f),
-            new("disk.dev.write_bytes", ShapeType.Cylinder, "Write", DarkGreen, 0f, 500_000_000f, 0.2f, 5.0f),
+            new("disk.dev.read_bytes",  ShapeType.Cylinder, "Read",  DarkGreen, 0f, 500_000f, 0.2f, 5.0f),
+            new("disk.dev.write_bytes", ShapeType.Cylinder, "Write", DarkGreen, 0f, 500_000f, 0.2f, 5.0f),
         ],
         InstanceMetricSource: "disk.dev.read_bytes");
 
@@ -105,4 +106,28 @@ internal static class SharedZones
             new("network.interface.out.errors",  ShapeType.Bar, "Errors", Red,  0f, 100f,         0.2f, 5.0f),
         ],
         InstanceMetricSource: "network.interface.out.bytes");
+
+    private static readonly ZoneDefinition[] AllZones =
+    [
+        CpuZone(), LoadZone(), DiskTotalsZone(),
+        PerCpuZone(), PerDiskZone(),
+        NetworkInZone(), NetworkOutZone(),
+    ];
+
+    internal static string? ResolveZone(string metricName)
+    {
+        foreach (var zone in AllZones)
+            foreach (var metric in zone.Metrics)
+                if (metric.MetricName == metricName)
+                    return zone.Name;
+        return null;
+    }
+
+    internal static string[] GetMetricNames(string zoneName)
+    {
+        foreach (var zone in AllZones)
+            if (zone.Name == zoneName)
+                return zone.Metrics.Select(m => m.MetricName).ToArray();
+        return [];
+    }
 }
