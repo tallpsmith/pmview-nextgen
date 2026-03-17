@@ -203,12 +203,34 @@ public partial class SceneBinder : Node
 	}
 
 	/// <summary>
-	/// Updates SourceRangeMax for all active bindings matching the given zone.
-	/// Stub — full implementation provided by Task 7.
+	/// Replaces the SourceRangeMax on all active bindings whose ZoneName matches
+	/// and whose metric name contains "bytes". Called by the range tuning panel
+	/// when users adjust a slider. The next poll tick picks up the new range
+	/// through the existing Normalise() path.
 	/// </summary>
 	public void UpdateSourceRangeMax(string zoneName, double newMax)
 	{
-		// Task 7 implements the body; stub present for compilation.
+		for (int i = 0; i < _activeBindings.Count; i++)
+		{
+			var active = _activeBindings[i];
+			if (active.Resolved.Binding.ZoneName != zoneName) continue;
+			if (!active.Resolved.Binding.Metric.Contains("bytes")) continue;
+
+			var oldBinding = active.Resolved.Binding;
+			var newBinding = oldBinding with { SourceRangeMax = newMax };
+			var newResolved = active.Resolved with { Binding = newBinding };
+			var newActive = active with { Resolved = newResolved };
+
+			if (_smoothValues.TryGetValue(active, out var smoothState))
+			{
+				_smoothValues.Remove(active);
+				_smoothValues[newActive] = smoothState;
+			}
+
+			_activeBindings[i] = newActive;
+		}
+
+		GD.Print($"[SceneBinder] Updated SourceRangeMax for zone '{zoneName}' to {newMax}");
 	}
 
 	/// <summary>

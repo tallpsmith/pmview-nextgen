@@ -570,6 +570,30 @@ public partial class SceneBinderTests
 		AssertThat(binder.IsBound).IsFalse();
 	}
 
+	// ── Range tuning ────────────────────────────────────────────────────
+
+	[TestCase]
+	public void Normalise_RangeChangeAffectsOutput()
+	{
+		// Same raw value normalises to a smaller target when the range widens.
+		var beforeUpdate = SceneBinder.Normalise(250_000_000, 0, 500_000_000, 0.2, 5.0);
+		var afterUpdate = SceneBinder.Normalise(250_000_000, 0, 1_000_000_000, 0.2, 5.0);
+
+		AssertThat(beforeUpdate).IsEqual(2.6);   // 50% of range → midpoint of 0.2–5.0
+		AssertThat(afterUpdate).IsEqual(1.4);    // 25% of range → quarter of 0.2–5.0
+		AssertThat(afterUpdate).IsLess(beforeUpdate);
+	}
+
+	[TestCase]
+	[RequireGodotRuntime]
+	public void UpdateSourceRangeMax_CanBeCalled()
+	{
+		// Verifies the public API exists. Calling on an empty binder is a no-op.
+		var binder = new SceneBinder();
+		binder.UpdateSourceRangeMax("Disk", 1_000_000_000.0);
+		// No exception = method exists and handles empty binding list gracefully.
+	}
+
 	// ── Helpers ──────────────────────────────────────────────────────────
 
 	private static Godot.Collections.Dictionary MakeSingularMetrics(
