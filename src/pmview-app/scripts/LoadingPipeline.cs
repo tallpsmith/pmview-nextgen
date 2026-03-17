@@ -16,72 +16,100 @@ namespace PmviewApp;
 /// </summary>
 public partial class LoadingPipeline : Node
 {
-    [Signal]
-    public delegate void PhaseCompletedEventHandler(int phaseIndex, string phaseName);
+	[Signal]
+	public delegate void PhaseCompletedEventHandler(int phaseIndex, string phaseName);
 
-    [Signal]
-    public delegate void PipelineCompletedEventHandler();
+	[Signal]
+	public delegate void PipelineCompletedEventHandler();
 
-    [Signal]
-    public delegate void PipelineErrorEventHandler(int phaseIndex, string error);
+	[Signal]
+	public delegate void PipelineErrorEventHandler(int phaseIndex, string error);
 
-    /// <summary>The fully-built scene graph, available after phase 5 completes.</summary>
-    public Node3D? BuiltScene { get; private set; }
+	/// <summary>The fully-built scene graph, available after phase 5 completes.</summary>
+	public Node3D? BuiltScene { get; private set; }
 
-    public async void StartPipeline(string endpoint)
-    {
-        var currentPhase = 0;
-        PcpClientConnection? client = null;
+	/// <summary>
+	/// Minimum milliseconds between phase completion signals.
+	/// Configurable from the editor or GDScript to let the loading
+	/// animation breathe. Set to 0 for no artificial delay.
+	/// </summary>
+	[Export] public int MinPhaseDelayMs { get; set; } = 1000;
 
-        try
-        {
-            // Phase 0: CONNECTING
-            currentPhase = 0;
-            client = new PcpClientConnection(new Uri(endpoint));
-            await client.ConnectAsync();
-            EmitSignal(SignalName.PhaseCompleted, 0, "CONNECTING");
+	public async void StartPipeline(string endpoint)
+	{
+		var currentPhase = 0;
+		PcpClientConnection? client = null;
 
-            // Phase 1: TOPOLOGY
-            currentPhase = 1;
-            var topology = await MetricDiscovery.DiscoverAsync(client);
-            EmitSignal(SignalName.PhaseCompleted, 1, "TOPOLOGY");
+		try
+		{
+			// Phase 0: CONNECTING
+			currentPhase = 0;
+			var phaseStart = DateTime.UtcNow;
+			client = new PcpClientConnection(new Uri(endpoint));
+			await client.ConnectAsync();
+			await EnforceMinPhaseDelay(phaseStart);
+			EmitSignal(SignalName.PhaseCompleted, 0, "CONNECTING");
 
-            // Phase 2: INSTANCES (already resolved as part of discovery)
-            currentPhase = 2;
-            EmitSignal(SignalName.PhaseCompleted, 2, "INSTANCES");
+			// Phase 1: TOPOLOGY
+			currentPhase = 1;
+			phaseStart = DateTime.UtcNow;
+			var topology = await MetricDiscovery.DiscoverAsync(client);
+			await EnforceMinPhaseDelay(phaseStart);
+			EmitSignal(SignalName.PhaseCompleted, 1, "TOPOLOGY");
 
-            // Phase 3: PROFILE
-            currentPhase = 3;
-            var profileProvider = new HostProfileProvider();
-            var zones = profileProvider.GetProfile(topology.Os);
-            EmitSignal(SignalName.PhaseCompleted, 3, "PROFILE");
+			// Phase 2: INSTANCES (already resolved as part of discovery)
+			currentPhase = 2;
+			await EnforceMinPhaseDelay(DateTime.UtcNow);
+			EmitSignal(SignalName.PhaseCompleted, 2, "INSTANCES");
 
-            // Phase 4: LAYOUT
-            currentPhase = 4;
-            var layout = LayoutCalculator.Calculate(zones, topology);
-            EmitSignal(SignalName.PhaseCompleted, 4, "LAYOUT");
+			// Phase 3: PROFILE
+			currentPhase = 3;
+			phaseStart = DateTime.UtcNow;
+			var profileProvider = new HostProfileProvider();
+			var zones = profileProvider.GetProfile(topology.Os);
+			await EnforceMinPhaseDelay(phaseStart);
+			EmitSignal(SignalName.PhaseCompleted, 3, "PROFILE");
 
-            // Phase 5: BUILDING
-            currentPhase = 5;
-            BuiltScene = RuntimeSceneBuilder.Build(layout, endpoint);
-            EmitSignal(SignalName.PhaseCompleted, 5, "BUILDING");
+			// Phase 4: LAYOUT
+			currentPhase = 4;
+			phaseStart = DateTime.UtcNow;
+			var layout = LayoutCalculator.Calculate(zones, topology);
+			await EnforceMinPhaseDelay(phaseStart);
+			EmitSignal(SignalName.PhaseCompleted, 4, "LAYOUT");
 
-            // Disconnect — the MetricPoller in the built scene manages its own connection
-            await client.DisconnectAsync();
-            client.Dispose();
+			// Phase 5: BUILDING
+			currentPhase = 5;
+			phaseStart = DateTime.UtcNow;
+			BuiltScene = RuntimeSceneBuilder.Build(layout, endpoint);
+			await EnforceMinPhaseDelay(phaseStart);
+			EmitSignal(SignalName.PhaseCompleted, 5, "BUILDING");
 
-            EmitSignal(SignalName.PipelineCompleted);
-        }
-        catch (Exception ex)
-        {
-            GD.PrintErr($"Pipeline failed at phase {currentPhase}: {ex.Message}");
-            EmitSignal(SignalName.PipelineError, currentPhase, ex.Message);
+			// Disconnect — the MetricPoller in the built scene manages its own connection
+			await client.DisconnectAsync();
+			client.Dispose();
 
-            if (client != null)
-            {
-                try { client.Dispose(); }
-                catch { /* swallow cleanup errors */ }
-            }
-        }
-    }
+			EmitSignal(SignalName.PipelineCompleted);
+		}
+		catch (Exception ex)
+		{
+			GD.PrintErr($"Pipeline failed at phase {currentPhase}: {ex.Message}");
+			EmitSignal(SignalName.PipelineError, currentPhase, ex.Message);
+
+			if (client != null)
+			{
+				try { client.Dispose(); }
+				catch { /* swallow cleanup errors */ }
+			}
+		}
+	}
+
+	private async Task EnforceMinPhaseDelay(DateTime phaseStart)
+	{
+		if (MinPhaseDelayMs <= 0) return;
+
+		var elapsed = (int)(DateTime.UtcNow - phaseStart).TotalMilliseconds;
+		var remaining = MinPhaseDelayMs - elapsed;
+		if (remaining > 0)
+			await Task.Delay(remaining);
+	}
 }
