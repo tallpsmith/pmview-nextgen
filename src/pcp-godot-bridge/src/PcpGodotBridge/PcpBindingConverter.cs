@@ -22,7 +22,8 @@ public static class PcpBindingConverter
         double targetRangeMax,
         int instanceId,
         string? instanceName,
-        double initialValue)
+        double initialValue,
+        string? zoneName = null)
     {
         return new MetricBinding(
             SceneNode: sceneNode,
@@ -34,6 +35,7 @@ public static class PcpBindingConverter
             TargetRangeMax: targetRangeMax,
             InstanceId: instanceId < 0 ? null : instanceId,
             InstanceName: string.IsNullOrWhiteSpace(instanceName) ? null : instanceName,
-            InitialValue: initialValue);
+            InitialValue: initialValue,
+            ZoneName: zoneName);
     }
 }
