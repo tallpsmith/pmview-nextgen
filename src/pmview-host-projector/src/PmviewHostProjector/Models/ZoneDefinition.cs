@@ -33,7 +33,8 @@ public record MetricShapeMapping(
     float TargetRangeMax,
     string? InstanceName = null,
     Vec3? Position = null,
-    LabelPlacement LabelPlacement = LabelPlacement.Front);
+    LabelPlacement LabelPlacement = LabelPlacement.Front,
+    bool IsPlaceholder = false);
 
 /// <summary>
 /// Declares that a named subset of this zone's metrics should be emitted as a

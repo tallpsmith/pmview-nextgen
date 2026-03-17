@@ -205,6 +205,26 @@ public class LayoutCalculatorForegroundTests
     }
 
     [Fact]
+    public void Calculate_PlaceholderMetric_PropagatesIsPlaceholderToPlacedShape()
+    {
+        var zone = new ZoneDefinition(
+            Name: "Test", Row: ZoneRow.Foreground, Type: ZoneType.Aggregate,
+            Metrics:
+            [
+                new("m.live", ShapeType.Bar, "Live", new RgbColour(0, 1, 0), 0f, 100f, 0.2f, 5.0f),
+                new("m.ghost", ShapeType.Bar, "Ghost", new RgbColour(0, 0, 1), 0f, 100f, 0.2f, 5.0f,
+                    IsPlaceholder: true),
+            ]);
+
+        var layout = LayoutCalculator.Calculate([zone], MakeTopology());
+        var placed = layout.Zones.Single();
+        var shapes = placed.Shapes;
+
+        Assert.False(shapes.Single(s => s.NodeName.Contains("Live")).IsPlaceholder);
+        Assert.True(shapes.Single(s => s.NodeName.Contains("Ghost")).IsPlaceholder);
+    }
+
+    [Fact]
     public void Calculate_StackedForegroundZone_GroundWidthReflectsVisualColumns()
     {
         // 3 metrics in 1 stack group = 1 visual column, not 3.

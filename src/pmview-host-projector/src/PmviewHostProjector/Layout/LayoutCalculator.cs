@@ -186,7 +186,8 @@ public static class LayoutCalculator
             SourceRangeMax: ResolveSourceRangeMax(metric, topology),
             TargetRangeMin: metric.TargetRangeMin,
             TargetRangeMax: metric.TargetRangeMax,
-            LabelPlacement: metric.LabelPlacement);
+            LabelPlacement: metric.LabelPlacement,
+            IsPlaceholder:  metric.IsPlaceholder);
 
     // Returns a lookup from metric label → the stack group it belongs to (empty if no StackGroups).
     private static Dictionary<string, MetricStackGroupDefinition> StackedMetricLabels(ZoneDefinition zone)

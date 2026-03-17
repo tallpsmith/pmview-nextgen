@@ -2,6 +2,7 @@ using PcpClient;
 using PmviewHostProjector.Discovery;
 using PmviewHostProjector.Emission;
 using PmviewHostProjector.Layout;
+using PmviewHostProjector.Models;
 using PmviewHostProjector.Profiles;
 using PmviewHostProjector.Scaffolding;
 
@@ -82,7 +83,18 @@ public class Program
                 {
                     var repoRoot = LibraryBuilder.FindRepoRoot(AppContext.BaseDirectory);
                     if (repoRoot != null)
+                    {
                         AddonInstaller.InstallAddonWithLibraries(addonSource, godotRoot, repoRoot);
+                        Console.WriteLine("  Addon installed with libraries");
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine("  Warning: could not find repo root — addon libraries not installed");
+                    }
+                }
+                else
+                {
+                    Console.Error.WriteLine("  Warning: could not find addon source — addon not installed");
                 }
             }
             else if (godotRoot == null)
@@ -129,11 +141,16 @@ public class Program
             Console.WriteLine($"  CPUs: {topology.CpuInstances.Count}, " +
                               $"Disks: {topology.DiskDevices.Count}, " +
                               $"NICs: {topology.NetworkInterfaces.Count}");
+            if (topology.NetworkInterfaces.Count > 0)
+                Console.WriteLine($"  NIC instances: {string.Join(", ", topology.NetworkInterfaces)}");
 
             var zones = new HostProfileProvider().GetProfile(topology.Os);
+            Console.WriteLine($"  Profile: {topology.Os} ({zones.Count} zones)");
 
             Console.WriteLine("Computing layout...");
             var layout = LayoutCalculator.Calculate(zones, topology);
+
+            LogLayoutDiagnostics(layout);
 
             Console.WriteLine("Generating scene...");
             var tscn = SceneEmitter.Emit(layout, pmproxyUrl);
@@ -146,6 +163,10 @@ public class Program
             Console.WriteLine($"Scene written to: {outputPath}");
             Console.WriteLine($"  {layout.Zones.Count} zones, " +
                               $"{layout.Zones.Sum(z => z.Shapes.Count)} shapes");
+
+            if (shouldInit)
+                Console.WriteLine("\nNext: open project in Godot, build C# solution (Alt+B), then enable the pmview-bridge plugin.");
+
             return 0;
         }
         catch (Exception ex)
@@ -169,6 +190,31 @@ public class Program
         if (Directory.Exists(path) || !Path.HasExtension(path))
             return Path.Combine(path, "host-view.tscn");
         return path;
+    }
+
+    private static void LogLayoutDiagnostics(SceneLayout layout)
+    {
+        foreach (var zone in layout.Zones)
+        {
+            var allShapes = zone.Items.SelectMany(item => item switch
+            {
+                PlacedStack stack => stack.Members,
+                PlacedShape shape => [shape],
+                _ => Enumerable.Empty<PlacedShape>()
+            }).ToList();
+
+            var ghostCount = allShapes.Count(s => s.IsPlaceholder);
+            var liveCount = allShapes.Count - ghostCount;
+
+            var status = ghostCount > 0
+                ? $"{liveCount} live, {ghostCount} ghost"
+                : $"{liveCount} shapes";
+
+            Console.WriteLine($"  [{zone.Name}] {status}");
+
+            foreach (var shape in allShapes.Where(s => s.IsPlaceholder))
+                Console.WriteLine($"    ghost: {shape.MetricName} ({shape.NodeName})");
+        }
     }
 
     private static void LogScaffoldResult(ScaffoldResult result)

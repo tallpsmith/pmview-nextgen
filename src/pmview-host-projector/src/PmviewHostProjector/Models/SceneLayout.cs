@@ -24,7 +24,8 @@ public record PlacedShape(
     float SourceRangeMax,
     float TargetRangeMin,
     float TargetRangeMax,
-    LabelPlacement LabelPlacement = LabelPlacement.Front) : PlacedItem(LocalPosition);
+    LabelPlacement LabelPlacement = LabelPlacement.Front,
+    bool IsPlaceholder = false) : PlacedItem(LocalPosition);
 
 // Members are ordered bottom → top. All member LocalPositions are Vec3.Zero;
 // StackGroupNode owns their Y positions at runtime.

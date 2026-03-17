@@ -45,6 +45,10 @@ public static class TscnWriter
             "res://addons/pmview-bridge/building_blocks/metric_grid.gd");
         registry.Require("ground_bezel_script", "Script",
             "res://addons/pmview-bridge/building_blocks/ground_bezel.gd");
+        registry.Require("bindable_script", "Script",
+            "res://addons/pmview-bridge/PcpBindable.cs");
+        registry.Require("binding_res_script", "Script",
+            "res://addons/pmview-bridge/PcpBindingResource.cs");
     }
 
     // --- resource collection ---
@@ -72,6 +76,10 @@ public static class TscnWriter
                 {
                     var sceneId = SceneExtResourceId(shape.Shape);
                     registry.Require(sceneId, "PackedScene", SceneExtResourcePath(shape.Shape));
+
+                    if (shape.IsPlaceholder)
+                        continue;
+
                     registry.Require("bindable_script", "Script", "res://addons/pmview-bridge/PcpBindable.cs");
                     registry.Require("binding_res_script", "Script", "res://addons/pmview-bridge/PcpBindingResource.cs");
 
@@ -294,6 +302,14 @@ public static class TscnWriter
 
         sb.AppendLine($"[node name=\"{shape.NodeName}\" parent=\"{parentOverride}\" instance=ExtResource(\"{sceneId}\")]");
         sb.AppendLine($"colour = Color({F(shape.Colour.R)}, {F(shape.Colour.G)}, {F(shape.Colour.B)}, 1)");
+
+        if (shape.IsPlaceholder)
+        {
+            sb.AppendLine("ghost = true");
+            sb.AppendLine();
+            return;
+        }
+
         sb.AppendLine();
 
         var subResId = SubResourceId(shape.NodeName);
