@@ -38,10 +38,12 @@ public static class RuntimeSceneBuilder
     public static Node3D Build(SceneLayout layout, string pmproxyEndpoint,
         IProgress<float>? progress = null)
     {
+        GD.Print("[RuntimeSceneBuilder] Build starting...");
         var root = CreateHostViewRoot();
         AddMetricPoller(root, pmproxyEndpoint, layout.Hostname);
         AddSceneBinder(root);
 
+        GD.Print($"[RuntimeSceneBuilder] Building {layout.Zones.Count} zones...");
         for (var i = 0; i < layout.Zones.Count; i++)
         {
             BuildZone(root, layout.Zones[i]);
@@ -49,6 +51,7 @@ public static class RuntimeSceneBuilder
         }
 
         BuildAmbientLabels(root);
+        GD.Print($"[RuntimeSceneBuilder] Build complete. Root children: {root.GetChildCount()}");
         return root;
     }
 
@@ -56,18 +59,25 @@ public static class RuntimeSceneBuilder
 
     private static Node3D CreateHostViewRoot()
     {
-        // The addon's host_view_controller.gd handles MetricPoller ↔ SceneBinder
-        // wiring in _ready() — same pattern used by standalone .tscn scenes.
         var root = new Node3D { Name = "HostView" };
-        root.SetScript(GD.Load<Script>(ControllerScriptPath));
+        var script = GD.Load<Script>(ControllerScriptPath);
+        if (script == null)
+            GD.PrintErr($"[RuntimeSceneBuilder] FAILED to load controller script: {ControllerScriptPath}");
+        else
+            GD.Print($"[RuntimeSceneBuilder] Loaded controller script: {script.ResourcePath}");
+        root.SetScript(script);
+        GD.Print($"[RuntimeSceneBuilder] Root script after SetScript: {root.GetScript()}");
         return root;
     }
 
     private static void AddMetricPoller(Node3D root, string endpoint, string hostname)
     {
         var poller = new Node { Name = "MetricPoller" };
-        // C# script — SetScript invalidates the managed wrapper, must re-fetch
+        var script = GD.Load<Script>(MetricPollerScriptPath);
+        if (script == null)
+            GD.PrintErr($"[RuntimeSceneBuilder] FAILED to load MetricPoller script: {MetricPollerScriptPath}");
         poller = SetCSharpScript<Node>(poller, MetricPollerScriptPath);
+        GD.Print($"[RuntimeSceneBuilder] MetricPoller type after SetScript: {poller.GetClass()}, script: {poller.GetScript()}");
         poller.Set("Endpoint", endpoint);
         poller.Set("Hostname", hostname);
         root.AddChild(poller);
@@ -76,7 +86,11 @@ public static class RuntimeSceneBuilder
     private static void AddSceneBinder(Node3D root)
     {
         var binder = new Node { Name = "SceneBinder" };
+        var script = GD.Load<Script>(SceneBinderScriptPath);
+        if (script == null)
+            GD.PrintErr($"[RuntimeSceneBuilder] FAILED to load SceneBinder script: {SceneBinderScriptPath}");
         binder = SetCSharpScript<Node>(binder, SceneBinderScriptPath);
+        GD.Print($"[RuntimeSceneBuilder] SceneBinder type after SetScript: {binder.GetClass()}, script: {binder.GetScript()}");
         root.AddChild(binder);
     }
 

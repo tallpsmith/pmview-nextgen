@@ -10,6 +10,7 @@ var _esc_timer: SceneTreeTimer = null
 
 
 func _ready() -> void:
+	print("[HostView] _ready called")
 	var scene := SceneManager.built_scene
 	if scene == null:
 		push_error("[HostView] No built scene — returning to menu")
@@ -17,10 +18,15 @@ func _ready() -> void:
 		return
 
 	SceneManager.built_scene = null
+	print("[HostView] Built scene name: %s, script: %s, child count: %d" % [scene.name, scene.get_script(), scene.get_child_count()])
+	for child in scene.get_children():
+		print("[HostView]   child: %s (type: %s, script: %s)" % [child.name, child.get_class(), child.get_script()])
 
 	# The built scene's root has host_view_controller.gd (from the addon)
 	# which handles MetricPoller ↔ SceneBinder wiring in its own _ready().
+	print("[HostView] Adding built scene to tree...")
 	add_child(scene)
+	print("[HostView] Built scene added to tree")
 
 
 func _unhandled_input(event: InputEvent) -> void:
