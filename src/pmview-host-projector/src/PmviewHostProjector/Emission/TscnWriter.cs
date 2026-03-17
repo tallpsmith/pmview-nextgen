@@ -49,6 +49,8 @@ public static class TscnWriter
             "res://addons/pmview-bridge/PcpBindable.cs");
         registry.Require("binding_res_script", "Script",
             "res://addons/pmview-bridge/PcpBindingResource.cs");
+        registry.Require("range_tuning_panel_scene", "PackedScene",
+            "res://addons/pmview-bridge/ui/range_tuning_panel.tscn");
     }
 
     // --- resource collection ---
@@ -191,6 +193,7 @@ public static class TscnWriter
             WriteZone(sb, zone, registry, subResources);
 
         WriteAmbientLabels(sb, ambientLabels);
+        WriteRangeTuningPanel(sb, registry);
     }
 
     private static void WriteAmbientLabels(StringBuilder sb,
@@ -228,6 +231,15 @@ public static class TscnWriter
             sb.AppendLine($"PcpBindings = Array[ExtResource(\"binding_res_script\")]([SubResource(\"{label.SubResourceId}\")])");
             sb.AppendLine();
         }
+    }
+
+    private static void WriteRangeTuningPanel(StringBuilder sb, ExtResourceRegistry registry)
+    {
+        sb.AppendLine("[node name=\"UILayer\" type=\"CanvasLayer\" parent=\".\"]");
+        sb.AppendLine();
+
+        sb.AppendLine("[node name=\"RangeTuningPanel\" parent=\"UILayer\" instance=ExtResource(\"range_tuning_panel_scene\")]");
+        sb.AppendLine();
     }
 
     private static void WriteZone(StringBuilder sb, PlacedZone zone,

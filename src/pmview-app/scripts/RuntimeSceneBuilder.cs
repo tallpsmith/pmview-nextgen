@@ -26,6 +26,7 @@ public static class RuntimeSceneBuilder
     // -- packed scene paths --
     private const string BarScenePath = "res://addons/pmview-bridge/building_blocks/grounded_bar.tscn";
     private const string CylinderScenePath = "res://addons/pmview-bridge/building_blocks/grounded_cylinder.tscn";
+    private const string RangeTuningPanelScenePath = "res://addons/pmview-bridge/ui/range_tuning_panel.tscn";
 
     // -- ambient label colours --
     private static readonly Color TimestampColour = new(0.976f, 0.451f, 0.086f, 1f);
@@ -51,6 +52,7 @@ public static class RuntimeSceneBuilder
         }
 
         BuildAmbientLabels(root);
+        AddRangeTuningPanel(root);
 
         // Set Owner on all descendants so find_child(owned=true) works —
         // programmatic nodes don't get an owner automatically unlike .tscn scenes.
@@ -338,6 +340,28 @@ public static class RuntimeSceneBuilder
 
         root.AddChild(label);
         AddBindable(label, BuildAmbientBinding("pmview.meta.hostname"));
+    }
+
+    // ── range tuning panel ──────────────────────────────────────────────
+
+    private static void AddRangeTuningPanel(Node3D sceneRoot)
+    {
+        var panelScene = GD.Load<PackedScene>(RangeTuningPanelScenePath);
+        if (panelScene == null)
+        {
+            GD.PushWarning("[RuntimeSceneBuilder] RangeTuningPanel scene not found");
+            return;
+        }
+
+        var canvas = new CanvasLayer();
+        canvas.Name = "UILayer";
+
+        var panel = panelScene.Instantiate();
+        panel.Name = "RangeTuningPanel";
+
+        canvas.AddChild(panel);
+        sceneRoot.AddChild(canvas);
+        // Owner is set by SetOwnerRecursive() in Build() — don't set manually here.
     }
 
     // ── script assignment ─────────────────────────────────────────────
