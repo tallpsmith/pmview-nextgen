@@ -33,7 +33,7 @@ public partial class LoadingPipeline : Node
 	/// Configurable from the editor or GDScript to let the loading
 	/// animation breathe. Set to 0 for no artificial delay.
 	/// </summary>
-	[Export] public int MinPhaseDelayMs { get; set; } = 1000;
+	[Export] public int MinPhaseDelayMs { get; set; } = 500;
 
 	public async void StartPipeline(string endpoint)
 	{
