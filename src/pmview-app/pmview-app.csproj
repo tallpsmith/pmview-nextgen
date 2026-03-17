@@ -1,0 +1,23 @@
+<Project Sdk="Godot.NET.Sdk/4.6.1">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\pmview-projection-core\src\PmviewProjectionCore\PmviewProjectionCore.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="PcpClient">
+      <HintPath>addons/pmview-bridge/lib/PcpClient.dll</HintPath>
+    </Reference>
+    <Reference Include="PcpGodotBridge">
+      <HintPath>addons/pmview-bridge/lib/PcpGodotBridge.dll</HintPath>
+    </Reference>
+    <Reference Include="Tomlyn">
+      <HintPath>addons/pmview-bridge/lib/Tomlyn.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+</Project>
