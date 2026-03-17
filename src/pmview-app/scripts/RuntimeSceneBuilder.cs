@@ -51,6 +51,11 @@ public static class RuntimeSceneBuilder
         }
 
         BuildAmbientLabels(root);
+
+        // Set Owner on all descendants so find_child(owned=true) works —
+        // programmatic nodes don't get an owner automatically unlike .tscn scenes.
+        SetOwnerRecursive(root, root);
+
         GD.Print($"[RuntimeSceneBuilder] Build complete. Root children: {root.GetChildCount()}");
         return root;
     }
@@ -343,6 +348,22 @@ public static class RuntimeSceneBuilder
         var id = obj.GetInstanceId();
         obj.SetScript(GD.Load<Script>(scriptPath));
         return (T)GodotObject.InstanceFromId(id);
+    }
+
+    // ── ownership ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Recursively sets Owner on all descendants so that GDScript's
+    /// find_child(owned=true) can discover them. Programmatically-added
+    /// nodes don't get an owner automatically — unlike .tscn scene loading.
+    /// </summary>
+    private static void SetOwnerRecursive(Node node, Node owner)
+    {
+        foreach (var child in node.GetChildren())
+        {
+            child.Owner = owner;
+            SetOwnerRecursive(child, owner);
+        }
     }
 
     // ── utilities ──────────────────────────────────────────────────────
