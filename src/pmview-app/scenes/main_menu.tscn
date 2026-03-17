@@ -1,0 +1,279 @@
+[gd_scene load_steps=24 format=3]
+
+[ext_resource type="Script" path="res://scripts/MainMenuController.gd" id="1"]
+[ext_resource type="FontFile" path="res://assets/fonts/PressStart2P-Regular.ttf" id="2"]
+[ext_resource type="Shader" path="res://shaders/kitt_scanner.gdshader" id="3"]
+[ext_resource type="Theme" path="res://assets/themes/arcade_theme.tres" id="4"]
+
+[sub_resource type="ProceduralSkyMaterial" id="sky_mat"]
+sky_top_color = Color(0.02, 0.02, 0.06, 1)
+sky_horizon_color = Color(0.04, 0.02, 0.08, 1)
+ground_bottom_color = Color(0.01, 0.01, 0.03, 1)
+ground_horizon_color = Color(0.04, 0.02, 0.08, 1)
+
+[sub_resource type="Sky" id="sky"]
+sky_material = SubResource("sky_mat")
+
+[sub_resource type="Environment" id="env"]
+background_mode = 2
+sky = SubResource("sky")
+ambient_light_source = 0
+glow_enabled = true
+glow_intensity = 0.8
+
+[sub_resource type="StandardMaterial3D" id="mat_pink"]
+albedo_color = Color(0.15, 0.05, 0.1, 1)
+emission_enabled = true
+emission = Color(1.0, 0.0, 0.43, 1)
+emission_energy_multiplier = 1.5
+
+[sub_resource type="StandardMaterial3D" id="mat_pink2"]
+albedo_color = Color(0.15, 0.05, 0.1, 1)
+emission_enabled = true
+emission = Color(0.9, 0.05, 0.5, 1)
+emission_energy_multiplier = 1.5
+
+[sub_resource type="StandardMaterial3D" id="mat_purple"]
+albedo_color = Color(0.1, 0.05, 0.15, 1)
+emission_enabled = true
+emission = Color(0.7, 0.15, 0.85, 1)
+emission_energy_multiplier = 1.5
+
+[sub_resource type="StandardMaterial3D" id="mat_purple2"]
+albedo_color = Color(0.1, 0.05, 0.15, 1)
+emission_enabled = true
+emission = Color(0.514, 0.22, 0.925, 1)
+emission_energy_multiplier = 1.5
+
+[sub_resource type="StandardMaterial3D" id="mat_blue"]
+albedo_color = Color(0.05, 0.05, 0.15, 1)
+emission_enabled = true
+emission = Color(0.35, 0.45, 1.0, 1)
+emission_energy_multiplier = 1.5
+
+[sub_resource type="StandardMaterial3D" id="mat_blue2"]
+albedo_color = Color(0.05, 0.05, 0.15, 1)
+emission_enabled = true
+emission = Color(0.228, 0.525, 1.0, 1)
+emission_energy_multiplier = 1.5
+
+[sub_resource type="TextMesh" id="mesh_P"]
+text = "P"
+font = ExtResource("2")
+font_size = 80
+depth = 0.3
+
+[sub_resource type="TextMesh" id="mesh_M"]
+text = "M"
+font = ExtResource("2")
+font_size = 80
+depth = 0.3
+
+[sub_resource type="TextMesh" id="mesh_V"]
+text = "V"
+font = ExtResource("2")
+font_size = 80
+depth = 0.3
+
+[sub_resource type="TextMesh" id="mesh_I"]
+text = "I"
+font = ExtResource("2")
+font_size = 80
+depth = 0.3
+
+[sub_resource type="TextMesh" id="mesh_E"]
+text = "E"
+font = ExtResource("2")
+font_size = 80
+depth = 0.3
+
+[sub_resource type="TextMesh" id="mesh_W"]
+text = "W"
+font = ExtResource("2")
+font_size = 80
+depth = 0.3
+
+[sub_resource type="ShaderMaterial" id="kitt_mat"]
+shader = ExtResource("3")
+shader_parameter/sweep_position = -0.4
+shader_parameter/sweep_width = 0.4
+shader_parameter/intensity = 0.0
+shader_parameter/color_left = Color(1.0, 0.0, 0.43, 1)
+shader_parameter/color_mid = Color(0.514, 0.22, 0.925, 1)
+shader_parameter/color_right = Color(0.228, 0.525, 1.0, 1)
+
+[sub_resource type="ButtonGroup" id="mode_group"]
+
+[sub_resource type="StyleBoxFlat" id="launch_panel_style"]
+bg_color = Color(0.08, 0.06, 0.12, 0.9)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.514, 0.22, 0.925, 0.6)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[node name="MainMenu" type="Node3D"]
+script = ExtResource("1")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("env")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866, -0.354, 0.354, 0, 0.707, 0.707, -0.5, -0.612, 0.612, 2, 4, 2)
+light_color = Color(0.6, 0.55, 0.8, 1)
+light_energy = 0.4
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.985, 0.174, 0, -0.174, 0.985, 0, 2, 8)
+
+[node name="TitleGroup" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0)
+
+[node name="LetterP" type="MeshInstance3D" parent="TitleGroup"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.75, 0, 0)
+mesh = SubResource("mesh_P")
+surface_material_override/0 = SubResource("mat_pink")
+
+[node name="LetterM" type="MeshInstance3D" parent="TitleGroup"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.25, 0, 0)
+mesh = SubResource("mesh_M")
+surface_material_override/0 = SubResource("mat_pink2")
+
+[node name="LetterV" type="MeshInstance3D" parent="TitleGroup"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.75, 0, 0)
+mesh = SubResource("mesh_V")
+surface_material_override/0 = SubResource("mat_purple")
+
+[node name="LetterI" type="MeshInstance3D" parent="TitleGroup"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.75, 0, 0)
+mesh = SubResource("mesh_I")
+surface_material_override/0 = SubResource("mat_purple2")
+
+[node name="LetterE" type="MeshInstance3D" parent="TitleGroup"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.25, 0, 0)
+mesh = SubResource("mesh_E")
+surface_material_override/0 = SubResource("mat_blue")
+
+[node name="LetterW" type="MeshInstance3D" parent="TitleGroup"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.75, 0, 0)
+mesh = SubResource("mesh_W")
+surface_material_override/0 = SubResource("mat_blue2")
+
+[node name="SubtitleLabel" type="Label3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+pixel_size = 0.01
+modulate = Color(0.5, 0.55, 0.7, 0.7)
+text = "PERFORMANCE  CO-PILOT  VISUALISER"
+font = ExtResource("2")
+font_size = 24
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="Control" type="Control" parent="CanvasLayer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme = ExtResource("4")
+
+[node name="CenterContainer" type="CenterContainer" parent="CanvasLayer/Control"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -240.0
+offset_top = -340.0
+offset_right = 240.0
+offset_bottom = -40.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CanvasLayer/Control/CenterContainer"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="EndpointLabel" type="Label" parent="CanvasLayer/Control/CenterContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "PMPROXY ENDPOINT"
+horizontal_alignment = 1
+
+[node name="EndpointInput" type="LineEdit" parent="CanvasLayer/Control/CenterContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(420, 36)
+theme_override_font_sizes/font_size = 12
+text = "http://localhost:44322"
+alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="CanvasLayer/Control/CenterContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="ModeLabel" type="Label" parent="CanvasLayer/Control/CenterContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "MODE"
+horizontal_alignment = 1
+
+[node name="ModeButtons" type="HBoxContainer" parent="CanvasLayer/Control/CenterContainer/VBoxContainer"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 16
+
+[node name="LiveButton" type="Button" parent="CanvasLayer/Control/CenterContainer/VBoxContainer/ModeButtons"]
+layout_mode = 2
+custom_minimum_size = Vector2(120, 32)
+toggle_mode = true
+button_pressed = true
+button_group = SubResource("mode_group")
+text = "LIVE"
+
+[node name="ArchiveButton" type="Button" parent="CanvasLayer/Control/CenterContainer/VBoxContainer/ModeButtons"]
+layout_mode = 2
+custom_minimum_size = Vector2(120, 32)
+disabled = true
+toggle_mode = true
+button_group = SubResource("mode_group")
+text = "ARCHIVE"
+
+[node name="HSeparator2" type="HSeparator" parent="CanvasLayer/Control/CenterContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="LaunchPanel" type="Panel" parent="CanvasLayer/Control/CenterContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(420, 56)
+mouse_default_cursor_shape = 2
+theme_override_styles/panel = SubResource("launch_panel_style")
+
+[node name="KittRect" type="ColorRect" parent="CanvasLayer/Control/CenterContainer/VBoxContainer/LaunchPanel"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+material = SubResource("kitt_mat")
+
+[node name="LaunchLabel" type="Label" parent="CanvasLayer/Control/CenterContainer/VBoxContainer/LaunchPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_font_sizes/font_size = 20
+text = "LAUNCH"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="VersionLabel" type="Label" parent="CanvasLayer/Control/CenterContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 8
+theme_override_colors/font_color = Color(0.4, 0.4, 0.5, 0.5)
+text = "v0.1.0"
+horizontal_alignment = 1
