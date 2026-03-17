@@ -203,6 +203,35 @@ public partial class SceneBinder : Node
 	}
 
 	/// <summary>
+	/// Updates SourceRangeMax for all active bindings matching the given zone.
+	/// Stub — full implementation provided by Task 7.
+	/// </summary>
+	public void UpdateSourceRangeMax(string zoneName, double newMax)
+	{
+		// Task 7 implements the body; stub present for compilation.
+	}
+
+	/// <summary>
+	/// Returns {zoneName: currentSourceRangeMax} for each zone with active bindings.
+	/// Only returns the SourceRangeMax from bytes-throughput bindings.
+	/// Zones with no active bindings are omitted.
+	/// </summary>
+	public Godot.Collections.Dictionary GetSourceRanges()
+	{
+		var result = new Godot.Collections.Dictionary();
+		foreach (var active in _activeBindings)
+		{
+			var binding = active.Resolved.Binding;
+			if (binding.ZoneName == null) continue;
+			if (!binding.Metric.Contains("bytes")) continue;
+			if (result.ContainsKey(binding.ZoneName)) continue;
+
+			result[binding.ZoneName] = binding.SourceRangeMax;
+		}
+		return result;
+	}
+
+	/// <summary>
 	/// Creates distinct 3D objects for each instance of a metric.
 	/// Clones a template node and creates one binding per instance.
 	/// Call after scene is loaded and instance domain is known.
