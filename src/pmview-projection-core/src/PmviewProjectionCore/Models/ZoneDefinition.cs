@@ -1,4 +1,4 @@
-namespace PmviewHostProjector.Models;
+namespace PmviewProjectionCore.Models;
 
 public enum ZoneRow { Foreground, Background }
 public enum ZoneType { Aggregate, PerInstance }

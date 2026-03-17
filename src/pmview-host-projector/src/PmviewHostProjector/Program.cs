@@ -2,7 +2,7 @@ using PcpClient;
 using PmviewHostProjector.Discovery;
 using PmviewHostProjector.Emission;
 using PmviewHostProjector.Layout;
-using PmviewHostProjector.Models;
+using PmviewProjectionCore.Models;
 using PmviewHostProjector.Profiles;
 using PmviewHostProjector.Scaffolding;
 

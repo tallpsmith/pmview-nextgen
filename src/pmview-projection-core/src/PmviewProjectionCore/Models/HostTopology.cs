@@ -1,4 +1,4 @@
-namespace PmviewHostProjector.Models;
+namespace PmviewProjectionCore.Models;
 
 /// <summary>
 /// Named HostOs to avoid collision with System.OperatingSystem under ImplicitUsings.

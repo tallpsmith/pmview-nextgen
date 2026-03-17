@@ -1,5 +1,5 @@
 using System.Globalization;
-using PmviewHostProjector.Models;
+using PmviewProjectionCore.Models;
 
 namespace PmviewHostProjector.Emission;
 

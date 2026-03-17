@@ -1,4 +1,4 @@
-namespace PmviewHostProjector.Models;
+namespace PmviewProjectionCore.Models;
 
 public record Vec3(float X, float Y, float Z)
 {

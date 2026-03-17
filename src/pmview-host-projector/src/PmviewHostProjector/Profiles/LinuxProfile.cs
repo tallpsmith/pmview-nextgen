@@ -1,4 +1,4 @@
-using PmviewHostProjector.Models;
+using PmviewProjectionCore.Models;
 
 namespace PmviewHostProjector.Profiles;
 

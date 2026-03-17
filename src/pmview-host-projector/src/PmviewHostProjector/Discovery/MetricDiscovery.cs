@@ -1,5 +1,5 @@
 using PcpClient;
-using PmviewHostProjector.Models;
+using PmviewProjectionCore.Models;
 
 namespace PmviewHostProjector.Discovery;
 
