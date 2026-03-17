@@ -16,6 +16,11 @@ public partial class SceneBinder : Node
 	[Signal]
 	public delegate void BindingErrorEventHandler(string message);
 
+	[Signal]
+	public delegate void BindingsReadyEventHandler();
+
+	public bool IsBound { get; private set; }
+
 	/// <summary>
 	/// Controls how quickly displayed values converge to polled targets.
 	/// Higher = faster. Uses frame-rate-independent exponential decay.
@@ -136,6 +141,8 @@ public partial class SceneBinder : Node
 		}
 
 		GD.Print($"[SceneBinder] {_activeBindings.Count} bindings from scene properties");
+		IsBound = true;
+		EmitSignal(SignalName.BindingsReady);
 		return metricNames.ToArray();
 	}
 
@@ -254,6 +261,7 @@ public partial class SceneBinder : Node
 
 	public void UnloadCurrentScene()
 	{
+		IsBound = false;
 		_activeBindings.Clear();
 		_rotationSpeeds.Clear();
 		_smoothValues.Clear();

@@ -560,6 +560,16 @@ public partial class SceneBinderTests
 		AssertThat(dict.ContainsKey("pmview.meta.hostname")).IsFalse();
 	}
 
+	// ── IsBound property ────────────────────────────────────────────────
+
+	[TestCase]
+	[RequireGodotRuntime]
+	public void IsBound_FalseBeforeBinding()
+	{
+		var binder = new SceneBinder();
+		AssertThat(binder.IsBound).IsFalse();
+	}
+
 	// ── Helpers ──────────────────────────────────────────────────────────
 
 	private static Godot.Collections.Dictionary MakeSingularMetrics(
