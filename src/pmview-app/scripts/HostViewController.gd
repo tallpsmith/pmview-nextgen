@@ -12,22 +12,42 @@ var _esc_timer: SceneTreeTimer = null
 func _ready() -> void:
 	var scene := SceneManager.built_scene
 	if scene == null:
-		push_error("No built scene — returning to menu")
+		push_error("[HostView] No built scene — returning to menu")
 		SceneManager.go_to_main_menu()
 		return
 
-	# Reparent the built scene into this scene tree
-	SceneManager.built_scene = null  # Take ownership
+	# Take ownership before the scene enters the tree
+	SceneManager.built_scene = null
+
+	# Wire up MetricPoller → SceneBinder BEFORE add_child so that
+	# MetricPoller._Ready() sees populated MetricNames and auto-starts
+	# polling from the C# side — avoids cross-language method call issues
+	# on nodes created via SetScript() at runtime.
+	var poller = scene.find_child("MetricPoller")
+	var binder = scene.find_child("SceneBinder")
+	if not poller or not binder:
+		push_error("[HostView] MetricPoller or SceneBinder not found in built scene")
+		add_child(scene)
+		return
+
+	var metric_names: PackedStringArray = binder.call("BindFromSceneProperties", scene)
+	print("[HostView] Bound %d metric names" % metric_names.size())
+
+	poller.set("MetricNames", metric_names)
+	poller.connect("MetricsUpdated", Callable(binder, "ApplyMetrics"))
+	poller.connect("ErrorOccurred", _on_poller_error)
+	poller.connect("ConnectionStateChanged", _on_poller_state)
+
+	# Now add to tree — MetricPoller._Ready() sees MetricNames > 0 and auto-starts
 	add_child(scene)
 
-	# Wire up MetricPoller → SceneBinder
-	var poller = scene.get_node("MetricPoller")
-	var binder = scene.get_node("SceneBinder")
-	if poller and binder:
-		var metric_names = binder.Call("BindFromSceneProperties", scene)
-		poller.Set("MetricNames", metric_names)
-		poller.Call("StartPolling")
-		poller.Connect("MetricsUpdated", Callable(binder, "ApplyMetrics"))
+
+func _on_poller_error(message: String) -> void:
+	push_error("[HostView] MetricPoller error: %s" % message)
+
+
+func _on_poller_state(state: String) -> void:
+	print("[HostView] MetricPoller state: %s" % state)
 
 
 func _unhandled_input(event: InputEvent) -> void:
