@@ -1,6 +1,6 @@
 using PmviewProjectionCore.Models;
 
-namespace PmviewHostProjector.Profiles;
+namespace PmviewProjectionCore.Profiles;
 
 /// <summary>
 /// Zone definitions and colour palette shared across platform profiles.

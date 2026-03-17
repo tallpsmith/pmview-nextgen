@@ -1,5 +1,5 @@
 using Xunit;
-using PmviewHostProjector.Models;
+using PmviewProjectionCore.Models;
 
 namespace PmviewHostProjector.Tests.Models;
 

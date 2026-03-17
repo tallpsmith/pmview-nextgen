@@ -1,6 +1,6 @@
 using Xunit;
-using PmviewHostProjector.Models;
-using PmviewHostProjector.Profiles;
+using PmviewProjectionCore.Models;
+using PmviewProjectionCore.Profiles;
 
 namespace PmviewHostProjector.Tests.Profiles;
 

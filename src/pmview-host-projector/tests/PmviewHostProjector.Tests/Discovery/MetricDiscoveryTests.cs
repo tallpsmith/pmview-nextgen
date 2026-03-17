@@ -1,6 +1,6 @@
 using Xunit;
-using PmviewHostProjector.Discovery;
-using PmviewHostProjector.Models;
+using PmviewProjectionCore.Discovery;
+using PmviewProjectionCore.Models;
 using PmviewHostProjector.Tests.TestHelpers;
 
 namespace PmviewHostProjector.Tests.Discovery;

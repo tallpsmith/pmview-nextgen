@@ -1,9 +1,9 @@
 using PcpClient;
-using PmviewHostProjector.Discovery;
 using PmviewHostProjector.Emission;
-using PmviewHostProjector.Layout;
+using PmviewProjectionCore.Discovery;
+using PmviewProjectionCore.Layout;
 using PmviewProjectionCore.Models;
-using PmviewHostProjector.Profiles;
+using PmviewProjectionCore.Profiles;
 using PmviewHostProjector.Scaffolding;
 
 namespace PmviewHostProjector;

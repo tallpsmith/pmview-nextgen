@@ -1,6 +1,6 @@
 using PmviewProjectionCore.Models;
 
-namespace PmviewHostProjector.Profiles;
+namespace PmviewProjectionCore.Profiles;
 
 public class HostProfileProvider : IHostProfileProvider
 {

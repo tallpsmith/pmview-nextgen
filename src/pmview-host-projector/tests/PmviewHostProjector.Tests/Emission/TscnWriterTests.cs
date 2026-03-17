@@ -1,8 +1,8 @@
 using Xunit;
 using PmviewHostProjector.Emission;
-using PmviewHostProjector.Layout;
-using PmviewHostProjector.Models;
-using PmviewHostProjector.Profiles;
+using PmviewProjectionCore.Layout;
+using PmviewProjectionCore.Models;
+using PmviewProjectionCore.Profiles;
 
 namespace PmviewHostProjector.Tests.Emission;
 

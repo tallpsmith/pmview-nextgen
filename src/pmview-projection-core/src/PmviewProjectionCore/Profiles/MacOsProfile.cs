@@ -1,6 +1,6 @@
 using PmviewProjectionCore.Models;
 
-namespace PmviewHostProjector.Profiles;
+namespace PmviewProjectionCore.Profiles;
 
 /// <summary>
 /// macOS host profile. Shares CPU, Load, Disk, and per-instance zones with

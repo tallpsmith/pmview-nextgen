@@ -1,6 +1,6 @@
 using PmviewProjectionCore.Models;
 
-namespace PmviewHostProjector.Layout;
+namespace PmviewProjectionCore.Layout;
 
 /// <summary>
 /// Pure geometry — no I/O, no Godot dependencies.

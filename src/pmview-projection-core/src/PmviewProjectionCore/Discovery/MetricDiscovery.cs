@@ -1,7 +1,7 @@
 using PcpClient;
 using PmviewProjectionCore.Models;
 
-namespace PmviewHostProjector.Discovery;
+namespace PmviewProjectionCore.Discovery;
 
 /// <summary>
 /// Discovers host topology from a live pmproxy endpoint via IPcpClient.
