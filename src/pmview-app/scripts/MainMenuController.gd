@@ -12,16 +12,10 @@ const PHASE_OFFSET := 0.4           # radians offset per letter for wave effect
 @onready var launch_panel: Panel = %LaunchPanel
 @onready var kitt_rect: ColorRect = %KittRect
 
-var _letter_nodes: Array[Node3D] = []
 var _sweep_tween: Tween = null
 
 
 func _ready() -> void:
-	# Gather all letter MeshInstance3D children for rotation
-	for child in title_group.get_children():
-		if child is MeshInstance3D:
-			_letter_nodes.append(child)
-
 	# Wire up LAUNCH panel hover signals
 	launch_panel.mouse_entered.connect(_on_launch_hover)
 	launch_panel.mouse_exited.connect(_on_launch_unhover)
@@ -35,10 +29,8 @@ func _process(delta: float) -> void:
 
 
 func _rotate_title_letters(delta: float) -> void:
-	for i in _letter_nodes.size():
-		var letter := _letter_nodes[i]
-		var phase := i * PHASE_OFFSET
-		letter.rotate_y((ROTATION_SPEED + sin(Time.get_ticks_msec() * 0.001 + phase) * 0.15) * delta)
+	# Rotate the whole title group as one unit with a gentle sine wobble
+	title_group.rotate_y((ROTATION_SPEED + sin(Time.get_ticks_msec() * 0.001) * 0.15) * delta)
 
 
 # --- LAUNCH button hover: KITT scanner effect ---
