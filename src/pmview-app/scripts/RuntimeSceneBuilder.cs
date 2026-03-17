@@ -117,10 +117,10 @@ public static class RuntimeSceneBuilder
             switch (item)
             {
                 case PlacedStack stack:
-                    BuildStack(grid, stack);
+                    BuildStack(grid, stack, zone.Name);
                     break;
                 case PlacedShape shape:
-                    BuildShape(grid, shape);
+                    BuildShape(grid, shape, zone.Name);
                     break;
             }
         }
@@ -180,7 +180,7 @@ public static class RuntimeSceneBuilder
 
     // ── shapes ─────────────────────────────────────────────────────────
 
-    private static void BuildShape(Node parent, PlacedShape shape)
+    private static void BuildShape(Node parent, PlacedShape shape, string zoneName)
     {
         var scenePath = shape.Shape == ShapeType.Cylinder ? CylinderScenePath : BarScenePath;
         var packedScene = GD.Load<PackedScene>(scenePath);
@@ -198,12 +198,12 @@ public static class RuntimeSceneBuilder
         }
 
         parent.AddChild(instance);
-        AddBindable(instance, BuildBinding(shape));
+        AddBindable(instance, BuildBinding(shape, zoneName));
     }
 
     // ── stacks ─────────────────────────────────────────────────────────
 
-    private static void BuildStack(Node3D grid, PlacedStack stack)
+    private static void BuildStack(Node3D grid, PlacedStack stack, string zoneName)
     {
         var stackNode = new Node3D { Name = stack.GroupName };
         stackNode.SetScript(GD.Load<Script>(StackGroupScriptPath));
@@ -218,12 +218,12 @@ public static class RuntimeSceneBuilder
         grid.AddChild(stackNode);
 
         foreach (var member in stack.Members)
-            BuildShape(stackNode, member);
+            BuildShape(stackNode, member, zoneName);
     }
 
     // ── bindings ───────────────────────────────────────────────────────
 
-    private static Resource BuildBinding(PlacedShape shape)
+    private static Resource BuildBinding(PlacedShape shape, string zoneName)
     {
         return CreateBindingResource(
             shape.MetricName,
@@ -233,7 +233,8 @@ public static class RuntimeSceneBuilder
             shape.TargetRangeMin,
             shape.TargetRangeMax,
             shape.InstanceName,
-            shape.TargetRangeMin);
+            shape.TargetRangeMin,
+            zoneName);
     }
 
     private static Resource BuildAmbientBinding(string metricName)
@@ -246,14 +247,16 @@ public static class RuntimeSceneBuilder
             targetRangeMin: 0f,
             targetRangeMax: 1f,
             instanceName: null,
-            initialValue: 0f);
+            initialValue: 0f,
+            zoneName: "");
     }
 
     private static Resource CreateBindingResource(
         string metricName, string targetProperty,
         float sourceRangeMin, float sourceRangeMax,
         float targetRangeMin, float targetRangeMax,
-        string? instanceName, float initialValue)
+        string? instanceName, float initialValue,
+        string zoneName)
     {
         var res = new Resource();
         // C# script — re-fetch after SetScript
@@ -271,6 +274,7 @@ public static class RuntimeSceneBuilder
 
         res.Set("InstanceId", -1);
         res.Set("InitialValue", initialValue);
+        res.Set("ZoneName", zoneName);
         return res;
     }
 
