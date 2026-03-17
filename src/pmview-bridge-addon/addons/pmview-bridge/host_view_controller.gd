@@ -27,3 +27,9 @@ func _ready() -> void:
 	print("[host_view_controller] Calling StartPolling...")
 	poller.StartPolling()
 	print("[host_view_controller] Wiring complete")
+
+	var tuning_panel = find_child("RangeTuningPanel")
+	if tuning_panel:
+		print("[host_view_controller] Initialising RangeTuningPanel...")
+		tuning_panel.initialise(binder)
+		print("[host_view_controller] RangeTuningPanel wired")
