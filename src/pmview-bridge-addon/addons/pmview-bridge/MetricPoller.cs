@@ -29,6 +29,7 @@ public partial class MetricPoller : Node
 	[Export] public int PollIntervalMs { get; set; } = 1000;
 	[Export] public string[] MetricNames { get; set; } = [];
 	[Export] public string Hostname { get; set; } = "";
+	[Export] public bool VerboseLogging { get; set; } = false;
 
 	[Signal]
 	public delegate void PlaybackPositionChangedEventHandler(string position, string mode);
@@ -325,8 +326,9 @@ public partial class MetricPoller : Node
 					foreach (var inst in indom.Instances)
 						nameMap[inst.Name] = inst.Id;
 					_liveInstanceNames[metricName] = nameMap;
-					GD.Print($"[MetricPoller] Live instance names for {metricName}: " +
-						string.Join(", ", nameMap.Select(kv => $"{kv.Key}→{kv.Value}")));
+					if (VerboseLogging)
+						GD.Print($"[MetricPoller] Live instance names for {metricName}: " +
+							string.Join(", ", nameMap.Select(kv => $"{kv.Key}→{kv.Value}")));
 				}
 			}
 			catch (Exception ex)
@@ -389,15 +391,17 @@ public partial class MetricPoller : Node
 				if (bounds.HasValue)
 				{
 					_timeCursor.EndBound = bounds.Value.End;
-					GD.Print($"[MetricPoller] Archive discovery: " +
-						$"sampling interval = {_archiveSamplingIntervalSeconds:F1}s, " +
-						$"sample bounds = {bounds.Value.Start:o} to {bounds.Value.End:o}");
+					if (VerboseLogging)
+						GD.Print($"[MetricPoller] Archive discovery: " +
+							$"sampling interval = {_archiveSamplingIntervalSeconds:F1}s, " +
+							$"sample bounds = {bounds.Value.Start:o} to {bounds.Value.End:o}");
 				}
 			}
 
-			GD.Print($"[MetricPoller] Archive query window: " +
-				$"{_archiveSamplingIntervalSeconds * 1.5:F1}s " +
-				$"(1.5x detected {_archiveSamplingIntervalSeconds:F1}s interval)");
+			if (VerboseLogging)
+				GD.Print($"[MetricPoller] Archive query window: " +
+					$"{_archiveSamplingIntervalSeconds * 1.5:F1}s " +
+					$"(1.5x detected {_archiveSamplingIntervalSeconds:F1}s interval)");
 		}
 		catch (Exception ex)
 		{
@@ -415,7 +419,8 @@ public partial class MetricPoller : Node
 			.Where(m => !m.StartsWith("pmview.meta.", StringComparison.Ordinal))
 			.ToArray();
 
-		GD.Print($"[MetricPoller] Historical fetch at cursor: {cursorPosition:o}");
+		if (VerboseLogging)
+			GD.Print($"[MetricPoller] Historical fetch at cursor: {cursorPosition:o}");
 
 		foreach (var metricName in realMetrics)
 		{
@@ -464,8 +469,9 @@ public partial class MetricPoller : Node
 
 				if (seriesValues.Count == 0)
 				{
-					GD.Print($"[MetricPoller] No values in window for {metricName} " +
-						$"(window: {windowSeconds:F1}s before {cursorPosition:o})");
+					if (VerboseLogging)
+						GD.Print($"[MetricPoller] No values in window for {metricName} " +
+							$"(window: {windowSeconds:F1}s before {cursorPosition:o})");
 					continue;
 				}
 
@@ -477,8 +483,9 @@ public partial class MetricPoller : Node
 					var vals = group.OrderBy(v => v.Timestamp).ToList();
 					var valStrs = vals.Select(v =>
 						$"{v.NumericValue:F2}@{DateTimeOffset.FromUnixTimeMilliseconds((long)v.Timestamp).UtcDateTime:HH:mm:ss}");
-					GD.Print($"[MetricPoller] {metricName} series {seriesLabel}: " +
-						$"{vals.Count} samples [{string.Join(", ", valStrs)}]");
+					if (VerboseLogging)
+						GD.Print($"[MetricPoller] {metricName} series {seriesLabel}: " +
+							$"{vals.Count} samples [{string.Join(", ", valStrs)}]");
 				}
 
 				// Sample-and-hold: skip if we already emitted this timestamp
@@ -491,8 +498,9 @@ public partial class MetricPoller : Node
 				}
 				_lastEmittedTimestamp[metricName] = latestTimestamp;
 
-				GD.Print($"[MetricPoller] {metricName}: NEW sample detected " +
-					$"(ts={latestTimestamp:F3}, prev={lastTs:F3})");
+				if (VerboseLogging)
+					GD.Print($"[MetricPoller] {metricName}: NEW sample detected " +
+						$"(ts={latestTimestamp:F3}, prev={lastTs:F3})");
 
 				// Counters: compute per-second rates from consecutive samples
 				// Instant/discrete: take latest timestamp's values directly
@@ -503,12 +511,14 @@ public partial class MetricPoller : Node
 					foreach (var rv in resolvedValues)
 					{
 						var seriesLabel = rv.SeriesId[..8];
-						GD.Print($"[MetricPoller] {metricName} rate: series {seriesLabel} " +
-							$"= {rv.NumericValue:F4}/s");
+						if (VerboseLogging)
+							GD.Print($"[MetricPoller] {metricName} rate: series {seriesLabel} " +
+								$"= {rv.NumericValue:F4}/s");
 					}
 					if (resolvedValues.Count == 0)
-						GD.Print($"[MetricPoller] {metricName}: rate computation returned 0 values " +
-							$"(need >=2 samples per series, got {seriesValues.Count} total)");
+						if (VerboseLogging)
+							GD.Print($"[MetricPoller] {metricName}: rate computation returned 0 values " +
+								$"(need >=2 samples per series, got {seriesValues.Count} total)");
 				}
 				else
 				{
@@ -537,8 +547,9 @@ public partial class MetricPoller : Node
 					instances[instanceKey] = sv.NumericValue;
 					if (matched != null)
 						matchedInstanceInfos.Add(matched);
-					GD.Print($"[MetricPoller] {metricName}: instance {instanceKey} " +
-						$"= {sv.NumericValue:F4}");
+					if (VerboseLogging)
+						GD.Print($"[MetricPoller] {metricName}: instance {instanceKey} " +
+							$"= {sv.NumericValue:F4}");
 				}
 
 				// Build name→id from only the instance entries that matched actual values.
@@ -566,7 +577,8 @@ public partial class MetricPoller : Node
 
 		if (dict.Count > 0)
 		{
-			GD.Print($"[MetricPoller] Historical update: {dict.Count} metrics with new data");
+			if (VerboseLogging)
+				GD.Print($"[MetricPoller] Historical update: {dict.Count} metrics with new data");
 			InjectVirtualMetrics(dict);
 			_lastEmittedMetrics = dict;
 			EmitSignal(SignalName.MetricsUpdated, dict);
@@ -604,8 +616,9 @@ public partial class MetricPoller : Node
 			if (mapping.Count > 0)
 			{
 				var pairs = mapping.Select(kv => $"{kv.Key[..8]}..→{kv.Value.PcpInstanceId} ({kv.Value.Name})");
-				GD.Print($"[MetricPoller] Instance mapping for {metricName}: " +
-					$"{string.Join(", ", pairs)}");
+				if (VerboseLogging)
+					GD.Print($"[MetricPoller] Instance mapping for {metricName}: " +
+						$"{string.Join(", ", pairs)}");
 			}
 		}
 		catch (Exception ex)

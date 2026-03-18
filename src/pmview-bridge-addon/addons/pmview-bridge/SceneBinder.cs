@@ -28,6 +28,12 @@ public partial class SceneBinder : Node
 	/// </summary>
 	[Export] public float SmoothSpeed { get; set; } = 5.0f;
 
+	/// <summary>
+	/// Enables per-tick diagnostic logging in ApplyMetrics.
+	/// Off by default — turn on in editor or via GDScript for debugging.
+	/// </summary>
+	[Export] public bool VerboseLogging { get; set; } = false;
+
 	private Node? _currentScene;
 	private readonly List<ActiveBinding> _activeBindings = new();
 	private readonly Dictionary<Node3D, float> _rotationSpeeds = new();
@@ -177,12 +183,15 @@ public partial class SceneBinder : Node
 			double? rawValue = ExtractValue(binding, instances, nameToId);
 			if (rawValue == null)
 			{
-				var instanceLabel = binding.InstanceName != null
-					? $"name='{binding.InstanceName}'"
-					: $"id={binding.InstanceId}";
-				GD.Print($"[SceneBinder] {binding.SceneNode}: no value for " +
-					$"{binding.Metric}[{instanceLabel}] " +
-					$"(available keys: {string.Join(",", instances.Keys)})");
+				if (VerboseLogging)
+				{
+					var instanceLabel = binding.InstanceName != null
+						? $"name='{binding.InstanceName}'"
+						: $"id={binding.InstanceId}";
+					GD.Print($"[SceneBinder] {binding.SceneNode}: no value for " +
+						$"{binding.Metric}[{instanceLabel}] " +
+						$"(available keys: {string.Join(",", instances.Keys)})");
+				}
 				continue;
 			}
 
@@ -190,10 +199,11 @@ public partial class SceneBinder : Node
 				binding.SourceRangeMin, binding.SourceRangeMax,
 				binding.TargetRangeMin, binding.TargetRangeMax);
 
-			GD.Print($"[SceneBinder] {binding.SceneNode}.{binding.Property}: " +
-				$"raw={rawValue.Value:F4} -> normalised={normalised:F4} " +
-				$"(src [{binding.SourceRangeMin}-{binding.SourceRangeMax}] " +
-				$"-> tgt [{binding.TargetRangeMin}-{binding.TargetRangeMax}])");
+			if (VerboseLogging)
+				GD.Print($"[SceneBinder] {binding.SceneNode}.{binding.Property}: " +
+					$"raw={rawValue.Value:F4} -> normalised={normalised:F4} " +
+					$"(src [{binding.SourceRangeMin}-{binding.SourceRangeMax}] " +
+					$"-> tgt [{binding.TargetRangeMin}-{binding.TargetRangeMax}])");
 
 			if (IsSmoothable(active))
 				SetSmoothTarget(active, (float)normalised);
@@ -210,12 +220,14 @@ public partial class SceneBinder : Node
 	/// </summary>
 	public void UpdateSourceRangeMax(string zoneName, double newMax)
 	{
+		var updated = 0;
 		for (int i = 0; i < _activeBindings.Count; i++)
 		{
 			var active = _activeBindings[i];
 			if (active.Resolved.Binding.ZoneName != zoneName) continue;
 			if (!active.Resolved.Binding.Metric.Contains("bytes")) continue;
 
+			var oldMax = active.Resolved.Binding.SourceRangeMax;
 			var oldBinding = active.Resolved.Binding;
 			var newBinding = oldBinding with { SourceRangeMax = newMax };
 			var newResolved = active.Resolved with { Binding = newBinding };
@@ -228,9 +240,20 @@ public partial class SceneBinder : Node
 			}
 
 			_activeBindings[i] = newActive;
+			updated++;
+			GD.Print($"[SceneBinder] {oldBinding.Metric}: SourceRangeMax {oldMax} -> {newMax}");
 		}
 
-		GD.Print($"[SceneBinder] Updated SourceRangeMax for zone '{zoneName}' to {newMax}");
+		if (updated == 0)
+		{
+			GD.PushWarning($"[SceneBinder] UpdateSourceRangeMax('{zoneName}', {newMax}): " +
+				$"NO bindings matched! Active bindings: {_activeBindings.Count}, " +
+				$"zones present: {string.Join(", ", _activeBindings.Select(a => a.Resolved.Binding.ZoneName ?? "(null)"))}");
+		}
+		else
+		{
+			GD.Print($"[SceneBinder] Updated {updated} bindings for zone '{zoneName}' to {newMax}");
+		}
 	}
 
 	/// <summary>
