@@ -62,22 +62,52 @@ Probing is done via a new `ArchiveSourceDiscovery` component in PcpClient (not d
 
 ### Loading Pipeline Branching
 
-`LoadingPipeline.StartPipeline()` accepts mode from config:
+`LoadingPipeline.StartPipeline()` currently accepts only `string endpoint`. The signature changes to accept the full config:
+
+```csharp
+public async void StartPipeline(string endpoint, string mode = "live",
+    string? hostname = null, string? startTime = null)
+```
+
+`LoadingController.gd` reads these from `SceneManager.connection_config` and passes them through:
+
+```gdscript
+# LoadingController._ready()
+var config := SceneManager.connection_config
+pipeline.StartPipeline(
+    config.get("endpoint", "http://localhost:44322"),
+    config.get("mode", "live"),
+    config.get("hostname", ""),
+    config.get("start_time", ""))
+```
+
+Pipeline branching by mode:
 
 - **Live mode:** Existing path — `PcpClientConnection.ConnectAsync()` → `MetricDiscovery.DiscoverAsync()` → layout → build.
-- **Archive mode:** `ArchiveMetricDiscoverer` path — uses `/series/*` endpoints to discover topology for the selected hostname, then same layout → build path.
+- **Archive mode:** `ArchiveMetricDiscoverer` path — uses `/series/*` endpoints with **hostname-filtered queries** to discover topology for the selected hostname, then same layout → build path. The existing `DiscoverArchiveMetadata()` in MetricPoller must also be updated to use hostname-filtered queries rather than querying `MetricNames[0]` without a hostname filter.
 
 `RuntimeSceneBuilder.Build()` is unchanged — it builds from a `SceneLayout` regardless of data source.
 
 ### Host View Changes
 
-`HostViewController` reads `mode` from `SceneManager.connection_config`. If archive mode, calls `MetricPoller.StartPlayback(start_time)` after the built scene is added to the tree.
+**Controller distinction:** The app-level `HostViewController.gd` (in `pmview-app/scripts/`) is the outer controller that receives the built scene. The built scene's root node has the addon's `host_view_controller.gd` script (set by `RuntimeSceneBuilder`). Archive mode wiring belongs in the **app-level** `HostViewController.gd` because it's app-specific behaviour, not addon concern. It reaches into the built scene to find the MetricPoller node:
+
+```gdscript
+# HostViewController._ready() — after add_child(scene)
+var config := SceneManager.connection_config
+if config.get("mode", "live") == "archive":
+    var poller = scene.find_child("MetricPoller", true, false)
+    if poller:
+        poller.StartPlayback(config.get("start_time", ""))
+```
+
+Archive keyboard shortcuts (Space, Left/Right, SHIFT+Left/Right, R, F2) are handled in `HostViewController._unhandled_input()` — alongside the existing ESC handler. All shortcuts are registered as Godot `InputMap` actions for consistency and remappability.
 
 ## Phase 2: Time Control UI
 
 ### Visual Design
 
-A translucent 2D overlay anchored to the right edge of the viewport. The panel is a `CanvasLayer` with a `Control` node using custom `_draw()` for the timeline bars.
+A translucent 2D overlay anchored to the right edge of the viewport. The TimeControl is added as a child of the existing `UILayer` CanvasLayer (created by `RuntimeSceneBuilder.AddRangeTuningPanel()`), not as a separate CanvasLayer. The main visual node is a `Control` using custom `_draw()` for the timeline bars.
 
 **Visual elements:**
 - **Timeline bars** — horizontal bars representing timestamps across the archive range. Bars near the mouse cursor extend toward it (length proportional to proximity), creating the Time Machine fan-out effect.
@@ -113,6 +143,7 @@ The entire panel has translucency — it's a ghostly overlay, not a solid wall.
 | Click | Jump playhead to that timestamp |
 | SHIFT+Click (1st) | Set IN point. OUT defaults to archive end. Auto-resume. |
 | SHIFT+Click (2nd) | Set OUT point. Auto-resume. |
+| SHIFT+Click (3rd+) | Starts a new range — becomes the new IN point (replaces previous range). Next SHIFT+Click sets new OUT. |
 
 **Keyboard shortcuts (any time in archive mode, panel not required):**
 
@@ -127,8 +158,11 @@ The entire panel has translucency — it's a ghostly overlay, not a solid wall.
 ### Node Structure
 
 ```
-TimeControl (CanvasLayer)
-  TimelinePanel (Control)
+UILayer (CanvasLayer — existing, from RuntimeSceneBuilder)
+  RangeTuningPanel (existing)
+  HudBar (existing)
+  TimeControl (Control — added by RuntimeSceneBuilder in archive mode only)
+    TimelinePanel (Control)
     — Custom _draw() renders timeline bars
     — Handles mouse proximity, hover, click
     — Manages IN/OUT point state
@@ -147,13 +181,34 @@ TimeControl (CanvasLayer)
 ### Signal Flow
 
 ```
+# App-level HostViewController.gd connects these in _ready() after adding the built scene:
+
 TimelinePanel.playhead_jumped → HostViewController → MetricPoller.JumpToTimestamp()
 TimelinePanel.range_set       → HostViewController → MetricPoller.SetInOutRange()
 TimelinePanel.range_cleared   → HostViewController → MetricPoller.ClearRange()
 TimelinePanel.panel_opened    → HostViewController → MetricPoller.PausePlayback()
 TimelinePanel.panel_closed    → HostViewController → MetricPoller.ResumePlayback()
 
-MetricPoller.PlaybackPositionChanged → TimelinePanel (updates playhead)
+# HostViewController connects MetricPoller feedback to TimeControl:
+MetricPoller.PlaybackPositionChanged → HostViewController → TimelinePanel.update_playhead()
+```
+
+**SHIFT+Click state machine:**
+
+```
+State: NO_RANGE (initial)
+  SHIFT+Click → set IN point, OUT = archive end → State: IN_SET
+  Click → jump playhead (no range effect)
+
+State: IN_SET
+  SHIFT+Click → set OUT point → State: RANGE_COMPLETE
+  Click → jump playhead (IN point persists)
+  R → clear → State: NO_RANGE
+
+State: RANGE_COMPLETE
+  SHIFT+Click → replace range, becomes new IN point, OUT = archive end → State: IN_SET
+  Click → jump playhead (range persists)
+  R → clear → State: NO_RANGE
 ```
 
 ## Architecture: What Changes Where
@@ -163,22 +218,22 @@ MetricPoller.PlaybackPositionChanged → TimelinePanel (updates playhead)
 | Component | Layer | Language | Purpose |
 |-----------|-------|----------|---------|
 | `ArchiveSourceDiscovery` | PcpClient | C# | List hosts, probe time bounds. Composes PcpSeriesClient calls. |
-| `TimeControl` scene | pmview-app | GDScript | CanvasLayer + TimelinePanel for archive navigation |
+| `TimeControl` scene | pmview-app | GDScript | Control node within existing UILayer CanvasLayer for archive navigation |
 
 ### Modified Components
 
 | Component | Changes |
 |-----------|---------|
 | `PcpSeriesQuery` | RFC 3986 URL encoding for hostname label filter expressions |
-| `TimeCursor` | Add `InPoint`/`OutPoint` (nullable DateTime), `StepByInterval(seconds, direction)`. `AdvanceBy()` respects IN/OUT bounds for looping. |
+| `TimeCursor` | Add `InPoint`/`OutPoint` (nullable DateTime), `StepByInterval(seconds, direction)`. `AdvanceBy()` loop logic changes: when `InPoint` is set, loop back to `InPoint` (not `StartTime`). When no IN/OUT range, loop back to `StartTime` as before. `EndBound` is set to `OutPoint` when OUT is set. |
 | `MetricPoller` | Add `StepPlayback()`, `JumpToTimestamp()`, `SetInOutRange()`, `ClearRange()` |
 | `MainMenuController.gd` | Wire ArchiveButton, add hostname dropdown + time input, archive panel show/hide |
 | `main_menu.tscn` | Enable ArchiveButton, add archive config panel nodes |
 | `SceneManager.gd` | Pass mode/hostname/start_time in config dict |
 | `LoadingController.gd` | Read mode from config |
 | `LoadingPipeline.cs` | Branch on mode — archive discovery path |
-| `HostViewController.gd` | Start playback if archive mode, connect TimeControl signals, keyboard shortcuts |
-| `RuntimeSceneBuilder.cs` | Add TimeControl CanvasLayer to UILayer |
+| `HostViewController.gd` | Start playback if archive mode, connect TimeControl signals, keyboard shortcuts via InputMap actions |
+| `RuntimeSceneBuilder.cs` | Add TimeControl as child of UILayer (archive mode only) |
 
 ### Unchanged Components
 
