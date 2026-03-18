@@ -727,4 +727,38 @@ public class SeriesQueryTests
         var result = PcpSeriesQuery.ParseLabelsResponse(json, "hostname");
         Assert.Empty(result);
     }
+
+    // ── Hostname-filtered query URL building ──
+
+    [Fact]
+    public void BuildHostnameFilteredQueryUrl_EncodesFilterExpression()
+    {
+        var baseUrl = new Uri("http://localhost:44322");
+
+        var url = PcpSeriesQuery.BuildHostnameFilteredQueryUrl(
+            baseUrl, "kernel.all.load", "saas-prod-01");
+
+        var urlStr = url.AbsoluteUri;
+        Assert.Contains("/series/query", urlStr);
+        // Must percent-encode { } " = for pmproxy compatibility
+        Assert.Contains("%7B", urlStr);  // {
+        Assert.Contains("%7D", urlStr);  // }
+        Assert.Contains("%22", urlStr);  // "
+        Assert.Contains("%3D%3D", urlStr);  // ==
+        Assert.Contains("saas-prod-01", urlStr);
+    }
+
+    [Fact]
+    public void BuildHostnameFilteredQueryUrl_HostnameWithSpecialChars_EncodesCorrectly()
+    {
+        var baseUrl = new Uri("http://localhost:44322");
+
+        var url = PcpSeriesQuery.BuildHostnameFilteredQueryUrl(
+            baseUrl, "kernel.all.load", "web server.local");
+
+        var urlStr = url.AbsoluteUri;
+        // Hostname with spaces must also be encoded
+        Assert.DoesNotContain(" ", urlStr);
+        Assert.Contains("web%20server.local", urlStr);
+    }
 }
