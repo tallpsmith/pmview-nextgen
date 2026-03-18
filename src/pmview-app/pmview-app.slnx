@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="../pcp-client-dotnet/src/PcpClient/PcpClient.csproj" />
+  <Project Path="../pmview-projection-core/src/PmviewProjectionCore/PmviewProjectionCore.csproj" />
+  <Project Path="pmview-app.csproj" />
+</Solution>

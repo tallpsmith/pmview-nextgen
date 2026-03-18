@@ -16,12 +16,23 @@ public partial class SceneBinder : Node
 	[Signal]
 	public delegate void BindingErrorEventHandler(string message);
 
+	[Signal]
+	public delegate void BindingsReadyEventHandler();
+
+	public bool IsBound { get; private set; }
+
 	/// <summary>
 	/// Controls how quickly displayed values converge to polled targets.
 	/// Higher = faster. Uses frame-rate-independent exponential decay.
 	/// Default 5 gives a smooth ~0.2s response.
 	/// </summary>
 	[Export] public float SmoothSpeed { get; set; } = 5.0f;
+
+	/// <summary>
+	/// Enables per-tick diagnostic logging in ApplyMetrics.
+	/// Off by default — turn on in editor or via GDScript for debugging.
+	/// </summary>
+	[Export] public bool VerboseLogging { get; set; } = false;
 
 	private Node? _currentScene;
 	private readonly List<ActiveBinding> _activeBindings = new();
@@ -73,18 +84,21 @@ public partial class SceneBinder : Node
 	internal void AdvanceInterpolations(float delta)
 	{
 		var smoothFactor = 1f - MathF.Exp(-delta * SmoothSpeed);
-		foreach (var key in _smoothValues.Keys.ToList())
+		List<ActiveBinding> toRemove = null;
+		foreach (var (key, (current, target)) in _smoothValues)
 		{
 			if (!IsInstanceValid(key.TargetNode))
 			{
-				_smoothValues.Remove(key);
+				(toRemove ??= []).Add(key);
 				continue;
 			}
-			var (current, target) = _smoothValues[key];
 			var next = Mathf.Lerp(current, target, smoothFactor);
 			_smoothValues[key] = (next, target);
 			ApplyBuiltInProperty(key.TargetNode, key.Resolved.Binding.Property, next);
 		}
+		if (toRemove != null)
+			foreach (var key in toRemove)
+				_smoothValues.Remove(key);
 	}
 
 	/// <summary>
@@ -136,6 +150,8 @@ public partial class SceneBinder : Node
 		}
 
 		GD.Print($"[SceneBinder] {_activeBindings.Count} bindings from scene properties");
+		IsBound = true;
+		EmitSignal(SignalName.BindingsReady);
 		return metricNames.ToArray();
 	}
 
@@ -170,12 +186,15 @@ public partial class SceneBinder : Node
 			double? rawValue = ExtractValue(binding, instances, nameToId);
 			if (rawValue == null)
 			{
-				var instanceLabel = binding.InstanceName != null
-					? $"name='{binding.InstanceName}'"
-					: $"id={binding.InstanceId}";
-				GD.Print($"[SceneBinder] {binding.SceneNode}: no value for " +
-					$"{binding.Metric}[{instanceLabel}] " +
-					$"(available keys: {string.Join(",", instances.Keys)})");
+				if (VerboseLogging)
+				{
+					var instanceLabel = binding.InstanceName != null
+						? $"name='{binding.InstanceName}'"
+						: $"id={binding.InstanceId}";
+					GD.Print($"[SceneBinder] {binding.SceneNode}: no value for " +
+						$"{binding.Metric}[{instanceLabel}] " +
+						$"(available keys: {string.Join(",", instances.Keys)})");
+				}
 				continue;
 			}
 
@@ -183,16 +202,104 @@ public partial class SceneBinder : Node
 				binding.SourceRangeMin, binding.SourceRangeMax,
 				binding.TargetRangeMin, binding.TargetRangeMax);
 
-			GD.Print($"[SceneBinder] {binding.SceneNode}.{binding.Property}: " +
-				$"raw={rawValue.Value:F4} -> normalised={normalised:F4} " +
-				$"(src [{binding.SourceRangeMin}-{binding.SourceRangeMax}] " +
-				$"-> tgt [{binding.TargetRangeMin}-{binding.TargetRangeMax}])");
+			if (VerboseLogging)
+				GD.Print($"[SceneBinder] {binding.SceneNode}.{binding.Property}: " +
+					$"raw={rawValue.Value:F4} -> normalised={normalised:F4} " +
+					$"(src [{binding.SourceRangeMin}-{binding.SourceRangeMax}] " +
+					$"-> tgt [{binding.TargetRangeMin}-{binding.TargetRangeMax}])");
 
 			if (IsSmoothable(active))
 				SetSmoothTarget(active, (float)normalised);
 			else
 				ApplyProperty(active, (float)normalised);
 		}
+	}
+
+	/// <summary>
+	/// Replaces the SourceRangeMax on all active bindings whose ZoneName matches
+	/// and whose metric name contains "bytes". Called by the range tuning panel
+	/// when users adjust a slider. The next poll tick picks up the new range
+	/// through the existing Normalise() path.
+	/// </summary>
+	public void UpdateSourceRangeMax(string zoneName, double newMax)
+	{
+		var updated = 0;
+		for (int i = 0; i < _activeBindings.Count; i++)
+		{
+			var active = _activeBindings[i];
+			if (active.Resolved.Binding.ZoneName != zoneName) continue;
+			if (!active.Resolved.Binding.Metric.Contains("bytes")) continue;
+
+			var oldMax = active.Resolved.Binding.SourceRangeMax;
+			var oldBinding = active.Resolved.Binding;
+			var newBinding = oldBinding with { SourceRangeMax = newMax };
+			var newResolved = active.Resolved with { Binding = newBinding };
+			var newActive = active with { Resolved = newResolved };
+
+			if (_smoothValues.TryGetValue(active, out var smoothState))
+			{
+				_smoothValues.Remove(active);
+				_smoothValues[newActive] = smoothState;
+			}
+
+			_activeBindings[i] = newActive;
+			updated++;
+			GD.Print($"[SceneBinder] {oldBinding.Metric}: SourceRangeMax {oldMax} -> {newMax}");
+		}
+
+		if (updated == 0)
+		{
+			GD.PushWarning($"[SceneBinder] UpdateSourceRangeMax('{zoneName}', {newMax}): " +
+				$"NO bindings matched! Active bindings: {_activeBindings.Count}, " +
+				$"zones present: {string.Join(", ", _activeBindings.Select(a => a.Resolved.Binding.ZoneName ?? "(null)"))}");
+		}
+		else
+		{
+			GD.Print($"[SceneBinder] Updated {updated} bindings for zone '{zoneName}' to {newMax}");
+		}
+	}
+
+	/// <summary>
+	/// Returns {zoneName: currentSourceRangeMax} for each zone with active bindings.
+	/// Only returns the SourceRangeMax from bytes-throughput bindings.
+	/// Zones with no active bindings are omitted.
+	/// </summary>
+	public Godot.Collections.Dictionary GetSourceRanges()
+	{
+		var result = new Godot.Collections.Dictionary();
+		foreach (var active in _activeBindings)
+		{
+			var binding = active.Resolved.Binding;
+			if (binding.ZoneName == null) continue;
+			if (!binding.Metric.Contains("bytes")) continue;
+			if (result.ContainsKey(binding.ZoneName)) continue;
+
+			result[binding.ZoneName] = binding.SourceRangeMax;
+		}
+		return result;
+	}
+
+	/// <summary>
+	/// Returns the spatial centroid of all Node3D targets in the named zone.
+	/// Used by the range tuning panel for camera auto-focus.
+	/// </summary>
+	public Vector3 GetZoneCentroid(string zoneName)
+	{
+		var seen = new HashSet<Node3D>();
+		foreach (var active in _activeBindings)
+		{
+			if (active.Resolved.Binding.ZoneName != zoneName) continue;
+			if (active.TargetNode is Node3D node3D)
+				seen.Add(node3D);
+		}
+
+		if (seen.Count == 0)
+			return Vector3.Zero;
+
+		var sum = Vector3.Zero;
+		foreach (var node in seen)
+			sum += node.GlobalPosition;
+		return sum / seen.Count;
 	}
 
 	/// <summary>
@@ -254,6 +361,7 @@ public partial class SceneBinder : Node
 
 	public void UnloadCurrentScene()
 	{
+		IsBound = false;
 		_activeBindings.Clear();
 		_rotationSpeeds.Clear();
 		_smoothValues.Clear();
@@ -372,8 +480,9 @@ public partial class SceneBinder : Node
 		if (instances.ContainsKey(-1))
 			return instances[-1].AsDouble();
 
-		foreach (var key in instances.Keys)
-			return instances[key].AsDouble();
+		// Singular metric with non-standard key: return whatever value exists
+		if (instances.Count > 0)
+			return instances.Values.First().AsDouble();
 
 		return null;
 	}

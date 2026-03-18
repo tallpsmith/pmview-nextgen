@@ -109,6 +109,33 @@ public class PcpBindingConverterTests
 
         Assert.Equal(3.14, binding.InitialValue);
     }
+
+    [Fact]
+    public void ZoneName_IncludedInMetricBinding()
+    {
+        var binding = PcpBindingConverter.ToMetricBinding(
+            sceneNode: "TestNode", metricName: "disk.all.read_bytes",
+            targetProperty: "height",
+            sourceRangeMin: 0, sourceRangeMax: 500_000_000,
+            targetRangeMin: 0.2, targetRangeMax: 5.0,
+            instanceId: -1, instanceName: null, initialValue: 0.2,
+            zoneName: "Disk");
+
+        Assert.Equal("Disk", binding.ZoneName);
+    }
+
+    [Fact]
+    public void ZoneName_DefaultsToNull_WhenNotProvided()
+    {
+        var binding = PcpBindingConverter.ToMetricBinding(
+            sceneNode: "TestNode", metricName: "kernel.all.cpu.sys",
+            targetProperty: "height",
+            sourceRangeMin: 0, sourceRangeMax: 100,
+            targetRangeMin: 0.2, targetRangeMax: 5.0,
+            instanceId: -1, instanceName: null, initialValue: 0.2);
+
+        Assert.Null(binding.ZoneName);
+    }
 }
 
 /// <summary>

@@ -54,6 +54,8 @@ public class TimeCursor
     {
         Mode = CursorMode.Live;
         StartTime = null;
+        EndBound = null;
+        Loop = false;
     }
 
     public void AdvanceBy(TimeSpan elapsed)

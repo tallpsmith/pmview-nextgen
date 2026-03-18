@@ -1,5 +1,5 @@
 using System.Globalization;
-using PmviewHostProjector.Models;
+using PmviewProjectionCore.Models;
 
 namespace PmviewHostProjector.Emission;
 
@@ -60,5 +60,5 @@ public static class WorldSetup
         return len > 0f ? (x / len, y / len, z / len) : (0f, 0f, 1f);
     }
 
-    private static string F(float value) => (value == 0f ? 0f : value).ToString(Inv);
+    private static string F(float value) => value.ToString(Inv);
 }

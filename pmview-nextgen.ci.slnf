@@ -1,0 +1,15 @@
+{
+  "solution": {
+    "path": "pmview-nextgen.sln",
+    "projects": [
+      "src/pcp-client-dotnet/src/PcpClient/PcpClient.csproj",
+      "src/pcp-client-dotnet/tests/PcpClient.Tests/PcpClient.Tests.csproj",
+      "src/pcp-godot-bridge/src/PcpGodotBridge/PcpGodotBridge.csproj",
+      "src/pcp-godot-bridge/tests/PcpGodotBridge.Tests/PcpGodotBridge.Tests.csproj",
+      "src/pmview-host-projector/src/PmviewHostProjector/PmviewHostProjector.csproj",
+      "src/pmview-host-projector/tests/PmviewHostProjector.Tests/PmviewHostProjector.Tests.csproj",
+      "src/pmview-projection-core/src/PmviewProjectionCore/PmviewProjectionCore.csproj",
+      "src/pmview-projection-core/tests/PmviewProjectionCore.Tests/PmviewProjectionCore.Tests.csproj"
+    ]
+  }
+}

@@ -24,6 +24,7 @@ public partial class PcpBindingResource : Resource
 	[Export] public string InstanceName { get; set; } = "";
 	[Export] public int InstanceId { get; set; } = -1;
 	[Export] public float InitialValue { get; set; } = 0.0f;
+	[Export] public string ZoneName { get; set; } = "";
 
 	/// <summary>
 	/// Converts this resource to a pure .NET MetricBinding for validation and runtime use.
@@ -35,6 +36,7 @@ public partial class PcpBindingResource : Resource
 			SourceRangeMin, SourceRangeMax,
 			TargetRangeMin, TargetRangeMax,
 			InstanceId, InstanceName,
-			InitialValue);
+			InitialValue,
+			zoneName: string.IsNullOrWhiteSpace(ZoneName) ? null : ZoneName);
 	}
 }

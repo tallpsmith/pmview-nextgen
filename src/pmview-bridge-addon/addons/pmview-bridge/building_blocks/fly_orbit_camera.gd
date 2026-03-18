@@ -28,6 +28,16 @@ var _transition_start_pos: Vector3
 var _transition_start_basis: Basis
 var _transition_progress: float = 0.0
 
+# Focus state (smooth look-at for auto-focus)
+var _focus_target: Vector3 = Vector3.ZERO
+var _focus_active: bool = false
+var _focus_start_yaw: float = 0.0
+var _focus_start_pitch: float = 0.0
+var _focus_target_yaw: float = 0.0
+var _focus_target_pitch: float = 0.0
+var _focus_progress: float = 0.0
+const FOCUS_DURATION: float = 0.5
+
 func _ready() -> void:
 	_orbit_height = position.y
 	_radius = Vector2(position.x - orbit_center.x, position.z - orbit_center.z).length()
@@ -37,6 +47,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and event.physical_keycode == KEY_TAB:
 		_toggle_mode()
 		get_viewport().set_input_as_handled()
+	# Cancel focus animation on any manual camera input
+	if _focus_active:
+		if event is InputEventMouseMotion and _is_right_clicking:
+			_focus_active = false
 	if _mode == Mode.FLY:
 		if event is InputEventMouseButton:
 			_is_right_clicking = event.pressed and event.button_index == MOUSE_BUTTON_RIGHT
@@ -85,6 +99,15 @@ func _process_orbit(delta: float) -> void:
 	look_at(orbit_center, Vector3.UP)
 
 func _process_fly(delta: float) -> void:
+	# Handle focus animation
+	if _focus_active:
+		_focus_progress += delta / FOCUS_DURATION
+		var t := _ease_in_out(_focus_progress)
+		_fly_yaw = lerpf(_focus_start_yaw, _focus_target_yaw, t)
+		_fly_pitch = lerpf(_focus_start_pitch, _focus_target_pitch, t)
+		if _focus_progress >= 1.0:
+			_focus_active = false
+
 	var speed := fly_speed
 	if Input.is_physical_key_pressed(KEY_SHIFT):
 		speed *= sprint_multiplier
@@ -102,6 +125,10 @@ func _process_fly(delta: float) -> void:
 		input_dir.y -= 1.0
 	if Input.is_physical_key_pressed(KEY_E):
 		input_dir.y += 1.0
+
+	# Cancel focus if user takes manual control
+	if input_dir.length_squared() > 0.0:
+		_focus_active = false
 
 	# Build orientation from yaw/pitch
 	var fly_basis := Basis.from_euler(Vector3(_fly_pitch, _fly_yaw, 0.0))
@@ -139,3 +166,23 @@ func _process_transition(delta: float) -> void:
 func _ease_in_out(t: float) -> float:
 	var clamped := clampf(t, 0.0, 1.0)
 	return clamped * clamped * (3.0 - 2.0 * clamped)
+
+## Smoothly pans the camera to look at the given world position.
+## In orbit mode: changes orbit_center so the camera orbits the target.
+## In fly mode: smoothly rotates to look at the target without moving.
+func focus_on_position(target: Vector3) -> void:
+	_focus_target = target
+	match _mode:
+		Mode.ORBIT:
+			orbit_center = target
+		Mode.FLY:
+			var dir := (target - global_position).normalized()
+			_focus_target_yaw = atan2(-dir.x, -dir.z)
+			_focus_target_pitch = asin(dir.y)
+			_focus_start_yaw = _fly_yaw
+			_focus_start_pitch = _fly_pitch
+			_focus_progress = 0.0
+			_focus_active = true
+		Mode.TRANSITIONING:
+			_mode = Mode.ORBIT
+			orbit_center = target

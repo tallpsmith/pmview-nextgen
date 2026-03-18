@@ -120,6 +120,14 @@ public static class BindingConfigLoader
         if (!meta.TryGetValue("poll_interval_ms", out var pollObj))
             return DefaultPollIntervalMs;
 
+        if (pollObj is not (long or int))
+        {
+            messages.Add(new ValidationMessage(ValidationSeverity.Warning,
+                $"poll_interval_ms must be an integer, got {pollObj?.GetType().Name}. Using default {DefaultPollIntervalMs}.",
+                null));
+            return DefaultPollIntervalMs;
+        }
+
         var pollValue = Convert.ToInt32(pollObj);
         if (pollValue < MinPollIntervalMs)
         {
@@ -151,7 +159,7 @@ public static class BindingConfigLoader
 
         string? instanceName = binding.TryGetValue("instance_name", out var nameObj)
             ? nameObj?.ToString() : null;
-        int? instanceId = binding.TryGetValue("instance_id", out var idObj)
+        int? instanceId = binding.TryGetValue("instance_id", out var idObj) && idObj is long or int
             ? Convert.ToInt32(idObj) : null;
 
         var metricBinding = new MetricBinding(sceneNode, metric, property,

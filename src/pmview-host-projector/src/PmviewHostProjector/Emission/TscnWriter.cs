@@ -1,6 +1,6 @@
 using System.Globalization;
 using System.Text;
-using PmviewHostProjector.Models;
+using PmviewProjectionCore.Models;
 
 namespace PmviewHostProjector.Emission;
 
@@ -49,6 +49,10 @@ public static class TscnWriter
             "res://addons/pmview-bridge/PcpBindable.cs");
         registry.Require("binding_res_script", "Script",
             "res://addons/pmview-bridge/PcpBindingResource.cs");
+        registry.Require("range_tuning_panel_scene", "PackedScene",
+            "res://addons/pmview-bridge/ui/range_tuning_panel.tscn");
+        registry.Require("hud_bar_scene", "PackedScene",
+            "res://addons/pmview-bridge/ui/hud_bar.tscn");
     }
 
     // --- resource collection ---
@@ -90,7 +94,8 @@ public static class TscnWriter
                         SourceRangeMin: shape.SourceRangeMin,
                         SourceRangeMax: shape.SourceRangeMax,
                         TargetRangeMin: shape.TargetRangeMin,
-                        TargetRangeMax: shape.TargetRangeMax));
+                        TargetRangeMax: shape.TargetRangeMax,
+                        ZoneName: zone.Name));
                 }
             }
         }
@@ -140,6 +145,7 @@ public static class TscnWriter
 
             sb.AppendLine("InstanceId = -1");
             sb.AppendLine($"InitialValue = {F(entry.TargetRangeMin)}");
+            sb.AppendLine($"ZoneName = \"{entry.ZoneName}\"");
             sb.AppendLine();
         }
     }
@@ -189,6 +195,7 @@ public static class TscnWriter
             WriteZone(sb, zone, registry, subResources);
 
         WriteAmbientLabels(sb, ambientLabels);
+        WriteRangeTuningPanel(sb, registry);
     }
 
     private static void WriteAmbientLabels(StringBuilder sb,
@@ -199,7 +206,7 @@ public static class TscnWriter
             sb.AppendLine($"[node name=\"{label.NodeName}\" type=\"Label3D\" parent=\".\"]");
 
             if (label.IsFlatOnFloor)
-                sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, {F(label.YPosition)}, -4)");
+                sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, {F(label.YPosition)}, -4)");
             else
                 sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, {F(label.YPosition)}, 0)");
 
@@ -226,6 +233,18 @@ public static class TscnWriter
             sb.AppendLine($"PcpBindings = Array[ExtResource(\"binding_res_script\")]([SubResource(\"{label.SubResourceId}\")])");
             sb.AppendLine();
         }
+    }
+
+    private static void WriteRangeTuningPanel(StringBuilder sb, ExtResourceRegistry registry)
+    {
+        sb.AppendLine("[node name=\"UILayer\" type=\"CanvasLayer\" parent=\".\"]");
+        sb.AppendLine();
+
+        sb.AppendLine("[node name=\"RangeTuningPanel\" parent=\"UILayer\" instance=ExtResource(\"range_tuning_panel_scene\")]");
+        sb.AppendLine();
+
+        sb.AppendLine("[node name=\"HudBar\" parent=\"UILayer\" instance=ExtResource(\"hud_bar_scene\")]");
+        sb.AppendLine();
     }
 
     private static void WriteZone(StringBuilder sb, PlacedZone zone,
@@ -357,7 +376,7 @@ public static class TscnWriter
 
     private static string SubResourceId(string nodeName) => $"binding_{nodeName}";
 
-    private static string F(float value) => (value == 0f ? 0f : value).ToString(Inv);
+    private static string F(float value) => value.ToString(Inv);
 
     private static string FormatPackedStringArray(IReadOnlyList<string> items)
     {
@@ -374,7 +393,8 @@ public static class TscnWriter
         float SourceRangeMin,
         float SourceRangeMax,
         float TargetRangeMin,
-        float TargetRangeMax);
+        float TargetRangeMax,
+        string ZoneName);
 
     private record AmbientLabelSpec(
         string NodeName,

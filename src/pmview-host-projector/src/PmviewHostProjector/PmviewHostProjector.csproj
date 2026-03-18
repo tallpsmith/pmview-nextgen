@@ -9,5 +9,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\pcp-client-dotnet\src\PcpClient\PcpClient.csproj" />
+    <ProjectReference Include="..\..\..\pmview-projection-core\src\PmviewProjectionCore\PmviewProjectionCore.csproj" />
   </ItemGroup>
 </Project>

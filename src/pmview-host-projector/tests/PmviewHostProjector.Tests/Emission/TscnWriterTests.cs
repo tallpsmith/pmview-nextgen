@@ -1,8 +1,8 @@
 using Xunit;
 using PmviewHostProjector.Emission;
-using PmviewHostProjector.Layout;
-using PmviewHostProjector.Models;
-using PmviewHostProjector.Profiles;
+using PmviewProjectionCore.Layout;
+using PmviewProjectionCore.Models;
+using PmviewProjectionCore.Profiles;
 
 namespace PmviewHostProjector.Tests.Emission;
 
@@ -351,7 +351,7 @@ public class TscnWriterTests
     public void Write_TimestampLabel_IsFlat_WithNeonOrangeAndLargeFont()
     {
         var tscn = TscnWriter.Write(MinimalLayout());
-        Assert.Contains("Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0.02, -4)", tscn);
+        Assert.Contains("Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0.02, -4)", tscn);
         Assert.Contains("font_size = 96", tscn);
         Assert.Contains("pixel_size = 0.02", tscn);
         Assert.Contains("outline_size = 8", tscn);
@@ -408,14 +408,15 @@ public class TscnWriterTests
     public void Write_LoadSteps_EqualsExtResourcesPlusSubResources()
     {
         // MinimalLayout: 1 Bar shape.
-        // ext_resources (9): controller_script, metric_poller_script, scene_binder_script,
-        //                     metric_group_script, metric_grid_script, ground_bezel_script,
-        //                     bar_scene, bindable_script, binding_res_script
+        // ext_resources (11): controller_script, metric_poller_script, scene_binder_script,
+        //                      metric_group_script, metric_grid_script, ground_bezel_script,
+        //                      bar_scene, bindable_script, binding_res_script,
+        //                      range_tuning_panel_scene, hud_bar_scene
         // sub_resources (1): binding for CPU_User
         // ambient labels (2): TimestampLabel, HostnameLabel
-        // = 9 + 1 + 2 = 12
+        // = 11 + 1 + 2 = 14
         var tscn = TscnWriter.Write(MinimalLayout());
-        Assert.Contains("load_steps=12 ", tscn);
+        Assert.Contains("load_steps=14 ", tscn);
     }
 
     // --- PlacedStack emission tests ---
@@ -509,14 +510,15 @@ public class TscnWriterTests
     public void Write_LoadSteps_WithPlacedStack_CountsCorrectly()
     {
         // Stack with 3 members:
-        // ext_resources (10): controller, metric_poller, scene_binder,
+        // ext_resources (12): controller, metric_poller, scene_binder,
         //                      metric_group_script, metric_grid_script, ground_bezel_script,
-        //                      bar_scene, bindable, binding_res, stack_group_script
+        //                      bar_scene, bindable, binding_res, stack_group_script,
+        //                      range_tuning_panel_scene, hud_bar_scene
         // sub_resources (3): one binding per member
         // ambient (2)
-        // = 10 + 3 + 2 = 15
+        // = 12 + 3 + 2 = 17
         var tscn = TscnWriter.Write(LayoutWithCpuStack());
-        Assert.Contains("load_steps=15 ", tscn);
+        Assert.Contains("load_steps=17 ", tscn);
     }
 
     // --- Placeholder / ghost shape tests ---
@@ -556,13 +558,14 @@ public class TscnWriterTests
         ]);
         var tscn = TscnWriter.Write(layout);
 
-        // ext_resources (9): controller, metric_poller, scene_binder,
-        //                     metric_group, metric_grid, ground_bezel,
-        //                     bar_scene, bindable_script, binding_res_script
+        // ext_resources (11): controller, metric_poller, scene_binder,
+        //                      metric_group, metric_grid, ground_bezel,
+        //                      bar_scene, bindable_script, binding_res_script,
+        //                      range_tuning_panel_scene, hud_bar_scene
         // sub_resources (0): placeholder has no binding
         // ambient (2): TimestampLabel, HostnameLabel
-        // = 9 + 0 + 2 = 11
-        Assert.Contains("load_steps=11 ", tscn);
+        // = 11 + 0 + 2 = 13
+        Assert.Contains("load_steps=13 ", tscn);
     }
 
     [Fact]
@@ -590,10 +593,90 @@ public class TscnWriterTests
         Assert.DoesNotContain("ghost = true", tscn.Split("Net_Bytes")[1].Split("Net_Ghost")[0]);
     }
 
+    // --- ZoneName emission ---
+
+    [Fact]
+    public void Write_SubResource_ContainsZoneName()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone(
+                Name: "TestZone", ZoneLabel: "Test Zone", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [new PlacedShape("TZ_Metric", ShapeType.Bar, Vec3.Zero,
+                    "test.metric.bytes", null, null,
+                    new RgbColour(0.5f, 0.5f, 0.5f),
+                    0f, 100f, 0.2f, 5.0f)])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("ZoneName = \"TestZone\"", tscn);
+    }
+
+    [Fact]
+    public void Write_SubResource_StackMembers_ContainZoneName()
+    {
+        var layout = new SceneLayout("testhost", [
+            new PlacedZone(
+                Name: "CPU", ZoneLabel: "CPU", Position: Vec3.Zero,
+                ColumnSpacing: null, RowSpacing: null,
+                Items: [
+                    new PlacedStack("CpuStack", Vec3.Zero,
+                    [
+                        new PlacedShape("CPU_User", ShapeType.Bar, Vec3.Zero,
+                            "kernel.all.cpu.user", null, null,
+                            new RgbColour(1f, 0f, 0f), 0f, 100f, 0.2f, 5.0f),
+                    ], StackMode.Proportional)
+                ])
+        ]);
+        var tscn = TscnWriter.Write(layout);
+        Assert.Contains("ZoneName = \"CPU\"", tscn);
+    }
+
+    // --- Range tuning panel ---
+
+    [Fact]
+    public void Write_HasRangeTuningPanelExtResource()
+    {
+        var tscn = TscnWriter.Write(MinimalLayout());
+        Assert.Contains("res://addons/pmview-bridge/ui/range_tuning_panel.tscn", tscn);
+        Assert.Contains("range_tuning_panel_scene", tscn);
+    }
+
+    [Fact]
+    public void Write_HasUILayerCanvasLayerNode()
+    {
+        var tscn = TscnWriter.Write(MinimalLayout());
+        Assert.Contains("[node name=\"UILayer\" type=\"CanvasLayer\" parent=\".\"]", tscn);
+    }
+
+    [Fact]
+    public void Write_HasRangeTuningPanelInstancedNode()
+    {
+        var tscn = TscnWriter.Write(MinimalLayout());
+        Assert.Contains("[node name=\"RangeTuningPanel\" parent=\"UILayer\" instance=ExtResource(\"range_tuning_panel_scene\")]", tscn);
+    }
+
+    // --- HUD bar ---
+
+    [Fact]
+    public void Write_ContainsHudBarInstance()
+    {
+        var tscn = TscnWriter.Write(MinimalLayout());
+        Assert.Contains("hud_bar", tscn);
+        Assert.Contains("[node name=\"HudBar\" parent=\"UILayer\" instance=ExtResource(\"hud_bar_scene\")]", tscn);
+    }
+
+    [Fact]
+    public void Write_HasHudBarExtResource()
+    {
+        var tscn = TscnWriter.Write(MinimalLayout());
+        Assert.Contains("res://addons/pmview-bridge/ui/hud_bar.tscn", tscn);
+        Assert.Contains("hud_bar_scene", tscn);
+    }
+
     // --- macOS end-to-end integration test ---
 
     [Fact]
-    public void Write_MacOsLayout_GhostNetworkShapes_AndDarwinMemoryMetrics()
+    public void Write_MacOsLayout_RealNetworkShapes_AndDarwinMemoryMetrics()
     {
         var topology = new HostTopology(HostOs.MacOs, "macbook",
             ["cpu0", "cpu1"], ["disk0"], ["en0"],
@@ -602,18 +685,18 @@ public class TscnWriterTests
         var layout = LayoutCalculator.Calculate(zones, topology);
         var tscn = TscnWriter.Write(layout);
 
-        // Ghost shapes should have ghost = true
-        Assert.Contains("ghost = true", tscn);
+        // No ghost shapes — PCP now ships network.all.* on macOS
+        Assert.DoesNotContain("ghost = true", tscn);
 
         // Memory zone should have Darwin-specific metrics
         Assert.Contains("mem.util.wired", tscn);
         Assert.Contains("mem.util.compressed", tscn);
 
-        // No binding for ghost network metrics
-        Assert.DoesNotContain("binding_Net_In_Bytes", tscn);
-        Assert.DoesNotContain("binding_Net_Out_Bytes", tscn);
+        // Network aggregate metrics now have real bindings
+        Assert.Contains("network.all.in.bytes", tscn);
+        Assert.Contains("network.all.out.bytes", tscn);
 
-        // Real metrics should still have bindings
+        // Other real metrics should still have bindings
         Assert.Contains("kernel.all.cpu.sys", tscn);
     }
 }

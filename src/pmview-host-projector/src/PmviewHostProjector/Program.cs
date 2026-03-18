@@ -1,9 +1,9 @@
 using PcpClient;
-using PmviewHostProjector.Discovery;
 using PmviewHostProjector.Emission;
-using PmviewHostProjector.Layout;
-using PmviewHostProjector.Models;
-using PmviewHostProjector.Profiles;
+using PmviewProjectionCore.Discovery;
+using PmviewProjectionCore.Layout;
+using PmviewProjectionCore.Models;
+using PmviewProjectionCore.Profiles;
 using PmviewHostProjector.Scaffolding;
 
 namespace PmviewHostProjector;
@@ -153,7 +153,7 @@ public class Program
             LogLayoutDiagnostics(layout);
 
             Console.WriteLine("Generating scene...");
-            var tscn = SceneEmitter.Emit(layout, pmproxyUrl);
+            var tscn = TscnWriter.Write(layout, pmproxyUrl);
 
             var directory = Path.GetDirectoryName(outputPath);
             if (!string.IsNullOrEmpty(directory))

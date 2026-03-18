@@ -14,4 +14,5 @@ public record MetricBinding(
     double TargetRangeMax,
     int? InstanceId,
     string? InstanceName,
-    double InitialValue = 0.0);
+    double InitialValue = 0.0,
+    string? ZoneName = null);
