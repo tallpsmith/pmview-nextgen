@@ -35,7 +35,8 @@ public partial class LoadingPipeline : Node
 	/// </summary>
 	[Export] public int MinPhaseDelayMs { get; set; } = 500;
 
-	public async void StartPipeline(string endpoint)
+	public async void StartPipeline(string endpoint, string mode = "live",
+		string hostname = "", string startTime = "")
 	{
 		var currentPhase = 0;
 		PcpClientConnection? client = null;
@@ -51,6 +52,9 @@ public partial class LoadingPipeline : Node
 			EmitSignal(SignalName.PhaseCompleted, 0, "CONNECTING");
 
 			// Phase 1: TOPOLOGY
+			// Both live and archive modes use the same /pmapi discovery for now.
+			// pmproxy exposes the same endpoints for archived hosts. The critical
+			// live/archive difference is in MetricPoller playback, not topology.
 			currentPhase = 1;
 			phaseStart = DateTime.UtcNow;
 			var topology = await MetricDiscovery.DiscoverAsync(client);
@@ -80,7 +84,7 @@ public partial class LoadingPipeline : Node
 			// Phase 5: BUILDING
 			currentPhase = 5;
 			phaseStart = DateTime.UtcNow;
-			BuiltScene = RuntimeSceneBuilder.Build(layout, endpoint);
+			BuiltScene = RuntimeSceneBuilder.Build(layout, endpoint, mode);
 			await EnforceMinPhaseDelay(phaseStart);
 			EmitSignal(SignalName.PhaseCompleted, 5, "BUILDING");
 

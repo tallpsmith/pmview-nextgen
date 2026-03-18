@@ -38,7 +38,7 @@ public static class RuntimeSceneBuilder
     /// mirroring the structure TscnWriter emits to .tscn.
     /// </summary>
     public static Node3D Build(SceneLayout layout, string pmproxyEndpoint,
-        IProgress<float>? progress = null)
+        string mode = "live", IProgress<float>? progress = null)
     {
         GD.Print("[RuntimeSceneBuilder] Build starting...");
         var root = CreateHostViewRoot();
