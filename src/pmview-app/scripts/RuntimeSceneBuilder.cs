@@ -55,6 +55,9 @@ public static class RuntimeSceneBuilder
         BuildAmbientLabels(root);
         AddRangeTuningPanel(root);
 
+        if (mode == "archive")
+            AddTimeControl(root);
+
         // Set Owner on all descendants so find_child(owned=true) works —
         // programmatic nodes don't get an owner automatically unlike .tscn scenes.
         SetOwnerRecursive(root, root);
@@ -377,6 +380,33 @@ public static class RuntimeSceneBuilder
 
         sceneRoot.AddChild(canvas);
         // Owner is set by SetOwnerRecursive() in Build() — don't set manually here.
+    }
+
+    // ── time control (archive mode) ────────────────────────────────────
+
+    private const string TimeControlScenePath = "res://scenes/time_control.tscn";
+
+    private static void AddTimeControl(Node3D sceneRoot)
+    {
+        var timeControlScene = GD.Load<PackedScene>(TimeControlScenePath);
+        if (timeControlScene == null)
+        {
+            GD.PushWarning("[RuntimeSceneBuilder] TimeControl scene not found");
+            return;
+        }
+
+        // Add to existing UILayer, or create one if missing
+        var uiLayer = sceneRoot.FindChild("UILayer", true, false) as CanvasLayer;
+        if (uiLayer == null)
+        {
+            GD.PushWarning("[RuntimeSceneBuilder] UILayer not found — creating one");
+            uiLayer = new CanvasLayer { Name = "UILayer" };
+            sceneRoot.AddChild(uiLayer);
+        }
+
+        var timeControl = timeControlScene.Instantiate();
+        timeControl.Name = "TimeControl";
+        uiLayer.AddChild(timeControl);
     }
 
     // ── script assignment ─────────────────────────────────────────────
