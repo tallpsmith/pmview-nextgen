@@ -594,6 +594,15 @@ public partial class SceneBinderTests
 		// No exception = method exists and handles empty binding list gracefully.
 	}
 
+	[TestCase]
+	[RequireGodotRuntime]
+	public void GetZoneCentroid_CanBeCalled()
+	{
+		var binder = new SceneBinder();
+		var centroid = binder.GetZoneCentroid("Disk");
+		AssertThat(centroid).IsEqual(Godot.Vector3.Zero);
+	}
+
 	// ── Helpers ──────────────────────────────────────────────────────────
 
 	private static Godot.Collections.Dictionary MakeSingularMetrics(

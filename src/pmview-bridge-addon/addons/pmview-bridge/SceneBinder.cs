@@ -254,6 +254,29 @@ public partial class SceneBinder : Node
 	}
 
 	/// <summary>
+	/// Returns the spatial centroid of all Node3D targets in the named zone.
+	/// Used by the range tuning panel for camera auto-focus.
+	/// </summary>
+	public Vector3 GetZoneCentroid(string zoneName)
+	{
+		var seen = new HashSet<Node3D>();
+		foreach (var active in _activeBindings)
+		{
+			if (active.Resolved.Binding.ZoneName != zoneName) continue;
+			if (active.TargetNode is Node3D node3D)
+				seen.Add(node3D);
+		}
+
+		if (seen.Count == 0)
+			return Vector3.Zero;
+
+		var sum = Vector3.Zero;
+		foreach (var node in seen)
+			sum += node.GlobalPosition;
+		return sum / seen.Count;
+	}
+
+	/// <summary>
 	/// Creates distinct 3D objects for each instance of a metric.
 	/// Clones a template node and creates one binding per instance.
 	/// Call after scene is loaded and instance domain is known.
