@@ -85,8 +85,7 @@ public partial class LoadingPipeline : Node
 			EmitSignal(SignalName.PhaseCompleted, 5, "BUILDING");
 
 			// Disconnect — the MetricPoller in the built scene manages its own connection
-			await client.DisconnectAsync();
-			client.Dispose();
+			await client.DisposeAsync();
 
 			EmitSignal(SignalName.PipelineCompleted);
 		}
@@ -97,7 +96,7 @@ public partial class LoadingPipeline : Node
 
 			if (client != null)
 			{
-				try { client.Dispose(); }
+				try { await client.DisposeAsync(); }
 				catch { /* swallow cleanup errors */ }
 			}
 		}

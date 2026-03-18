@@ -153,7 +153,7 @@ public class Program
             LogLayoutDiagnostics(layout);
 
             Console.WriteLine("Generating scene...");
-            var tscn = SceneEmitter.Emit(layout, pmproxyUrl);
+            var tscn = TscnWriter.Write(layout, pmproxyUrl);
 
             var directory = Path.GetDirectoryName(outputPath);
             if (!string.IsNullOrEmpty(directory))

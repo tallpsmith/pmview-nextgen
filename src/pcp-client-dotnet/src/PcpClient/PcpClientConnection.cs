@@ -121,7 +121,7 @@ public sealed class PcpClientConnection : IPcpClient
             var fetchUrl = _context.BuildFetchUrl(namesList);
             var response = await _httpClient.GetAsync(fetchUrl, cancellationToken);
 
-            if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+            if (response.StatusCode == HttpStatusCode.BadRequest)
             {
                 var retryErrorBody = await response.Content.ReadAsStringAsync(cancellationToken);
                 if (PcpMetricFetcher.IsContextExpiredResponse(retryErrorBody))
@@ -163,9 +163,14 @@ public sealed class PcpClientConnection : IPcpClient
 
             if (response.StatusCode == HttpStatusCode.BadRequest)
             {
+                // Non-existent prefix returns 400 from pmproxy — treat as empty namespace
+                // rather than throwing. Other 400s are genuine errors.
                 var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
-                // Non-existent prefix returns empty namespace rather than throwing
-                return new MetricNamespace(prefix, Array.Empty<string>(), Array.Empty<string>());
+                if (errorBody.Contains("unknown metric name", StringComparison.OrdinalIgnoreCase)
+                    || errorBody.Contains("No PMID", StringComparison.OrdinalIgnoreCase))
+                    return new MetricNamespace(prefix, [], []);
+
+                response.EnsureSuccessStatusCode();
             }
 
             response.EnsureSuccessStatusCode();
@@ -236,7 +241,7 @@ public sealed class PcpClientConnection : IPcpClient
             {
                 var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
                 if (PcpInstanceDomainFetcher.IsNoIndomResponse(errorBody))
-                    return new InstanceDomain("", Array.Empty<Instance>());
+                    return new InstanceDomain("", []);
             }
 
             response.EnsureSuccessStatusCode();

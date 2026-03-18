@@ -187,6 +187,11 @@ public static class RuntimeSceneBuilder
     {
         var scenePath = shape.Shape == ShapeType.Cylinder ? CylinderScenePath : BarScenePath;
         var packedScene = GD.Load<PackedScene>(scenePath);
+        if (packedScene == null)
+        {
+            GD.PrintErr($"[RuntimeSceneBuilder] Failed to load shape scene: {scenePath}");
+            return;
+        }
         var instance = packedScene.Instantiate<Node3D>();
         instance.Name = shape.NodeName;
 

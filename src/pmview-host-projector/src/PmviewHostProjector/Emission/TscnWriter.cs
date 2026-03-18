@@ -376,7 +376,7 @@ public static class TscnWriter
 
     private static string SubResourceId(string nodeName) => $"binding_{nodeName}";
 
-    private static string F(float value) => (value == 0f ? 0f : value).ToString(Inv);
+    private static string F(float value) => value.ToString(Inv);
 
     private static string FormatPackedStringArray(IReadOnlyList<string> items)
     {

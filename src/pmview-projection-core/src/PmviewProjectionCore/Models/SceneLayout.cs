@@ -1,3 +1,5 @@
+using System.Linq;
+
 namespace PmviewProjectionCore.Models;
 
 public record Vec3(float X, float Y, float Z)
@@ -48,8 +50,10 @@ public record PlacedZone(
     IReadOnlyList<string>? InstanceLabels = null,
     bool RotateYNinetyDeg = false)
 {
-    // Backward-compatible view: returns only PlacedShape items (not stacks).
-    public IReadOnlyList<PlacedShape> Shapes => Items.OfType<PlacedShape>().ToList();
+    private IReadOnlyList<PlacedShape>? _shapes;
+
+    /// <summary>Returns only standalone PlacedShape items (not members of stacks).</summary>
+    public IReadOnlyList<PlacedShape> Shapes => _shapes ??= Items.OfType<PlacedShape>().ToList();
     public bool HasGrid => ColumnSpacing.HasValue;
 }
 

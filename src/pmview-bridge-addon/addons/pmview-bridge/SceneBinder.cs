@@ -84,18 +84,21 @@ public partial class SceneBinder : Node
 	internal void AdvanceInterpolations(float delta)
 	{
 		var smoothFactor = 1f - MathF.Exp(-delta * SmoothSpeed);
-		foreach (var key in _smoothValues.Keys.ToList())
+		List<ActiveBinding> toRemove = null;
+		foreach (var (key, (current, target)) in _smoothValues)
 		{
 			if (!IsInstanceValid(key.TargetNode))
 			{
-				_smoothValues.Remove(key);
+				(toRemove ??= []).Add(key);
 				continue;
 			}
-			var (current, target) = _smoothValues[key];
 			var next = Mathf.Lerp(current, target, smoothFactor);
 			_smoothValues[key] = (next, target);
 			ApplyBuiltInProperty(key.TargetNode, key.Resolved.Binding.Property, next);
 		}
+		if (toRemove != null)
+			foreach (var key in toRemove)
+				_smoothValues.Remove(key);
 	}
 
 	/// <summary>
@@ -477,8 +480,9 @@ public partial class SceneBinder : Node
 		if (instances.ContainsKey(-1))
 			return instances[-1].AsDouble();
 
-		foreach (var key in instances.Keys)
-			return instances[key].AsDouble();
+		// Singular metric with non-standard key: return whatever value exists
+		if (instances.Count > 0)
+			return instances.Values.First().AsDouble();
 
 		return null;
 	}

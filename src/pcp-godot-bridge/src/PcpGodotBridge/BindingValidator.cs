@@ -38,10 +38,9 @@ public static class BindingValidator
             messages.Add(new ValidationMessage(ValidationSeverity.Error,
                 "instance_name and instance_id are mutually exclusive", context));
 
-        var nodePropertyKey = $"{binding.SceneNode}+{binding.Property}";
-        if (!seenNodeProperties.Add(nodePropertyKey))
+        if (!seenNodeProperties.Add(context))
             messages.Add(new ValidationMessage(ValidationSeverity.Error,
-                $"Duplicate binding for {nodePropertyKey}", context));
+                $"Duplicate binding for {context}", context));
 
         var propertyMessage = ValidateProperty(binding.Property);
         if (propertyMessage != null)
