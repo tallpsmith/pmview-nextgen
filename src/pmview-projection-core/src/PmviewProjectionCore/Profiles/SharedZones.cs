@@ -54,8 +54,8 @@ internal static class SharedZones
         Type: ZoneType.Aggregate,
         Metrics:
         [
-            new("disk.all.read_bytes",  ShapeType.Cylinder, "Read",  Amber, 0f, 500_000_000f, 0.2f, 5.0f),
-            new("disk.all.write_bytes", ShapeType.Cylinder, "Write", Amber, 0f, 500_000_000f, 0.2f, 5.0f),
+            new("disk.all.read_bytes",  ShapeType.Cylinder, "Read",  Amber, 0f, 550_000_000f, 0.2f, 5.0f),
+            new("disk.all.write_bytes", ShapeType.Cylinder, "Write", Amber, 0f, 550_000_000f, 0.2f, 5.0f),
         ],
         InstanceMetricSource: null);
 
@@ -78,8 +78,8 @@ internal static class SharedZones
         Type: ZoneType.PerInstance,
         Metrics:
         [
-            new("disk.dev.read_bytes",  ShapeType.Cylinder, "Read",  DarkGreen, 0f, 500_000f, 0.2f, 5.0f),
-            new("disk.dev.write_bytes", ShapeType.Cylinder, "Write", DarkGreen, 0f, 500_000f, 0.2f, 5.0f),
+            new("disk.dev.read_bytes",  ShapeType.Cylinder, "Read",  DarkGreen, 0f, 550_000_000f, 0.2f, 5.0f),
+            new("disk.dev.write_bytes", ShapeType.Cylinder, "Write", DarkGreen, 0f, 550_000_000f, 0.2f, 5.0f),
         ],
         InstanceMetricSource: "disk.dev.read_bytes");
 

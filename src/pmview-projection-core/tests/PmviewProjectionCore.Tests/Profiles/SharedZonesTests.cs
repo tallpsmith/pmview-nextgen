@@ -45,4 +45,24 @@ public class SharedZonesTests
         var metrics = SharedZones.GetMetricNames("Nonexistent");
         Assert.Empty(metrics);
     }
+
+    [Theory]
+    [InlineData("Disk", 550_000_000f)]
+    [InlineData("Per-Disk", 550_000_000f)]
+    [InlineData("Network In", 125_000_000f)]
+    [InlineData("Network Out", 125_000_000f)]
+    public void Zone_SourceRangeMax_MatchesPreset(string zoneName, float expectedMax)
+    {
+        var metrics = SharedZones.GetMetricNames(zoneName);
+        Assert.NotEmpty(metrics);
+
+        var allZones = typeof(SharedZones)
+            .GetField("AllZones", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
+            .GetValue(null) as PmviewProjectionCore.Models.ZoneDefinition[];
+
+        var zone = allZones!.First(z => z.Name == zoneName);
+        var bytesMetric = zone.Metrics.FirstOrDefault(m => m.MetricName.Contains("bytes"));
+        if (bytesMetric != null)
+            Assert.Equal(expectedMax, bytesMetric.SourceRangeMax);
+    }
 }
