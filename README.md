@@ -212,6 +212,16 @@ This provides a pmproxy endpoint at `http://localhost:44322` that serves synthet
 
 This project modernizes the original [PCP pmview](https://pcp.io/) tool, which visualized system metrics as 3D shapes (colored cylinders for disks, cubes for CPU/Memory/Load). pmview-nextgen takes this concept to the next level with game-like, living, breathing worlds.
 
+## Acknowledgements
+
+This project uses the following third-party assets:
+
+| Asset | Author | License | Usage |
+|-------|--------|---------|-------|
+| [Press Start 2P](https://fonts.google.com/specimen/Press+Start+2P) | CodeMan38 (cody@zone38.net) | [SIL Open Font License 1.1](src/pmview-app/assets/fonts/OFL.txt) | Arcade-style UI text throughout the app |
+| [Godot Engine](https://godotengine.org/) | Juan Linietsky, Ariel Manzur & contributors | MIT | Game engine / runtime |
+| [Tomlyn](https://github.com/xoofx/Tomlyn) | Alexandre Mutel | MIT | TOML configuration parsing |
+
 ## License
 
 TBD - Exploring open source and potential dual licensing options

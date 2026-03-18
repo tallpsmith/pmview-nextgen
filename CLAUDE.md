@@ -72,7 +72,27 @@ This is the same filter used in GitHub Actions CI (no pmproxy in CI runners eith
 
 C# (.NET 8.0) for Godot libraries, C# (.NET 10.0) for CLI/tests; GDScript for scene logic. Follow standard conventions.
 
-<!-- MANUAL ADDITIONS START -->
+## Documentation Scope
+
+All specifications, brainstorming, and feature development **must** include documentation as part of the scope of work. Consider updates to:
+
+- **README.md** — user-facing overview, quick start, feature descriptions
+- **Architecture docs** — design decisions, layer diagrams, data flow
+- **Installation & usage** — setup steps, CLI usage, configuration
+- **Packaging / deployment / releasing** — build artefacts, distribution, versioning
+
+Documentation is not an afterthought — it ships with the code.
+
+## Third-Party Asset Attribution
+
+When adding any external asset to this project (fonts, images, shaders, scripts, libraries bundled as files rather than NuGet packages):
+
+1. **Include the asset's license file** alongside the asset (e.g. `OFL.txt` next to font files)
+2. **Add an entry to the Acknowledgements table** in `README.md` with: asset name (linked to source), author, license (linked to local license file), and usage description
+3. **Verify license compatibility** — only use assets with permissive licenses (MIT, Apache 2.0, SIL OFL, CC-BY, etc.)
+
+Current bundled assets:
+- `src/pmview-app/assets/fonts/PressStart2P-Regular.ttf` — SIL OFL 1.1 (license at `OFL.txt` in same directory)
 
 ## Pre-Push Checklist
 
@@ -90,5 +110,5 @@ C# (.NET 8.0) for Godot libraries, C# (.NET 10.0) for CLI/tests; GDScript for sc
    ```
    This ensures CI failures are caught and surfaced immediately rather than discovered later.
 
-<!-- MANUAL ADDITIONS END -->
+3. **Investigate ALL CI failures.** Even if a build failure appears unrelated to your changes, always investigate it and aim to fix. Flaky infrastructure, stale dependencies, or pre-existing breakage — none of these get a free pass. A red CI is everyone's problem.
 
