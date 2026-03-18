@@ -3,7 +3,7 @@ namespace PcpClient;
 /// <summary>
 /// Controls what "now" means for metric queries.
 /// Manages transitions between live, playback, and paused modes
-/// with speed-adjusted position advancement.
+/// with speed-adjusted position advancement and IN/OUT range looping.
 /// </summary>
 public class TimeCursor
 {
@@ -18,6 +18,10 @@ public class TimeCursor
     public DateTime? EndBound { get; set; }
 
     public bool Loop { get; set; }
+
+    public DateTime? InPoint { get; private set; }
+
+    public DateTime? OutPoint { get; private set; }
 
     public double PlaybackSpeed
     {
@@ -56,6 +60,8 @@ public class TimeCursor
         StartTime = null;
         EndBound = null;
         Loop = false;
+        InPoint = null;
+        OutPoint = null;
     }
 
     public void AdvanceBy(TimeSpan elapsed)
@@ -66,10 +72,67 @@ public class TimeCursor
         var scaledTicks = (long)(elapsed.Ticks * _playbackSpeed);
         var newPosition = Position.Add(TimeSpan.FromTicks(scaledTicks));
 
-        if (Loop && EndBound.HasValue && newPosition > EndBound.Value && StartTime.HasValue)
-            Position = StartTime.Value;
+        if (Loop && EndBound.HasValue && newPosition > EndBound.Value)
+        {
+            // Loop back to InPoint if set, otherwise StartTime
+            var loopTarget = InPoint ?? StartTime;
+            if (loopTarget.HasValue)
+                Position = loopTarget.Value;
+            else
+                Position = newPosition;
+        }
         else
+        {
             Position = newPosition;
+        }
+    }
+
+    /// <summary>
+    /// Sets the IN/OUT range for loop playback.
+    /// Enables looping and sets EndBound to the OUT point.
+    /// </summary>
+    public void SetInOutRange(DateTime inPoint, DateTime outPoint)
+    {
+        InPoint = inPoint;
+        OutPoint = outPoint;
+        EndBound = outPoint;
+        Loop = true;
+    }
+
+    /// <summary>
+    /// Clears the IN/OUT range and disables looping.
+    /// </summary>
+    public void ClearInOutRange()
+    {
+        InPoint = null;
+        OutPoint = null;
+        EndBound = null;
+        Loop = false;
+    }
+
+    /// <summary>
+    /// Steps the position by a fixed interval. Used for frame-by-frame
+    /// scrubbing (arrow keys). Works in Playback or Paused mode.
+    /// Direction: +1 = forward, -1 = backward.
+    /// </summary>
+    public void StepByInterval(double intervalSeconds, int direction)
+    {
+        if (Mode == CursorMode.Live)
+            return;
+
+        Position = Position.AddSeconds(intervalSeconds * direction);
+    }
+
+    /// <summary>
+    /// Jumps the position to a specific timestamp.
+    /// Works in Playback or Paused mode.
+    /// </summary>
+    public void JumpTo(DateTime target)
+    {
+        if (Mode == CursorMode.Live)
+            return;
+
+        Position = target;
     }
 }
 
