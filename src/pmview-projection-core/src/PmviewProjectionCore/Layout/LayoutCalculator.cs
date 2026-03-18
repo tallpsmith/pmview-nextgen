@@ -129,44 +129,53 @@ public static class LayoutCalculator
 
     private static IReadOnlyList<PlacedItem> BuildForegroundItems(ZoneDefinition zone, HostTopology topology)
     {
-        var items = new List<PlacedItem>();
-        var stackedLabels = StackedMetricLabels(zone);
+        var shapes = zone.Metrics.Select(m =>
+            (Shape: BuildShape(zone.Name, m, m.Position ?? Vec3.Zero, topology),
+             Metric: m,
+             GroupPosition: m.Position ?? Vec3.Zero));
 
-        // Track active stacks: label → PlacedStack being built.
+        return AccumulateStackedItems(shapes, zone, namePrefix: zone.Name);
+    }
+
+    /// <summary>
+    /// Converts a sequence of shapes into PlacedItems, grouping stacked metrics into PlacedStacks.
+    /// Uses the first member's GroupPosition as the stack's local position.
+    /// </summary>
+    private static IReadOnlyList<PlacedItem> AccumulateStackedItems(
+        IEnumerable<(PlacedShape Shape, MetricShapeMapping Metric, Vec3 GroupPosition)> shapes,
+        ZoneDefinition zone,
+        string namePrefix)
+    {
+        var stackedLabels = StackedMetricLabels(zone);
+        var items = new List<PlacedItem>();
         var activeStacks = new Dictionary<string, (MetricStackGroupDefinition Def, List<PlacedShape> Members, Vec3 Position)>();
 
-        for (int i = 0; i < zone.Metrics.Count; i++)
+        foreach (var (shape, metric, groupPosition) in shapes)
         {
-            var metric  = zone.Metrics[i];
-            var localPos = metric.Position ?? Vec3.Zero;
-
             if (!stackedLabels.TryGetValue(metric.Label, out var groupDef))
             {
-                // Ungrouped metric → standalone PlacedShape.
-                items.Add(BuildShape(zone.Name, metric, localPos, topology));
+                items.Add(shape);
                 continue;
             }
 
-            // Stacked metric — accumulate into the group.
             if (!activeStacks.TryGetValue(groupDef.GroupName, out var entry))
             {
-                // First member encountered for this group — record the group's position.
-                entry = (groupDef, [], localPos);
+                entry = (groupDef, [], groupPosition);
                 activeStacks[groupDef.GroupName] = entry;
             }
 
-            // All members sit at Y=0 inside the StackGroupNode's local space.
-            entry.Members.Add(BuildShape(zone.Name, metric, Vec3.Zero, topology));
+            // Stack members use Vec3.Zero inside the StackGroupNode's local space
+            var stackMember = shape with { LocalPosition = Vec3.Zero };
+            entry.Members.Add(stackMember);
             activeStacks[groupDef.GroupName] = entry;
 
-            // If this is the last member in the group, seal it and emit one PlacedStack.
             if (metric.Label == groupDef.MetricLabels[^1])
             {
                 items.Add(new PlacedStack(
-                    GroupName:    SanitiseNodeName($"{zone.Name}_{groupDef.GroupName}"),
+                    GroupName:     SanitiseNodeName($"{namePrefix}_{groupDef.GroupName}"),
                     LocalPosition: entry.Position,
-                    Members:      entry.Members,
-                    Mode:         groupDef.Mode));
+                    Members:       entry.Members,
+                    Mode:          groupDef.Mode));
             }
         }
 
@@ -203,57 +212,33 @@ public static class LayoutCalculator
     private static IReadOnlyList<PlacedItem> BuildBackgroundShapes(ZoneDefinition zone, HostTopology topology)
     {
         var instances = ResolveInstances(zone, topology);
-        var stackedLabels = StackedMetricLabels(zone);
         var items = new List<PlacedItem>();
 
         foreach (var instance in instances)
         {
             var shortName = ShortenInstanceName(instance);
             var safeName  = SanitiseNodeName(shortName);
+            var namePrefix = $"{zone.Name}_{safeName}";
 
-            // Track active stacks per instance, keyed by group name.
-            var activeStacks = new Dictionary<string, (MetricStackGroupDefinition Def, List<PlacedShape> Members)>();
-
-            foreach (var metric in zone.Metrics)
-            {
-                var shape = new PlacedShape(
-                    NodeName:       SanitiseNodeName($"{zone.Name}_{safeName}_{metric.Label}"),
-                    Shape:          metric.Shape,
+            var shapes = zone.Metrics.Select(m =>
+                (Shape: new PlacedShape(
+                    NodeName:       SanitiseNodeName($"{namePrefix}_{m.Label}"),
+                    Shape:          m.Shape,
                     LocalPosition:  Vec3.Zero,
-                    MetricName:     metric.MetricName,
+                    MetricName:     m.MetricName,
                     InstanceName:   instance,
                     DisplayLabel:   shortName,
-                    Colour:         metric.DefaultColour,
-                    SourceRangeMin: metric.SourceRangeMin,
-                    SourceRangeMax: ResolveSourceRangeMax(metric, topology),
-                    TargetRangeMin: metric.TargetRangeMin,
-                    TargetRangeMax: metric.TargetRangeMax);
+                    Colour:         m.DefaultColour,
+                    SourceRangeMin: m.SourceRangeMin,
+                    SourceRangeMax: ResolveSourceRangeMax(m, topology),
+                    TargetRangeMin: m.TargetRangeMin,
+                    TargetRangeMax: m.TargetRangeMax),
+                 Metric: m,
+                 GroupPosition: Vec3.Zero));
 
-                if (!stackedLabels.TryGetValue(metric.Label, out var groupDef))
-                {
-                    items.Add(shape);
-                    continue;
-                }
-
-                if (!activeStacks.TryGetValue(groupDef.GroupName, out var entry))
-                {
-                    entry = (groupDef, []);
-                    activeStacks[groupDef.GroupName] = entry;
-                }
-
-                entry.Members.Add(shape);
-                activeStacks[groupDef.GroupName] = entry;
-
-                if (metric.Label == groupDef.MetricLabels[^1])
-                {
-                    items.Add(new PlacedStack(
-                        GroupName:     SanitiseNodeName($"{zone.Name}_{safeName}_{groupDef.GroupName}"),
-                        LocalPosition: Vec3.Zero,
-                        Members:       entry.Members,
-                        Mode:          groupDef.Mode));
-                }
-            }
+            items.AddRange(AccumulateStackedItems(shapes, zone, namePrefix));
         }
+
         return items;
     }
 
@@ -298,9 +283,14 @@ public static class LayoutCalculator
     private static float ResolveSourceRangeMax(MetricShapeMapping metric, HostTopology topology)
     {
         if (metric.SourceRangeMax != 0f) return metric.SourceRangeMax;
+
+        // SourceRangeMax of 0 is a sentinel meaning "derive from topology" — only valid for memory metrics
         if (metric.MetricName.StartsWith("mem.", StringComparison.Ordinal))
             return topology.PhysicalMemoryBytes ?? FallbackMemoryBytes;
-        return metric.SourceRangeMax;
+
+        throw new InvalidOperationException(
+            $"Metric '{metric.MetricName}' has SourceRangeMax=0 but is not a memory metric. " +
+            "Non-memory metrics must specify an explicit SourceRangeMax in the profile.");
     }
 
     private static IReadOnlyList<string> ResolveInstances(ZoneDefinition zone, HostTopology topology)

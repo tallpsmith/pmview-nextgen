@@ -89,24 +89,22 @@ public static class LibraryBuilder
 
         var restoreProcess = Process.Start(restoreInfo)
             ?? throw new InvalidOperationException("Failed to start dotnet restore");
+        var restoreStderr = restoreProcess.StandardError.ReadToEndAsync();
         restoreProcess.WaitForExit();
 
         if (restoreProcess.ExitCode != 0)
-        {
-            var stderr = restoreProcess.StandardError.ReadToEnd();
-            throw new InvalidOperationException($"dotnet restore failed: {stderr}");
-        }
+            throw new InvalidOperationException(
+                $"dotnet restore failed: {restoreStderr.GetAwaiter().GetResult()}");
 
         // Now publish (with --no-restore since we just restored)
         var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException("Failed to start dotnet publish");
+        var publishStderr = process.StandardError.ReadToEndAsync();
         process.WaitForExit();
 
         if (process.ExitCode != 0)
-        {
-            var stderr = process.StandardError.ReadToEnd();
-            throw new InvalidOperationException($"dotnet publish failed: {stderr}");
-        }
+            throw new InvalidOperationException(
+                $"dotnet publish failed: {publishStderr.GetAwaiter().GetResult()}");
     }
 
     private static void CopyExpectedDlls(string publishDir, string outputDir)
