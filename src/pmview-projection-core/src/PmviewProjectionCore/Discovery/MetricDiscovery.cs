@@ -79,6 +79,6 @@ public static class MetricDiscovery
         "Linux"  => HostOs.Linux,
         "Darwin" => HostOs.MacOs,
         _ => throw new InvalidOperationException(
-            $"Unsupported OS sysname '{sysname}' — go find a penguin or an apple.")
+            $"Unsupported OS sysname: '{sysname}'")
     };
 }

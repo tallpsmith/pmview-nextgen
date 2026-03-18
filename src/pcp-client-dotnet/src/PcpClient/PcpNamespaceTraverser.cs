@@ -30,7 +30,7 @@ internal static class PcpNamespaceTraverser
     private static IReadOnlyList<string> ParseStringArray(JsonElement root, string propertyName)
     {
         if (!root.TryGetProperty(propertyName, out var array))
-            return Array.Empty<string>();
+            return [];
 
         var results = new List<string>();
         foreach (var item in array.EnumerateArray())

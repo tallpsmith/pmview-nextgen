@@ -40,7 +40,7 @@ public sealed class ArchiveMetricDiscoverer
         var seriesIds = await _client.QuerySeriesAsync(expression, cancellationToken);
 
         if (seriesIds.Count == 0)
-            return Array.Empty<string>();
+            return [];
 
         var metricNames = await _client.GetMetricNamesAsync(seriesIds, cancellationToken);
 
@@ -58,7 +58,7 @@ public sealed class ArchiveMetricDiscoverer
 
         if (seriesIds.Count == 0)
             return new MetricDetail(metricName, null, null, null,
-                Array.Empty<SeriesInstanceInfo>());
+                []);
 
         var descs = await _client.GetDescriptorsAsync(seriesIds, cancellationToken);
         var instances = await _client.GetInstancesAsync(seriesIds, cancellationToken);

@@ -213,7 +213,7 @@ public static class PcpSeriesQuery
     {
         using var doc = JsonDocument.Parse(json);
         if (!doc.RootElement.TryGetProperty(labelName, out var values))
-            return Array.Empty<string>();
+            return [];
 
         var results = new List<string>();
         foreach (var item in values.EnumerateArray())

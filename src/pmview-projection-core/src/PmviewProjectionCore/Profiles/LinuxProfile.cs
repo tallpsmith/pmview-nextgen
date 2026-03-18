@@ -29,5 +29,4 @@ public static class LinuxProfile
             new("mem.util.bufmem", ShapeType.Bar, "Buffers", SharedZones.Green, 0f, 0f, 0.2f, 5.0f),
         ],
         InstanceMetricSource: null);
-
 }
