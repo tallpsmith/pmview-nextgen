@@ -1,17 +1,11 @@
-extends PanelContainer
+extends Control
 
-## Floating panel for tuning disk/network source range maximums.
-## Calls SceneBinder.UpdateSourceRangeMax() on Apply.
+## Range tuning modal — preset buttons for disk and network hardware speeds.
+## Click a preset to instantly apply via SceneBinder.UpdateSourceRangeMax().
+## F1 toggles open/close. ESC also closes.
 
-# -- Log-scale range boundaries (bytes/sec) --
-# Cannot be const — log() is not a compile-time constant in GDScript.
-var LOG_MIN: float = log(100_000.0)          # 100 KB/s
-var LOG_MAX: float = log(50_000_000_000.0)   # 50 GB/s
-
-## Preset snap threshold in normalised slider space (0-1)
-const SNAP_THRESHOLD: float = 0.02
-
-# -- Preset definitions: {label: bytes_per_sec} --
+# -- Zone definitions: each maps a display label to API zone name(s) --
+# Disk and Per-Disk share the same presets.
 const DISK_PRESETS: Dictionary = {
 	"HDD": 150_000_000.0,
 	"SATA SSD": 550_000_000.0,
@@ -28,132 +22,170 @@ const NETWORK_PRESETS: Dictionary = {
 	"100 Gbit": 12_500_000_000.0,
 }
 
-# -- Node references (unique-name-in-owner lookups) --
-@onready var disk_total_slider: HSlider = %DiskTotalSlider
-@onready var disk_total_readout: Label = %DiskTotalReadout
-@onready var disk_total_row: Control = %DiskTotalRow
-
-@onready var per_disk_slider: HSlider = %PerDiskSlider
-@onready var per_disk_readout: Label = %PerDiskReadout
-@onready var per_disk_row: Control = %PerDiskRow
-
-@onready var network_slider: HSlider = %NetworkSlider
-@onready var network_readout: Label = %NetworkReadout
-@onready var network_row: Control = %NetworkRow
-
-@onready var apply_button: Button = %ApplyButton
+# Zone column config: [display_label, api_zone_names, presets, colour]
+const ZONE_COLUMNS: Array = [
+	["Disk Total", ["Disk"], "disk", Color(0.97, 0.57, 0.09)],
+	["Per-Disk", ["Per-Disk"], "disk", Color(0.13, 0.77, 0.37)],
+	["Network", ["Network In", "Network Out"], "network", Color(0.23, 0.51, 0.96)],
+]
 
 var _scene_binder: Node = null
-var _initial_values: Dictionary = {}  # {zone_name: bytes_per_sec}
+var _camera: Node = null
+var _columns: Dictionary = {}  # zone_api_name -> {container, buttons, active_value}
+
+@onready var _overlay: ColorRect = %Overlay
 
 
 func _ready() -> void:
-	apply_button.pressed.connect(_on_apply_pressed)
-	disk_total_slider.value_changed.connect(
-		_on_slider_changed.bind(disk_total_slider, disk_total_readout, DISK_PRESETS))
-	per_disk_slider.value_changed.connect(
-		_on_slider_changed.bind(per_disk_slider, per_disk_readout, DISK_PRESETS))
-	network_slider.value_changed.connect(
-		_on_slider_changed.bind(network_slider, network_readout, NETWORK_PRESETS))
-	apply_button.disabled = true
+	visible = false
+	_overlay.color = Color(0, 0, 0, 0.35)
+	_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
-## Wire up the panel to a SceneBinder node. Populates sliders once bindings are ready.
 func initialise(scene_binder: Node) -> void:
 	_scene_binder = scene_binder
+	# Find the camera for auto-focus
+	_camera = get_viewport().get_camera_3d()
 	if scene_binder.IsBound:
-		_populate_from_binder()
+		_build_ui()
 	else:
-		scene_binder.connect("BindingsReady", _populate_from_binder)
+		scene_binder.connect("BindingsReady", _build_ui)
 
 
-func _populate_from_binder() -> void:
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed:
+		if event.physical_keycode == KEY_F1:
+			_toggle_panel()
+			get_viewport().set_input_as_handled()
+		elif event.physical_keycode == KEY_ESCAPE and visible:
+			_close_panel()
+			get_viewport().set_input_as_handled()
+
+
+func _toggle_panel() -> void:
+	if visible:
+		_close_panel()
+	else:
+		_open_panel()
+
+
+func _open_panel() -> void:
+	visible = true
+	if _overlay:
+		_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	# Notify HUD bar
+	var hud = get_parent().find_child("HudBar")
+	if hud and hud.has_method("set_tuner_active"):
+		hud.set_tuner_active(true)
+
+
+func _close_panel() -> void:
+	visible = false
+	if _overlay:
+		_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var hud = get_parent().find_child("HudBar")
+	if hud and hud.has_method("set_tuner_active"):
+		hud.set_tuner_active(false)
+
+
+func _build_ui() -> void:
 	var ranges: Dictionary = _scene_binder.GetSourceRanges()
-	_initial_values = ranges.duplicate()
 
-	_set_slider_if_present(disk_total_slider, disk_total_readout, disk_total_row,
-		ranges, "Disk", DISK_PRESETS)
-	_set_slider_if_present(per_disk_slider, per_disk_readout, per_disk_row,
-		ranges, "Per-Disk", DISK_PRESETS)
+	# Build the column layout programmatically
+	for col_def in ZONE_COLUMNS:
+		var display_name: String = col_def[0]
+		var api_zones: Array = col_def[1]
+		var preset_type: String = col_def[2]
+		var colour: Color = col_def[3]
 
-	# Network uses whichever is present — prefer "Network In"
-	var net_key := "Network In" if ranges.has("Network In") else "Network Out"
-	_set_slider_if_present(network_slider, network_readout, network_row,
-		ranges, net_key, NETWORK_PRESETS)
+		# Check if any of this column's zones are present
+		var active_zone: String = ""
+		var current_value: float = 0.0
+		for zone_name in api_zones:
+			if ranges.has(zone_name):
+				active_zone = zone_name
+				current_value = ranges[zone_name]
+				break
 
+		if active_zone.is_empty():
+			continue  # Zone not present — skip column
 
-func _set_slider_if_present(slider: HSlider, readout: Label, row: Control,
-		ranges: Dictionary, zone: String, _presets: Dictionary) -> void:
-	if not ranges.has(zone):
-		row.visible = false
-		return
-	row.visible = true
-	var bytes_val: float = ranges[zone]
-	slider.value = _bytes_to_slider(bytes_val)
-	readout.text = _format_bytes(bytes_val)
-
-
-# -- Log scale transforms --
-
-func _bytes_to_slider(bytes_per_sec: float) -> float:
-	if bytes_per_sec <= 0.0:
-		return 0.0
-	var log_val := log(bytes_per_sec)
-	return clampf((log_val - LOG_MIN) / (LOG_MAX - LOG_MIN), 0.0, 1.0)
+		var presets: Dictionary = DISK_PRESETS if preset_type == "disk" else NETWORK_PRESETS
+		_add_zone_column(display_name, api_zones, presets, colour, current_value)
 
 
-func _slider_to_bytes(slider_val: float) -> float:
-	var log_val := LOG_MIN + slider_val * (LOG_MAX - LOG_MIN)
-	return exp(log_val)
+func _add_zone_column(display_name: String, api_zones: Array,
+		presets: Dictionary, colour: Color, current_value: float) -> void:
+	var column: VBoxContainer = %ColumnsContainer.get_node_or_null(display_name.replace(" ", ""))
+	if column == null:
+		column = VBoxContainer.new()
+		column.name = display_name.replace(" ", "")
+		%ColumnsContainer.add_child(column)
+
+	# Zone header
+	var header := Label.new()
+	header.text = display_name
+	header.add_theme_color_override("font_color", colour)
+	header.add_theme_font_size_override("font_size", 13)
+	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	column.add_child(header)
+
+	# Preset buttons
+	var buttons: Array[Button] = []
+	for preset_name: String in presets:
+		var bytes_val: float = presets[preset_name]
+		var btn := Button.new()
+		btn.text = "%s  %s" % [preset_name, _format_bytes(bytes_val)]
+		btn.custom_minimum_size = Vector2(160, 0)
+		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+
+		# Style: muted by default
+		btn.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
+
+		# Highlight if this preset matches current value
+		if absf(bytes_val - current_value) < 1.0:
+			_highlight_button(btn, colour)
+
+		btn.pressed.connect(_on_preset_pressed.bind(api_zones, bytes_val, colour, buttons, btn))
+		column.add_child(btn)
+		buttons.append(btn)
+
+	_columns[display_name] = {"buttons": buttons, "colour": colour}
 
 
-# -- Slider change handler with snap-to-preset --
+func _on_preset_pressed(api_zones: Array, bytes_val: float,
+		colour: Color, all_buttons: Array[Button], pressed_btn: Button) -> void:
+	# Apply to all API zones in this column
+	for zone_name: String in api_zones:
+		_scene_binder.UpdateSourceRangeMax(zone_name, bytes_val)
 
-var _snapping: bool = false  # Guard against re-entrant signal from set_value_no_signal
+	# Update highlights — deselect all, highlight pressed
+	for btn: Button in all_buttons:
+		_unhighlight_button(btn)
+	_highlight_button(pressed_btn, colour)
 
-
-func _on_slider_changed(value: float, slider: HSlider, readout: Label,
-		presets: Dictionary) -> void:
-	if _snapping:
-		return
-
-	# Snap to nearest preset if close enough
-	for preset_bytes: float in presets.values():
-		var preset_pos := _bytes_to_slider(preset_bytes)
-		if absf(value - preset_pos) < SNAP_THRESHOLD:
-			_snapping = true
-			slider.set_value_no_signal(preset_pos)
-			_snapping = false
-			value = preset_pos
-			break
-
-	var bytes_val := _slider_to_bytes(value)
-	readout.text = _format_bytes(bytes_val)
-	apply_button.disabled = false
+	# Auto-focus camera on the first zone
+	if _camera and _camera.has_method("focus_on_position"):
+		var centroid: Vector3 = _scene_binder.GetZoneCentroid(api_zones[0])
+		if centroid != Vector3.ZERO:
+			_camera.focus_on_position(centroid)
 
 
-# -- Apply --
-
-func _on_apply_pressed() -> void:
-	if not _scene_binder:
-		return
-
-	var disk_bytes := _slider_to_bytes(disk_total_slider.value)
-	var per_disk_bytes := _slider_to_bytes(per_disk_slider.value)
-	var net_bytes := _slider_to_bytes(network_slider.value)
-
-	if disk_total_row.visible:
-		_scene_binder.UpdateSourceRangeMax("Disk", disk_bytes)
-	if per_disk_row.visible:
-		_scene_binder.UpdateSourceRangeMax("Per-Disk", per_disk_bytes)
-	if network_row.visible:
-		_scene_binder.UpdateSourceRangeMax("Network In", net_bytes)
-		_scene_binder.UpdateSourceRangeMax("Network Out", net_bytes)
-
-	apply_button.disabled = true
+func _highlight_button(btn: Button, colour: Color) -> void:
+	btn.add_theme_color_override("font_color", colour)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(colour, 0.15)
+	style.border_color = colour
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(4)
+	style.set_content_margin_all(4)
+	btn.add_theme_stylebox_override("normal", style)
 
 
-# -- Human-readable formatting --
+func _unhighlight_button(btn: Button) -> void:
+	btn.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
+	btn.remove_theme_stylebox_override("normal")
+
 
 static func _format_bytes(bytes_per_sec: float) -> String:
 	if bytes_per_sec >= 1_000_000_000.0:
