@@ -51,6 +51,8 @@ public static class TscnWriter
             "res://addons/pmview-bridge/PcpBindingResource.cs");
         registry.Require("range_tuning_panel_scene", "PackedScene",
             "res://addons/pmview-bridge/ui/range_tuning_panel.tscn");
+        registry.Require("hud_bar_scene", "PackedScene",
+            "res://addons/pmview-bridge/ui/hud_bar.tscn");
     }
 
     // --- resource collection ---
@@ -239,6 +241,9 @@ public static class TscnWriter
         sb.AppendLine();
 
         sb.AppendLine("[node name=\"RangeTuningPanel\" parent=\"UILayer\" instance=ExtResource(\"range_tuning_panel_scene\")]");
+        sb.AppendLine();
+
+        sb.AppendLine("[node name=\"HudBar\" parent=\"UILayer\" instance=ExtResource(\"hud_bar_scene\")]");
         sb.AppendLine();
     }
 

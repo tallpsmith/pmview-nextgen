@@ -27,6 +27,7 @@ public static class RuntimeSceneBuilder
     private const string BarScenePath = "res://addons/pmview-bridge/building_blocks/grounded_bar.tscn";
     private const string CylinderScenePath = "res://addons/pmview-bridge/building_blocks/grounded_cylinder.tscn";
     private const string RangeTuningPanelScenePath = "res://addons/pmview-bridge/ui/range_tuning_panel.tscn";
+    private const string HudBarScenePath = "res://addons/pmview-bridge/ui/hud_bar.tscn";
 
     // -- ambient label colours --
     private static readonly Color TimestampColour = new(0.976f, 0.451f, 0.086f, 1f);
@@ -360,6 +361,15 @@ public static class RuntimeSceneBuilder
         panel.Name = "RangeTuningPanel";
 
         canvas.AddChild(panel);
+
+        var hudScene = GD.Load<PackedScene>(HudBarScenePath);
+        if (hudScene != null)
+        {
+            var hud = hudScene.Instantiate();
+            hud.Name = "HudBar";
+            canvas.AddChild(hud);
+        }
+
         sceneRoot.AddChild(canvas);
         // Owner is set by SetOwnerRecursive() in Build() — don't set manually here.
     }

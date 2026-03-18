@@ -408,15 +408,15 @@ public class TscnWriterTests
     public void Write_LoadSteps_EqualsExtResourcesPlusSubResources()
     {
         // MinimalLayout: 1 Bar shape.
-        // ext_resources (10): controller_script, metric_poller_script, scene_binder_script,
+        // ext_resources (11): controller_script, metric_poller_script, scene_binder_script,
         //                      metric_group_script, metric_grid_script, ground_bezel_script,
         //                      bar_scene, bindable_script, binding_res_script,
-        //                      range_tuning_panel_scene
+        //                      range_tuning_panel_scene, hud_bar_scene
         // sub_resources (1): binding for CPU_User
         // ambient labels (2): TimestampLabel, HostnameLabel
-        // = 10 + 1 + 2 = 13
+        // = 11 + 1 + 2 = 14
         var tscn = TscnWriter.Write(MinimalLayout());
-        Assert.Contains("load_steps=13 ", tscn);
+        Assert.Contains("load_steps=14 ", tscn);
     }
 
     // --- PlacedStack emission tests ---
@@ -510,15 +510,15 @@ public class TscnWriterTests
     public void Write_LoadSteps_WithPlacedStack_CountsCorrectly()
     {
         // Stack with 3 members:
-        // ext_resources (11): controller, metric_poller, scene_binder,
+        // ext_resources (12): controller, metric_poller, scene_binder,
         //                      metric_group_script, metric_grid_script, ground_bezel_script,
         //                      bar_scene, bindable, binding_res, stack_group_script,
-        //                      range_tuning_panel_scene
+        //                      range_tuning_panel_scene, hud_bar_scene
         // sub_resources (3): one binding per member
         // ambient (2)
-        // = 11 + 3 + 2 = 16
+        // = 12 + 3 + 2 = 17
         var tscn = TscnWriter.Write(LayoutWithCpuStack());
-        Assert.Contains("load_steps=16 ", tscn);
+        Assert.Contains("load_steps=17 ", tscn);
     }
 
     // --- Placeholder / ghost shape tests ---
@@ -558,14 +558,14 @@ public class TscnWriterTests
         ]);
         var tscn = TscnWriter.Write(layout);
 
-        // ext_resources (10): controller, metric_poller, scene_binder,
+        // ext_resources (11): controller, metric_poller, scene_binder,
         //                      metric_group, metric_grid, ground_bezel,
         //                      bar_scene, bindable_script, binding_res_script,
-        //                      range_tuning_panel_scene
+        //                      range_tuning_panel_scene, hud_bar_scene
         // sub_resources (0): placeholder has no binding
         // ambient (2): TimestampLabel, HostnameLabel
-        // = 10 + 0 + 2 = 12
-        Assert.Contains("load_steps=12 ", tscn);
+        // = 11 + 0 + 2 = 13
+        Assert.Contains("load_steps=13 ", tscn);
     }
 
     [Fact]
@@ -653,6 +653,24 @@ public class TscnWriterTests
     {
         var tscn = TscnWriter.Write(MinimalLayout());
         Assert.Contains("[node name=\"RangeTuningPanel\" parent=\"UILayer\" instance=ExtResource(\"range_tuning_panel_scene\")]", tscn);
+    }
+
+    // --- HUD bar ---
+
+    [Fact]
+    public void Write_ContainsHudBarInstance()
+    {
+        var tscn = TscnWriter.Write(MinimalLayout());
+        Assert.Contains("hud_bar", tscn);
+        Assert.Contains("[node name=\"HudBar\" parent=\"UILayer\" instance=ExtResource(\"hud_bar_scene\")]", tscn);
+    }
+
+    [Fact]
+    public void Write_HasHudBarExtResource()
+    {
+        var tscn = TscnWriter.Write(MinimalLayout());
+        Assert.Contains("res://addons/pmview-bridge/ui/hud_bar.tscn", tscn);
+        Assert.Contains("hud_bar_scene", tscn);
     }
 
     // --- macOS end-to-end integration test ---
