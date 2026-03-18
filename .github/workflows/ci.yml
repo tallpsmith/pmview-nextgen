@@ -20,7 +20,7 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - name: Run all .NET unit tests (integration tests run in E2E workflow with pmproxy)
-        run: dotnet test pmview-nextgen.sln --filter 'FullyQualifiedName!~Integration'
+        run: dotnet test pmview-nextgen.ci.slnf --filter 'FullyQualifiedName!~Integration'
 
   godot-unit-tests:
     name: Godot Unit Tests (Tier 2)

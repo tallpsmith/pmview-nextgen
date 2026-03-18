@@ -32,9 +32,12 @@ src/
 ## Commands
 
 ```bash
-# Build and test everything (root solution includes all .NET projects)
+# Build and test everything (CI filter excludes Godot app — no Godot SDK needed)
+dotnet build pmview-nextgen.ci.slnf
+dotnet test pmview-nextgen.ci.slnf --filter "FullyQualifiedName!~Integration"
+
+# Full solution (includes pmview-app — needs Godot SDK, use in Rider)
 dotnet build pmview-nextgen.sln
-dotnet test pmview-nextgen.sln --filter "FullyQualifiedName!~Integration"
 
 # Run ALL tests including integration (requires dev-environment stack)
 dotnet test pmview-nextgen.sln
@@ -77,7 +80,7 @@ C# (.NET 8.0) for Godot libraries, C# (.NET 10.0) for CLI/tests; GDScript for sc
 
 1. **Run the local build and tests first.** Never push without a green local build:
    ```bash
-   dotnet test pmview-nextgen.sln --filter "FullyQualifiedName!~Integration"
+   dotnet test pmview-nextgen.ci.slnf --filter "FullyQualifiedName!~Integration"
    ```
    If the build or any test fails, fix it before pushing.
 
