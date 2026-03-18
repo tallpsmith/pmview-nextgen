@@ -107,9 +107,32 @@ internal static class SharedZones
         ],
         InstanceMetricSource: "network.interface.out.bytes");
 
+    internal static ZoneDefinition NetworkInAggregateZone() => new(
+        Name: "Net-In",
+        Row: ZoneRow.Foreground,
+        Type: ZoneType.Aggregate,
+        Metrics:
+        [
+            new("network.all.in.bytes",   ShapeType.Bar, "Bytes", Blue, 0f, 125_000_000f, 0.2f, 5.0f),
+            new("network.all.in.packets", ShapeType.Bar, "Pkts",  Blue, 0f, 100_000f,     0.2f, 5.0f),
+        ],
+        InstanceMetricSource: null);
+
+    internal static ZoneDefinition NetworkOutAggregateZone() => new(
+        Name: "Net-Out",
+        Row: ZoneRow.Foreground,
+        Type: ZoneType.Aggregate,
+        Metrics:
+        [
+            new("network.all.out.bytes",   ShapeType.Bar, "Bytes", Rose, 0f, 125_000_000f, 0.2f, 5.0f),
+            new("network.all.out.packets", ShapeType.Bar, "Pkts",  Rose, 0f, 100_000f,     0.2f, 5.0f),
+        ],
+        InstanceMetricSource: null);
+
     private static readonly ZoneDefinition[] AllZones =
     [
         CpuZone(), LoadZone(), DiskTotalsZone(),
+        NetworkInAggregateZone(), NetworkOutAggregateZone(),
         PerCpuZone(), PerDiskZone(),
         NetworkInZone(), NetworkOutZone(),
     ];

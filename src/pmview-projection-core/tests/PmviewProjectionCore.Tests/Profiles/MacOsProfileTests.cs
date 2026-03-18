@@ -50,19 +50,30 @@ public class MacOsProfileTests
     }
 
     [Fact]
-    public void NetInAggregate_AllMetricsArePlaceholders()
+    public void NetInAggregate_UsesRealMetrics_NotPlaceholders()
     {
         var netIn = _zones.Single(z => z.Name == "Net-In");
-        Assert.All(netIn.Metrics, m => Assert.True(m.IsPlaceholder,
-            $"{m.MetricName} should be a placeholder on macOS"));
+        Assert.All(netIn.Metrics, m => Assert.False(m.IsPlaceholder,
+            $"{m.MetricName} should be a real metric now that PCP ships network.all.* on macOS"));
     }
 
     [Fact]
-    public void NetOutAggregate_AllMetricsArePlaceholders()
+    public void NetOutAggregate_UsesRealMetrics_NotPlaceholders()
     {
         var netOut = _zones.Single(z => z.Name == "Net-Out");
-        Assert.All(netOut.Metrics, m => Assert.True(m.IsPlaceholder,
-            $"{m.MetricName} should be a placeholder on macOS"));
+        Assert.All(netOut.Metrics, m => Assert.False(m.IsPlaceholder,
+            $"{m.MetricName} should be a real metric now that PCP ships network.all.* on macOS"));
+    }
+
+    [Fact]
+    public void NetworkAggregateZones_HaveSameMetricsAsLinux()
+    {
+        var macNetIn = _zones.Single(z => z.Name == "Net-In");
+        var macNetOut = _zones.Single(z => z.Name == "Net-Out");
+        var linuxNetIn = LinuxProfile.GetZones().Single(z => z.Name == "Net-In");
+        var linuxNetOut = LinuxProfile.GetZones().Single(z => z.Name == "Net-Out");
+        Assert.Equal(linuxNetIn.Metrics, macNetIn.Metrics);
+        Assert.Equal(linuxNetOut.Metrics, macNetOut.Metrics);
     }
 
     [Fact]
@@ -75,15 +86,11 @@ public class MacOsProfileTests
     }
 
     [Fact]
-    public void SharedZones_AreNotPlaceholders()
+    public void AllZones_HaveNoPlaceholders()
     {
-        var sharedZoneNames = new[] { "CPU", "Load", "Disk", "Per-CPU", "Per-Disk", "Network In", "Network Out" };
-        foreach (var name in sharedZoneNames)
-        {
-            var zone = _zones.Single(z => z.Name == name);
+        foreach (var zone in _zones)
             Assert.All(zone.Metrics, m => Assert.False(m.IsPlaceholder,
-                $"{name}/{m.MetricName} should not be a placeholder"));
-        }
+                $"{zone.Name}/{m.MetricName} should not be a placeholder"));
     }
 
     [Fact]

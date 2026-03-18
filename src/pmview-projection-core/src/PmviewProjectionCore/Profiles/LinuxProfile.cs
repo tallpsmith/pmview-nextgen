@@ -10,8 +10,8 @@ public static class LinuxProfile
         SharedZones.LoadZone(),
         MemoryZone(),
         SharedZones.DiskTotalsZone(),
-        NetworkInAggregateZone(),
-        NetworkOutAggregateZone(),
+        SharedZones.NetworkInAggregateZone(),
+        SharedZones.NetworkOutAggregateZone(),
         SharedZones.PerCpuZone(),
         SharedZones.PerDiskZone(),
         SharedZones.NetworkInZone(),
@@ -30,25 +30,4 @@ public static class LinuxProfile
         ],
         InstanceMetricSource: null);
 
-    private static ZoneDefinition NetworkInAggregateZone() => new(
-        Name: "Net-In",
-        Row: ZoneRow.Foreground,
-        Type: ZoneType.Aggregate,
-        Metrics:
-        [
-            new("network.all.in.bytes",   ShapeType.Bar, "Bytes", SharedZones.Blue, 0f, 125_000_000f, 0.2f, 5.0f),
-            new("network.all.in.packets", ShapeType.Bar, "Pkts",  SharedZones.Blue, 0f, 100_000f,     0.2f, 5.0f),
-        ],
-        InstanceMetricSource: null);
-
-    private static ZoneDefinition NetworkOutAggregateZone() => new(
-        Name: "Net-Out",
-        Row: ZoneRow.Foreground,
-        Type: ZoneType.Aggregate,
-        Metrics:
-        [
-            new("network.all.out.bytes",   ShapeType.Bar, "Bytes", SharedZones.Rose, 0f, 125_000_000f, 0.2f, 5.0f),
-            new("network.all.out.packets", ShapeType.Bar, "Pkts",  SharedZones.Rose, 0f, 100_000f,     0.2f, 5.0f),
-        ],
-        InstanceMetricSource: null);
 }

@@ -206,7 +206,7 @@ public static class TscnWriter
             sb.AppendLine($"[node name=\"{label.NodeName}\" type=\"Label3D\" parent=\".\"]");
 
             if (label.IsFlatOnFloor)
-                sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, {F(label.YPosition)}, -4)");
+                sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, {F(label.YPosition)}, -4)");
             else
                 sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, {F(label.YPosition)}, 0)");
 

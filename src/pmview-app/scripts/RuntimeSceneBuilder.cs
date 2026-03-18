@@ -306,12 +306,12 @@ public static class RuntimeSceneBuilder
     {
         var label = new Label3D { Name = "TimestampLabel" };
 
-        // Flat on floor: rotated -90° around X, positioned at Y=0.02, Z=-4
-        // .tscn columns: (1,0,0), (0,0,-1), (0,1,0) → transposed to rows
+        // Flat on floor facing up: rotated +90° around X, positioned at Y=0.02, Z=-4
+        // .tscn rows: (1,0,0), (0,0,-1), (0,1,0)
         var basis = new Basis(
             new Vector3(1, 0, 0),
-            new Vector3(0, 0, 1),
-            new Vector3(0, -1, 0));
+            new Vector3(0, 0, -1),
+            new Vector3(0, 1, 0));
         label.Transform = new Transform3D(basis, new Vector3(0, 0.02f, -4));
 
         label.PixelSize = 0.02f;

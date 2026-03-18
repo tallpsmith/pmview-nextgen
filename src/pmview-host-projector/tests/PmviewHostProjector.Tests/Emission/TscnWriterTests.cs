@@ -351,7 +351,7 @@ public class TscnWriterTests
     public void Write_TimestampLabel_IsFlat_WithNeonOrangeAndLargeFont()
     {
         var tscn = TscnWriter.Write(MinimalLayout());
-        Assert.Contains("Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0.02, -4)", tscn);
+        Assert.Contains("Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0.02, -4)", tscn);
         Assert.Contains("font_size = 96", tscn);
         Assert.Contains("pixel_size = 0.02", tscn);
         Assert.Contains("outline_size = 8", tscn);
@@ -676,7 +676,7 @@ public class TscnWriterTests
     // --- macOS end-to-end integration test ---
 
     [Fact]
-    public void Write_MacOsLayout_GhostNetworkShapes_AndDarwinMemoryMetrics()
+    public void Write_MacOsLayout_RealNetworkShapes_AndDarwinMemoryMetrics()
     {
         var topology = new HostTopology(HostOs.MacOs, "macbook",
             ["cpu0", "cpu1"], ["disk0"], ["en0"],
@@ -685,18 +685,18 @@ public class TscnWriterTests
         var layout = LayoutCalculator.Calculate(zones, topology);
         var tscn = TscnWriter.Write(layout);
 
-        // Ghost shapes should have ghost = true
-        Assert.Contains("ghost = true", tscn);
+        // No ghost shapes — PCP now ships network.all.* on macOS
+        Assert.DoesNotContain("ghost = true", tscn);
 
         // Memory zone should have Darwin-specific metrics
         Assert.Contains("mem.util.wired", tscn);
         Assert.Contains("mem.util.compressed", tscn);
 
-        // No binding for ghost network metrics
-        Assert.DoesNotContain("binding_Net_In_Bytes", tscn);
-        Assert.DoesNotContain("binding_Net_Out_Bytes", tscn);
+        // Network aggregate metrics now have real bindings
+        Assert.Contains("network.all.in.bytes", tscn);
+        Assert.Contains("network.all.out.bytes", tscn);
 
-        // Real metrics should still have bindings
+        // Other real metrics should still have bindings
         Assert.Contains("kernel.all.cpu.sys", tscn);
     }
 }

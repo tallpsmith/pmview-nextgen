@@ -15,6 +15,10 @@ public class SharedZonesTests
     [InlineData("network.interface.in.packets", "Network In")]
     [InlineData("network.interface.out.bytes", "Network Out")]
     [InlineData("network.interface.out.packets", "Network Out")]
+    [InlineData("network.all.in.bytes", "Net-In")]
+    [InlineData("network.all.in.packets", "Net-In")]
+    [InlineData("network.all.out.bytes", "Net-Out")]
+    [InlineData("network.all.out.packets", "Net-Out")]
     [InlineData("kernel.all.cpu.sys", "CPU")]
     public void ResolveZone_ReturnsCorrectZoneName(string metricName, string expectedZone)
     {
@@ -33,6 +37,8 @@ public class SharedZonesTests
     [InlineData("Disk", new[] { "disk.all.read_bytes", "disk.all.write_bytes" })]
     [InlineData("Per-Disk", new[] { "disk.dev.read_bytes", "disk.dev.write_bytes" })]
     [InlineData("Network In", new[] { "network.interface.in.bytes", "network.interface.in.packets", "network.interface.in.errors" })]
+    [InlineData("Net-In", new[] { "network.all.in.bytes", "network.all.in.packets" })]
+    [InlineData("Net-Out", new[] { "network.all.out.bytes", "network.all.out.packets" })]
     public void GetMetricNames_ReturnsAllMetricsInZone(string zoneName, string[] expectedMetrics)
     {
         var metrics = SharedZones.GetMetricNames(zoneName);
@@ -51,6 +57,8 @@ public class SharedZonesTests
     [InlineData("Per-Disk", 550_000_000f)]
     [InlineData("Network In", 125_000_000f)]
     [InlineData("Network Out", 125_000_000f)]
+    [InlineData("Net-In", 125_000_000f)]
+    [InlineData("Net-Out", 125_000_000f)]
     public void Zone_SourceRangeMax_MatchesPreset(string zoneName, float expectedMax)
     {
         var metrics = SharedZones.GetMetricNames(zoneName);
