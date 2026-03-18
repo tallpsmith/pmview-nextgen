@@ -1,12 +1,16 @@
 extends Node3D
 
 ## Host view controller. Receives the runtime-built scene from SceneManager,
-## wires up MetricPoller and SceneBinder, handles ESC overlay.
+## wires up MetricPoller and SceneBinder, handles ESC overlay and archive controls.
 
 @onready var esc_label: Label = %EscLabel
 
 var _esc_pending := false
 var _esc_timer: SceneTreeTimer = null
+var _poller: Node = null
+var _time_control: Control = null
+var _is_archive_mode := false
+var _poll_interval_seconds := 60.0
 
 
 func _ready() -> void:
@@ -18,29 +22,67 @@ func _ready() -> void:
 		return
 
 	SceneManager.built_scene = null
-	print("[HostView] Built scene name: %s, script: %s, child count: %d" % [scene.name, scene.get_script(), scene.get_child_count()])
+	print("[HostView] Built scene name: %s, script: %s, child count: %d" % [
+		scene.name, scene.get_script(), scene.get_child_count()])
 	for child in scene.get_children():
-		print("[HostView]   child: %s (type: %s, script: %s)" % [child.name, child.get_class(), child.get_script()])
+		print("[HostView]   child: %s (type: %s, script: %s)" % [
+			child.name, child.get_class(), child.get_script()])
 
-	# The built scene's root has host_view_controller.gd (from the addon)
-	# which handles MetricPoller ↔ SceneBinder wiring in its own _ready().
 	print("[HostView] Adding built scene to tree...")
 	add_child(scene)
 	print("[HostView] Built scene added to tree")
 
-	# Archive mode: start playback at configured time
 	var config := SceneManager.connection_config
-	if config.get("mode", "live") == "archive":
-		var poller = scene.find_child("MetricPoller", true, false)
-		if poller:
+	_is_archive_mode = config.get("mode", "live") == "archive"
+
+	if _is_archive_mode:
+		_poller = scene.find_child("MetricPoller", true, false)
+		_time_control = scene.find_child("TimeControl", true, false)
+
+		if _poller:
 			var start_time: String = config.get("start_time", "")
 			print("[HostView] Starting archive playback at: %s" % start_time)
-			poller.StartPlayback(start_time)
+			_poller.StartPlayback(start_time)
+
+			if _time_control:
+				_poller.PlaybackPositionChanged.connect(
+					_time_control.update_playhead)
+				_time_control.playhead_jumped.connect(_on_playhead_jumped)
+				_time_control.range_set.connect(_on_range_set)
+				_time_control.range_cleared.connect(_on_range_cleared)
+				_time_control.panel_opened.connect(_on_panel_opened)
+				_time_control.panel_closed.connect(_on_panel_closed)
 		else:
 			push_error("[HostView] MetricPoller not found in built scene")
 
 
+func _on_playhead_jumped(timestamp: String) -> void:
+	if _poller:
+		_poller.JumpToTimestamp(timestamp)
+
+
+func _on_range_set(in_time: String, out_time: String) -> void:
+	if _poller:
+		_poller.SetInOutRange(in_time, out_time)
+
+
+func _on_range_cleared() -> void:
+	if _poller:
+		_poller.ClearRange()
+
+
+func _on_panel_opened() -> void:
+	if _poller:
+		_poller.PausePlayback()
+
+
+func _on_panel_closed() -> void:
+	if _poller:
+		_poller.ResumePlayback()
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	# ESC — double-press to return to menu
 	if event.is_action_pressed("ui_cancel"):
 		get_viewport().set_input_as_handled()
 		if _esc_pending:
@@ -50,6 +92,49 @@ func _unhandled_input(event: InputEvent) -> void:
 			esc_label.visible = true
 			_esc_timer = get_tree().create_timer(2.0)
 			_esc_timer.timeout.connect(_dismiss_esc)
+		return
+
+	if not _is_archive_mode:
+		return
+
+	# Archive mode keyboard shortcuts
+	if event is InputEventKey and event.pressed and not event.echo:
+		match event.keycode:
+			KEY_SPACE:
+				get_viewport().set_input_as_handled()
+				_toggle_playback()
+			KEY_LEFT:
+				get_viewport().set_input_as_handled()
+				if _poller:
+					var step := 5.0 if event.shift_pressed else _poll_interval_seconds
+					_poller.StepPlayback(step, -1)
+			KEY_RIGHT:
+				get_viewport().set_input_as_handled()
+				if _poller:
+					var step := 5.0 if event.shift_pressed else _poll_interval_seconds
+					_poller.StepPlayback(step, 1)
+			KEY_R:
+				if not event.shift_pressed:
+					get_viewport().set_input_as_handled()
+					if _time_control:
+						_time_control.reset_range()
+					if _poller:
+						_poller.ClearRange()
+			KEY_F2:
+				get_viewport().set_input_as_handled()
+				if _time_control:
+					_time_control.toggle_panel()
+
+
+func _toggle_playback() -> void:
+	if not _poller:
+		return
+	# TimeCursor.Mode: 0=Live, 1=Playback, 2=Paused
+	var cursor_mode: int = _poller.TimeCursor.Mode
+	if cursor_mode == 1:  # Playback
+		_poller.PausePlayback()
+	elif cursor_mode == 2:  # Paused
+		_poller.ResumePlayback()
 
 
 func _dismiss_esc() -> void:
