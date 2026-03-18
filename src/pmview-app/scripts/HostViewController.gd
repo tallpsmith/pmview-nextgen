@@ -28,6 +28,17 @@ func _ready() -> void:
 	add_child(scene)
 	print("[HostView] Built scene added to tree")
 
+	# Archive mode: start playback at configured time
+	var config := SceneManager.connection_config
+	if config.get("mode", "live") == "archive":
+		var poller = scene.find_child("MetricPoller", true, false)
+		if poller:
+			var start_time: String = config.get("start_time", "")
+			print("[HostView] Starting archive playback at: %s" % start_time)
+			poller.StartPlayback(start_time)
+		else:
+			push_error("[HostView] MetricPoller not found in built scene")
+
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
