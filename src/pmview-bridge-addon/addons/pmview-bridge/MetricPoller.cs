@@ -162,6 +162,106 @@ public partial class MetricPoller : Node
 		_timeCursor.Loop = loop;
 	}
 
+	/// <summary>
+	/// Steps the playback position by a fixed interval.
+	/// Direction: +1 = forward, -1 = backward.
+	/// Pauses playback if currently playing, then fetches data at new position.
+	/// </summary>
+	public async void StepPlayback(double intervalSeconds, int direction)
+	{
+		if (_timeCursor.Mode == CursorMode.Live)
+			return;
+
+		if (_timeCursor.Mode == CursorMode.Playback)
+			_timeCursor.Pause();
+
+		_timeCursor.StepByInterval(intervalSeconds, direction);
+		EmitSignal(SignalName.PlaybackPositionChanged,
+			_timeCursor.Position.ToString("o"), "Paused");
+
+		try
+		{
+			await FetchHistoricalMetrics();
+		}
+		catch (Exception ex)
+		{
+			EmitSignal(SignalName.ErrorOccurred, $"Step fetch error: {ex.Message}");
+		}
+	}
+
+	/// <summary>
+	/// Jumps the playback position to a specific timestamp.
+	/// Pauses playback if currently playing, then fetches data at new position.
+	/// </summary>
+	public async void JumpToTimestamp(string isoTimestamp)
+	{
+		if (DateTime.TryParse(isoTimestamp, null,
+			DateTimeStyles.AdjustToUniversal, out var target))
+		{
+			if (_timeCursor.Mode == CursorMode.Live)
+				return;
+
+			if (_timeCursor.Mode == CursorMode.Playback)
+				_timeCursor.Pause();
+
+			_timeCursor.JumpTo(target);
+			_lastEmittedTimestamp.Clear();
+			EmitSignal(SignalName.PlaybackPositionChanged,
+				target.ToString("o"), "Paused");
+
+			try
+			{
+				await FetchHistoricalMetrics();
+			}
+			catch (Exception ex)
+			{
+				EmitSignal(SignalName.ErrorOccurred, $"Jump fetch error: {ex.Message}");
+			}
+		}
+		else
+		{
+			EmitSignal(SignalName.ErrorOccurred,
+				$"Invalid timestamp format: {isoTimestamp}");
+		}
+	}
+
+	/// <summary>
+	/// Sets the IN/OUT range for loop playback.
+	/// Resumes playback if currently paused.
+	/// </summary>
+	public void SetInOutRange(string inPointIso, string outPointIso)
+	{
+		if (DateTime.TryParse(inPointIso, null,
+				DateTimeStyles.AdjustToUniversal, out var inPoint)
+			&& DateTime.TryParse(outPointIso, null,
+				DateTimeStyles.AdjustToUniversal, out var outPoint))
+		{
+			_timeCursor.SetInOutRange(inPoint, outPoint);
+
+			if (_timeCursor.Mode == CursorMode.Paused)
+				_timeCursor.Resume();
+		}
+		else
+		{
+			EmitSignal(SignalName.ErrorOccurred,
+				$"Invalid range format: {inPointIso} → {outPointIso}");
+		}
+	}
+
+	/// <summary>
+	/// Clears the IN/OUT range and resumes playback.
+	/// </summary>
+	public void ClearRange()
+	{
+		_timeCursor.ClearInOutRange();
+
+		if (_timeCursor.Mode == CursorMode.Paused)
+			_timeCursor.Resume();
+
+		EmitSignal(SignalName.PlaybackPositionChanged,
+			_timeCursor.Position.ToString("o"), "Playback");
+	}
+
 	public void UpdateEndpoint(string endpoint, int pollIntervalMs)
 	{
 		StopPolling();
