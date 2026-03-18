@@ -65,4 +65,16 @@ public sealed class PcpSeriesClient
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         return PcpSeriesQuery.ParseInstancesResponse(json);
     }
+
+    public async Task<IReadOnlyList<SeriesValue>> GetValuesAsync(
+        IEnumerable<string> seriesIds, DateTime position, double windowSeconds = 2.0,
+        CancellationToken cancellationToken = default)
+    {
+        var url = PcpSeriesQuery.BuildValuesUrlWithTimeWindow(
+            _baseUrl, seriesIds, position, windowSeconds);
+        var response = await _httpClient.GetAsync(url, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        return PcpSeriesQuery.ParseValuesResponse(json);
+    }
 }
