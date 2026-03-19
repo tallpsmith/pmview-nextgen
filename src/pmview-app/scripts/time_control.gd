@@ -135,14 +135,14 @@ func _draw() -> void:
 			colour = colour_active
 
 		# Mouse attraction
-		var distance := abs(mouse_pos.y - y)
+		var distance: float = absf(mouse_pos.y - y)
 		var attraction := clampf(1.0 - distance / ATTRACTION_RADIUS, 0.0, 1.0)
 		var bar_length: float = BAR_MIN_LENGTH + (BAR_MAX_LENGTH - BAR_MIN_LENGTH) * attraction
 
 		# Special markers: playhead, IN, OUT
-		var is_playhead := abs(t - playhead_position) < time_per_bar * 0.5
-		var is_in := in_point >= 0 and abs(t - in_point) < time_per_bar * 0.5
-		var is_out := out_point >= 0 and abs(t - out_point) < time_per_bar * 0.5
+		var is_playhead: bool = absf(t - playhead_position) < time_per_bar * 0.5
+		var is_in: bool = in_point >= 0 and absf(t - in_point) < time_per_bar * 0.5
+		var is_out: bool = out_point >= 0 and absf(t - out_point) < time_per_bar * 0.5
 
 		if is_playhead:
 			colour = colour_playhead
