@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 8.0.x
       - name: Run .NET unit tests (integration tests run in e2e-tests job)
         run: dotnet test pmview-nextgen.ci.slnf --filter 'FullyQualifiedName!~Integration'
 
@@ -32,6 +32,7 @@ jobs:
         with:
           godot-version: '4.6.1'
           godot-net: true
+          dotnet-version: net8.0
           paths: test/
           project_dir: 'src/pmview-bridge-addon/'
           timeout: 10
@@ -64,7 +65,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 8.0.x
 
       - name: PcpClient integration tests
         run: dotnet test src/pcp-client-dotnet/PcpClient.sln --filter 'Category=Integration'

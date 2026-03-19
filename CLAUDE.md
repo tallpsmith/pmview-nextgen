@@ -1,10 +1,9 @@
 # pmview-nextgen Development Guidelines
 
-Last updated: 2026-03-16
+Last updated: 2026-03-19
 
 ## Active Technologies
-- C# (.NET 8.0 LTS) for Godot bridge nodes/resources + PcpClient/PcpGodotBridge libraries
-- C# (.NET 10.0) for Host Projector CLI + all test projects
+- C# (.NET 8.0 LTS) for all projects (Godot.NET.Sdk 4.6.1 pins to net8.0)
 - GDScript for scene controllers, camera, building blocks
 - Godot 4.6+ (Godot.NET.Sdk 4.6.1), System.Net.Http.HttpClient, System.Text.Json, Tomlyn
 
@@ -20,8 +19,8 @@ src/
 
 ## Environment
 
-- **dotnet**: .NET 10 SDK at `/opt/homebrew/bin/dotnet`. If not on PATH: `export PATH="/opt/homebrew/bin:$PATH"`
-- **Target frameworks**: Libraries consumed by Godot (PcpClient, PcpGodotBridge) target `net8.0` (Godot.NET.Sdk/4.6.1 is pinned to net8.0). Standalone executables and test projects target `net10.0`.
+- **dotnet**: SDK at `/opt/homebrew/bin/dotnet`. If not on PATH: `export PATH="/opt/homebrew/bin:$PATH"`
+- **Target framework**: All projects target `net8.0` (Godot.NET.Sdk 4.6.1 pins to net8.0). `Directory.Build.props` sets `RollForward=LatestMajor` so net8.0 binaries execute on any installed runtime.
 - **Godot**: NOT installed in Claude Code VM (no UI). Write `.tscn`, `.gd`, and `.cs` files directly. User tests scenes in their host Godot editor.
 - Always include `/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin` in PATH when running shell commands (VM quirk).
 
@@ -70,7 +69,7 @@ This is the same filter used in GitHub Actions CI (no pmproxy in CI runners eith
 
 ## Code Style
 
-C# (.NET 8.0) for Godot libraries, C# (.NET 10.0) for CLI/tests; GDScript for scene logic. Follow standard conventions.
+C# (.NET 8.0) for all C# projects; GDScript for scene logic. Follow standard conventions.
 
 ## Documentation Scope
 
