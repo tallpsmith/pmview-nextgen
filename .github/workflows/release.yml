@@ -70,23 +70,17 @@ jobs:
       - name: Compute artifact name
         run: echo "ARTIFACT=pmview-${VERSION}-${{ matrix.artifact_suffix }}" >> "$GITHUB_ENV"
 
-      # The pmview-bridge addon is symlinked into the Godot project for dev
-      # ergonomics (src/pmview-app/addons/pmview-bridge -> ../../pmview-bridge-addon/...).
-      # Godot's export packer silently skips symlinks, so the addon's .tscn scenes
-      # and C# scripts don't make it into the .pck — producing a blank screen at
-      # runtime. We replace the symlink with a real copy before export.
-      - name: Resolve addon symlink for export
+      # The pmview-bridge addon lives in src/pmview-bridge-addon/ and is
+      # symlinked into the Godot project for local dev (the symlink is
+      # gitignored). On CI the symlink doesn't exist, so we copy the addon
+      # into the Godot project so the export packer can include its .tscn
+      # scenes and C# scripts in the .pck file.
+      - name: Copy addon into Godot project for export
         run: |
-          cd src/pmview-app
-          if [ -L addons/pmview-bridge ]; then
-            TARGET=$(readlink addons/pmview-bridge)
-            rm addons/pmview-bridge
-            cp -r "$TARGET" addons/pmview-bridge
-            echo "Resolved symlink to real copy"
-            ls -la addons/pmview-bridge/
-          else
-            echo "Not a symlink, nothing to do"
-          fi
+          mkdir -p src/pmview-app/addons
+          cp -r src/pmview-bridge-addon/addons/pmview-bridge src/pmview-app/addons/
+          echo "--- Addon files copied ---"
+          ls -la src/pmview-app/addons/pmview-bridge/
 
       - name: Restore .NET dependencies
         run: dotnet restore src/pmview-app/pmview-app.csproj
