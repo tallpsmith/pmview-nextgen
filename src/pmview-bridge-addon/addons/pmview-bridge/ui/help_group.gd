@@ -6,11 +6,11 @@ extends RefCounted
 
 var group_name: String
 var header_color: Color
-var entries: Array[HelpEntry] = []
+var entries: Array = []  # Array of HelpEntry
 var enabled: bool = true
 
 
-static func create(p_name: String, p_color: Color, p_entries: Array[HelpEntry],
+static func create(p_name: String, p_color: Color, p_entries: Array,
 		p_enabled: bool = true) -> HelpGroup:
 	var g := HelpGroup.new()
 	g.group_name = p_name

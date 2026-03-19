@@ -14,7 +14,7 @@ const ACTION_FONT_SIZE := 13
 const KEY_COLUMN_WIDTH := 110
 const DISABLED_OPACITY := 0.3
 
-var _groups: Array[HelpGroup] = []
+var _groups: Array = []  # Array of HelpGroup
 var _group_containers: Dictionary = {}  # group_name -> VBoxContainer
 
 
@@ -23,7 +23,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
 
-func set_groups(groups: Array[HelpGroup]) -> void:
+func set_groups(groups: Array) -> void:
 	_groups = groups
 	_rebuild_ui()
 

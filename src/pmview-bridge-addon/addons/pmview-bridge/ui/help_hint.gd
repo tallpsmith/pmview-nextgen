@@ -4,13 +4,13 @@ extends PanelContainer
 ## Rotates through tips (15s visible, then 60s silent).
 ## Hidden when the HelpPanel is open or TimeControl is revealed.
 
-signal visibility_changed(is_visible: bool)
+signal hint_visibility_changed(is_visible: bool)
 
-const DISPLAY_DURATION := 15.0
+const DISPLAY_DURATION := 10.0
 const SILENT_DURATION := 60.0
 const FADE_DURATION := 0.5
 
-var _hints: Array[HelpHintEntry] = []
+var _hints: Array = []  # Array of HelpHintEntry
 var _current_index: int = 0
 var _is_cycling: bool = false
 var _suppressed: bool = false  # external suppression (panel open, time control overlap)
@@ -29,7 +29,7 @@ func _ready() -> void:
 	_silent_timer.timeout.connect(_on_silent_timeout)
 
 
-func set_hints(hints: Array[HelpHintEntry]) -> void:
+func set_hints(hints: Array) -> void:
 	_hints = hints
 	_current_index = 0
 
@@ -64,7 +64,7 @@ func resume_hint() -> void:
 func _show_current_hint() -> void:
 	if _hints.is_empty() or _suppressed:
 		return
-	var hint := _hints[_current_index]
+	var hint = _hints[_current_index]
 	_key_label.text = hint.key_text
 	_action_label.text = hint.action_text
 	_fade_in()
