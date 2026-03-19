@@ -327,6 +327,12 @@ alignment = 1
 [node name="HSeparator2" type="HSeparator" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer" unique_id=1033124559]
 layout_mode = 2
 
+[node name="VerboseCheck" type="CheckButton" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "VERBOSE LOGGING"
+
 [node name="LaunchPanel" type="Panel" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer" unique_id=62087626]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(420, 56)
