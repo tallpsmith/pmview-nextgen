@@ -1,0 +1,291 @@
+extends Control
+
+## Time Control panel — Time Machine-style timeline navigation.
+## Translucent right-edge overlay with timeline bars, playhead, and IN/OUT points.
+## Archive mode only.
+
+signal playhead_jumped(timestamp: String)
+signal range_set(in_time: String, out_time: String)
+signal range_cleared()
+signal panel_opened()
+signal panel_closed()
+
+# Trigger zone — wider so the bars can grow visibly as mouse approaches
+const EDGE_TRIGGER_WIDTH := 200
+const EDGE_HIDE_MARGIN := 60
+
+# Bar dimensions
+const BAR_MAX_LENGTH := 120.0
+const BAR_MIN_LENGTH := 6.0
+const BAR_HEIGHT := 4.0
+const BAR_SPACING := 10.0
+const ATTRACTION_RADIUS := 200.0
+const PANEL_WIDTH := 140.0
+const PANEL_PADDING := 30.0
+
+# IN/OUT markers use the active colour but thicker
+const IN_OUT_BAR_HEIGHT := 16.0
+
+var archive_start: float = 0.0
+var archive_end: float = 0.0
+var playhead_position: float = 0.0
+var in_point: float = -1.0
+var out_point: float = -1.0
+var _is_visible := false
+var _f2_dismissed := false
+var _scrub_auto_shown := false
+var _scrub_hide_timer: float = 0.0
+const SCRUB_HIDE_DELAY := 2.0
+
+enum RangeState { NO_RANGE, IN_SET, RANGE_COMPLETE }
+var _range_state: RangeState = RangeState.NO_RANGE
+
+var colour_active := Color(0.514, 0.22, 0.925, 0.7)
+var colour_inactive := Color(0.3, 0.3, 0.3, 0.3)
+var colour_playhead := Color(0.976, 0.451, 0.086, 0.9)
+var colour_panel_bg := Color(0.05, 0.04, 0.08, 0.5)
+
+# Hover label follows mouse — shows where you'd jump to
+@onready var timestamp_label: Label = $TimestampLabel
+# Playhead label stays at the playhead bar — shows current position
+@onready var playhead_label: Label = $PlayheadLabel
+
+
+func _ready() -> void:
+	mouse_filter = Control.MOUSE_FILTER_PASS
+	visible = false
+
+
+func _process(delta: float) -> void:
+	var viewport_size := get_viewport_rect().size
+	var mouse_pos := get_global_mouse_position()
+
+	# Auto-hide after scrub quiescence
+	if _scrub_auto_shown and _scrub_hide_timer > 0:
+		_scrub_hide_timer -= delta
+		if _scrub_hide_timer <= 0:
+			_scrub_auto_shown = false
+			_hide_panel()
+
+	if not _is_visible:
+		if mouse_pos.x > viewport_size.x - EDGE_TRIGGER_WIDTH and not _f2_dismissed:
+			_show_panel()
+	else:
+		if not _scrub_auto_shown:
+			if mouse_pos.x < viewport_size.x - EDGE_TRIGGER_WIDTH - EDGE_HIDE_MARGIN:
+				_hide_panel()
+		queue_redraw()
+		_update_labels()
+
+
+func _show_panel() -> void:
+	if _is_visible:
+		return
+	_is_visible = true
+	visible = true
+	panel_opened.emit()
+
+
+func _hide_panel() -> void:
+	if not _is_visible:
+		return
+	_is_visible = false
+	visible = false
+	panel_closed.emit()
+
+
+func toggle_panel() -> void:
+	if _is_visible:
+		_f2_dismissed = true
+		_hide_panel()
+	else:
+		_f2_dismissed = false
+		_show_panel()
+
+
+func update_playhead(position_iso: String, _mode: String) -> void:
+	var dict := Time.get_datetime_dict_from_datetime_string(position_iso, false)
+	if dict.is_empty():
+		return
+	playhead_position = Time.get_unix_time_from_datetime_dict(dict)
+	if _is_visible:
+		queue_redraw()
+
+
+func set_archive_bounds(start_epoch: float, end_epoch: float) -> void:
+	archive_start = start_epoch
+	archive_end = end_epoch
+
+
+## Called by HostViewController when arrow keys scrub the timeline.
+func notify_scrub() -> void:
+	_scrub_hide_timer = SCRUB_HIDE_DELAY
+	if not _is_visible:
+		_scrub_auto_shown = true
+		_is_visible = true
+		visible = true
+	queue_redraw()
+
+
+func _ease_in_out(t: float) -> float:
+	return t * t * (3.0 - 2.0 * t)
+
+
+## Convert a Y position to the corresponding epoch time
+func _y_to_time(y_pos: float, usable_height: float) -> float:
+	var relative := clampf((y_pos - PANEL_PADDING) / usable_height, 0.0, 1.0)
+	return archive_start + relative * (archive_end - archive_start)
+
+
+## Convert an epoch time to a Y position
+func _time_to_y(t: float, usable_height: float) -> float:
+	if archive_end <= archive_start:
+		return PANEL_PADDING
+	var relative := clampf((t - archive_start) / (archive_end - archive_start), 0.0, 1.0)
+	return PANEL_PADDING + relative * usable_height
+
+
+func _draw() -> void:
+	if archive_end <= archive_start:
+		return
+
+	var rect := get_rect()
+	var mouse_pos := get_local_mouse_position()
+
+	# Translucent background
+	var panel_x := rect.size.x - PANEL_WIDTH
+	draw_rect(Rect2(panel_x, 0, PANEL_WIDTH, rect.size.y), colour_panel_bg)
+
+	# Calculate bars
+	var usable_height := rect.size.y - PANEL_PADDING * 2
+	var bar_count := int(usable_height / (BAR_HEIGHT + BAR_SPACING))
+	if bar_count <= 0:
+		return
+
+	var time_range := archive_end - archive_start
+	var bar_right := rect.size.x - 10.0
+	var time_per_bar := time_range / float(maxi(bar_count - 1, 1))
+
+	# Edge proximity for lerp effect
+	var edge_distance: float = rect.size.x - mouse_pos.x
+	var edge_proximity := clampf(edge_distance / float(EDGE_TRIGGER_WIDTH), 0.0, 1.0)
+	edge_proximity = 1.0 - edge_proximity
+	var edge_factor: float = _ease_in_out(edge_proximity)
+
+	for i in bar_count:
+		var y := PANEL_PADDING + i * (BAR_HEIGHT + BAR_SPACING)
+		var t := archive_start + float(i) / float(maxi(bar_count - 1, 1)) * time_range
+
+		# Colour based on IN/OUT range
+		var colour: Color
+		if _range_state == RangeState.NO_RANGE:
+			colour = colour_active
+		elif in_point >= 0 and out_point >= 0:
+			colour = colour_active if t >= in_point and t <= out_point else colour_inactive
+		elif in_point >= 0:
+			colour = colour_active if t >= in_point else colour_inactive
+		else:
+			colour = colour_active
+
+		# Mouse attraction — ease in/out for smooth rolloff
+		var distance: float = absf(mouse_pos.y - y)
+		var linear_attraction := clampf(1.0 - distance / ATTRACTION_RADIUS, 0.0, 1.0)
+		var attraction: float = _ease_in_out(linear_attraction)
+
+		var bar_length: float = BAR_MIN_LENGTH + (BAR_MAX_LENGTH - BAR_MIN_LENGTH) * attraction * edge_factor
+
+		# Special markers
+		var is_playhead: bool = absf(t - playhead_position) < time_per_bar * 0.5
+		var is_in: bool = in_point >= 0 and absf(t - in_point) < time_per_bar * 0.5
+		var is_out: bool = out_point >= 0 and absf(t - out_point) < time_per_bar * 0.5
+
+		var this_bar_height := BAR_HEIGHT
+		if is_playhead:
+			colour = colour_playhead
+			bar_length = maxf(bar_length, BAR_MAX_LENGTH * 0.7 * edge_factor)
+			this_bar_height = IN_OUT_BAR_HEIGHT
+		elif is_in or is_out:
+			bar_length = maxf(bar_length, BAR_MAX_LENGTH * 0.55 * edge_factor)
+			this_bar_height = IN_OUT_BAR_HEIGHT
+
+		bar_length = maxf(bar_length, BAR_MIN_LENGTH * edge_factor)
+
+		if bar_length > 0.5:
+			var y_offset := y - (this_bar_height - BAR_HEIGHT) * 0.5
+			draw_rect(Rect2(bar_right - bar_length, y_offset, bar_length, this_bar_height), colour)
+
+
+func _update_labels() -> void:
+	if archive_end <= archive_start:
+		return
+
+	var rect := get_rect()
+	var mouse_pos := get_local_mouse_position()
+	var usable_height := rect.size.y - PANEL_PADDING * 2
+	var label_x := rect.size.x - 360
+
+	# Hover label — follows mouse, shows potential jump target
+	if timestamp_label:
+		var hover_time := _y_to_time(mouse_pos.y, usable_height)
+		var hover_dt := Time.get_datetime_string_from_unix_time(int(hover_time))
+		timestamp_label.text = hover_dt + "Z"
+		timestamp_label.position = Vector2(label_x, mouse_pos.y - 12)
+		timestamp_label.visible = true
+
+	# Playhead label — stays at playhead position, shows current time
+	if playhead_label:
+		var playhead_y := _time_to_y(playhead_position, usable_height)
+		var playhead_dt := Time.get_datetime_string_from_unix_time(int(playhead_position))
+		playhead_label.text = "▶ " + playhead_dt + "Z"
+		playhead_label.position = Vector2(label_x, playhead_y - 12)
+		playhead_label.visible = true
+
+
+func _gui_input(event: InputEvent) -> void:
+	if not event is InputEventMouseButton:
+		return
+	if not event.pressed or event.button_index != MOUSE_BUTTON_LEFT:
+		return
+	if archive_end <= archive_start:
+		return
+
+	var rect := get_rect()
+	var usable_height := rect.size.y - PANEL_PADDING * 2
+	var clicked_time := _y_to_time(event.position.y, usable_height)
+	var clicked_iso := Time.get_datetime_string_from_unix_time(int(clicked_time)) + "Z"
+
+	if event.shift_pressed:
+		_handle_shift_click(clicked_time, clicked_iso)
+	else:
+		playhead_jumped.emit(clicked_iso)
+
+
+func _handle_shift_click(time_epoch: float, time_iso: String) -> void:
+	match _range_state:
+		RangeState.NO_RANGE:
+			in_point = time_epoch
+			out_point = archive_end
+			_range_state = RangeState.IN_SET
+			var out_iso := Time.get_datetime_string_from_unix_time(
+				int(archive_end)) + "Z"
+			range_set.emit(time_iso, out_iso)
+		RangeState.IN_SET:
+			out_point = time_epoch
+			_range_state = RangeState.RANGE_COMPLETE
+			var in_iso := Time.get_datetime_string_from_unix_time(
+				int(in_point)) + "Z"
+			range_set.emit(in_iso, time_iso)
+		RangeState.RANGE_COMPLETE:
+			in_point = time_epoch
+			out_point = archive_end
+			_range_state = RangeState.IN_SET
+			var out_iso := Time.get_datetime_string_from_unix_time(
+				int(archive_end)) + "Z"
+			range_set.emit(time_iso, out_iso)
+
+
+func reset_range() -> void:
+	in_point = -1.0
+	out_point = -1.0
+	_range_state = RangeState.NO_RANGE
+	range_cleared.emit()

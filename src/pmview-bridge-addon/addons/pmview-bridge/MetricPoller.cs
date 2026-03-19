@@ -47,6 +47,7 @@ public partial class MetricPoller : Node
 	private readonly Dictionary<string, Dictionary<string, int>> _liveInstanceNames = new();
 	private readonly HashSet<string> _liveInstanceNamesPopulated = new();
 	private Godot.Collections.Dictionary? _lastEmittedMetrics;
+	private bool _skipNextAdvance;
 
 	public ConnectionState CurrentState => _client?.State ?? ConnectionState.Disconnected;
 	internal IPcpClient? Client => _client;
@@ -66,8 +67,14 @@ public partial class MetricPoller : Node
 			CallDeferred(nameof(StartPolling));
 	}
 
+	private bool _startPollingCalled;
+
 	public async void StartPolling()
 	{
+		if (_startPollingCalled)
+			return;
+		_startPollingCalled = true;
+
 		try
 		{
 			await ConnectToEndpoint();
@@ -133,6 +140,9 @@ public partial class MetricPoller : Node
 		try
 		{
 			_timeCursor.Resume();
+			// Reset poll time so AdvanceBy doesn't jump by the time
+			// spent paused (e.g. in the TimeControl panel)
+			_lastPollTime = DateTime.UtcNow;
 			EmitSignal(SignalName.PlaybackPositionChanged,
 				_timeCursor.Position.ToString("o"), "Playback");
 		}
@@ -160,6 +170,140 @@ public partial class MetricPoller : Node
 	public void SetLoop(bool loop)
 	{
 		_timeCursor.Loop = loop;
+	}
+
+	/// <summary>
+	/// Returns true if currently in Playback mode (not paused, not live).
+	/// GDScript-callable — TimeCursor is not visible to GDScript.
+	/// </summary>
+	public bool IsPlaying()
+	{
+		return _timeCursor.Mode == CursorMode.Playback;
+	}
+
+	/// <summary>
+	/// Toggles between Playback and Paused modes.
+	/// No-op in Live mode. GDScript-callable.
+	/// </summary>
+	public void TogglePlayback()
+	{
+		if (_timeCursor.Mode == CursorMode.Playback)
+			PausePlayback();
+		else if (_timeCursor.Mode == CursorMode.Paused)
+			ResumePlayback();
+	}
+
+	/// <summary>
+	/// Steps the playback position by a fixed interval.
+	/// Direction: +1 = forward, -1 = backward.
+	/// Pauses playback if currently playing, then fetches data at new position.
+	/// </summary>
+	public async void StepPlayback(double intervalSeconds, int direction)
+	{
+		if (_timeCursor.Mode == CursorMode.Live)
+			return;
+
+		// Step without pausing — playback continues from the new position.
+		// If paused, stay paused but update the position.
+		_timeCursor.StepByInterval(intervalSeconds, direction);
+		_lastEmittedTimestamp.Clear();
+		_skipNextAdvance = true;
+		EmitSignal(SignalName.PlaybackPositionChanged,
+			_timeCursor.Position.ToString("o"), "Paused");
+
+		try
+		{
+			await FetchHistoricalMetrics();
+		}
+		catch (Exception ex)
+		{
+			EmitSignal(SignalName.ErrorOccurred, $"Step fetch error: {ex.Message}");
+		}
+	}
+
+	/// <summary>
+	/// Jumps the playback position to a specific timestamp.
+	/// Pauses playback if currently playing, then fetches data at new position.
+	/// </summary>
+	public async void JumpToTimestamp(string isoTimestamp)
+	{
+		if (DateTime.TryParse(isoTimestamp, null,
+			DateTimeStyles.AdjustToUniversal, out var target))
+		{
+			if (_timeCursor.Mode == CursorMode.Live)
+				return;
+
+			if (_timeCursor.Mode == CursorMode.Playback)
+				_timeCursor.Pause();
+
+			_timeCursor.JumpTo(target);
+			_lastEmittedTimestamp.Clear();
+			_skipNextAdvance = true;
+			EmitSignal(SignalName.PlaybackPositionChanged,
+				target.ToString("o"), "Paused");
+
+			try
+			{
+				await FetchHistoricalMetrics();
+			}
+			catch (Exception ex)
+			{
+				EmitSignal(SignalName.ErrorOccurred, $"Jump fetch error: {ex.Message}");
+			}
+		}
+		else
+		{
+			EmitSignal(SignalName.ErrorOccurred,
+				$"Invalid timestamp format: {isoTimestamp}");
+		}
+	}
+
+	/// <summary>
+	/// Sets the IN/OUT range for loop playback.
+	/// Resumes playback if currently paused.
+	/// </summary>
+	public void SetInOutRange(string inPointIso, string outPointIso)
+	{
+		if (DateTime.TryParse(inPointIso, null,
+				DateTimeStyles.AdjustToUniversal, out var inPoint)
+			&& DateTime.TryParse(outPointIso, null,
+				DateTimeStyles.AdjustToUniversal, out var outPoint))
+		{
+			_timeCursor.SetInOutRange(inPoint, outPoint);
+
+			// If playhead is outside the new range, jump to IN point
+			if (_timeCursor.Position < inPoint || _timeCursor.Position > outPoint)
+			{
+				_timeCursor.JumpTo(inPoint);
+				_lastEmittedTimestamp.Clear();
+				_skipNextAdvance = true;
+			}
+
+			if (_timeCursor.Mode == CursorMode.Paused)
+				_timeCursor.Resume();
+
+			EmitSignal(SignalName.PlaybackPositionChanged,
+				_timeCursor.Position.ToString("o"), "Playback");
+		}
+		else
+		{
+			EmitSignal(SignalName.ErrorOccurred,
+				$"Invalid range format: {inPointIso} → {outPointIso}");
+		}
+	}
+
+	/// <summary>
+	/// Clears the IN/OUT range and resumes playback.
+	/// </summary>
+	public void ClearRange()
+	{
+		_timeCursor.ClearInOutRange();
+
+		if (_timeCursor.Mode == CursorMode.Paused)
+			_timeCursor.Resume();
+
+		EmitSignal(SignalName.PlaybackPositionChanged,
+			_timeCursor.Position.ToString("o"), "Playback");
 	}
 
 	public void UpdateEndpoint(string endpoint, int pollIntervalMs)
@@ -207,7 +351,23 @@ public partial class MetricPoller : Node
 			var realMetrics = MetricNames
 				.Where(m => !m.StartsWith("pmview.meta.", StringComparison.Ordinal))
 				.ToArray();
-			var descriptors = await _client.DescribeMetricsAsync(realMetrics);
+
+			// Describe metrics individually — some may not exist on the live pmcd
+			// (archive metrics can differ from the local host's metrics).
+			var descriptors = new List<MetricDescriptor>();
+			foreach (var metric in realMetrics)
+			{
+				try
+				{
+					var descs = await _client.DescribeMetricsAsync(new[] { metric });
+					descriptors.AddRange(descs);
+				}
+				catch
+				{
+					// Metric not available on live pmcd — skip silently
+				}
+			}
+
 			_rateConverter = new MetricRateConverter(descriptors);
 			var counterNames = descriptors
 				.Where(d => d.Semantics == MetricSemantics.Counter)
@@ -246,7 +406,20 @@ public partial class MetricPoller : Node
 
 		if (_timeCursor.Mode == CursorMode.Playback)
 		{
-			_timeCursor.AdvanceBy(elapsed);
+			if (_skipNextAdvance)
+			{
+				// After a JumpTo, fetch at the current position without advancing
+				_skipNextAdvance = false;
+			}
+			else
+			{
+				// In archive playback, advance by the archive sampling interval
+				// so each poll tick lands on the next sample.
+				var advanceAmount = _archiveSamplingIntervalSeconds > 0
+					? TimeSpan.FromSeconds(_archiveSamplingIntervalSeconds)
+					: elapsed;
+				_timeCursor.AdvanceBy(advanceAmount);
+			}
 			EmitSignal(SignalName.PlaybackPositionChanged,
 				_timeCursor.Position.ToString("o"), "Playback");
 		}
@@ -575,11 +748,15 @@ public partial class MetricPoller : Node
 			}
 		}
 
+		// Always inject virtual metrics (timestamp, hostname) so the 3D
+		// display stays in sync with the cursor position, even when no
+		// new sample data is available (sample-and-hold between intervals).
+		InjectVirtualMetrics(dict);
+
 		if (dict.Count > 0)
 		{
 			if (VerboseLogging)
 				GD.Print($"[MetricPoller] Historical update: {dict.Count} metrics with new data");
-			InjectVirtualMetrics(dict);
 			_lastEmittedMetrics = dict;
 			EmitSignal(SignalName.MetricsUpdated, dict);
 		}

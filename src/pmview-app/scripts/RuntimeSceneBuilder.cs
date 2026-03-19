@@ -38,11 +38,14 @@ public static class RuntimeSceneBuilder
     /// mirroring the structure TscnWriter emits to .tscn.
     /// </summary>
     public static Node3D Build(SceneLayout layout, string pmproxyEndpoint,
+        string mode = "live", string? hostnameOverride = null,
         IProgress<float>? progress = null)
     {
         GD.Print("[RuntimeSceneBuilder] Build starting...");
         var root = CreateHostViewRoot();
-        AddMetricPoller(root, pmproxyEndpoint, layout.Hostname);
+        var hostname = hostnameOverride ?? layout.Hostname;
+        AddMetricPoller(root, pmproxyEndpoint, hostname,
+            verboseLogging: mode == "archive");
         AddSceneBinder(root);
 
         GD.Print($"[RuntimeSceneBuilder] Building {layout.Zones.Count} zones...");
@@ -54,6 +57,9 @@ public static class RuntimeSceneBuilder
 
         BuildAmbientLabels(root);
         AddRangeTuningPanel(root);
+
+        if (mode == "archive")
+            AddTimeControl(root);
 
         // Set Owner on all descendants so find_child(owned=true) works —
         // programmatic nodes don't get an owner automatically unlike .tscn scenes.
@@ -73,12 +79,14 @@ public static class RuntimeSceneBuilder
             GD.PrintErr($"[RuntimeSceneBuilder] FAILED to load controller script: {ControllerScriptPath}");
         else
             GD.Print($"[RuntimeSceneBuilder] Loaded controller script: {script.ResourcePath}");
-        root.SetScript(script);
+        if (script != null)
+            root.SetScript(script);
         GD.Print($"[RuntimeSceneBuilder] Root script after SetScript: {root.GetScript()}");
         return root;
     }
 
-    private static void AddMetricPoller(Node3D root, string endpoint, string hostname)
+    private static void AddMetricPoller(Node3D root, string endpoint, string hostname,
+        bool verboseLogging = false)
     {
         var poller = new Node { Name = "MetricPoller" };
         var script = GD.Load<Script>(MetricPollerScriptPath);
@@ -88,6 +96,8 @@ public static class RuntimeSceneBuilder
         GD.Print($"[RuntimeSceneBuilder] MetricPoller type after SetScript: {poller.GetClass()}, script: {poller.GetScript()}");
         poller.Set("Endpoint", endpoint);
         poller.Set("Hostname", hostname);
+        if (verboseLogging)
+            poller.Set("VerboseLogging", true);
         root.AddChild(poller);
     }
 
@@ -379,6 +389,33 @@ public static class RuntimeSceneBuilder
         // Owner is set by SetOwnerRecursive() in Build() — don't set manually here.
     }
 
+    // ── time control (archive mode) ────────────────────────────────────
+
+    private const string TimeControlScenePath = "res://scenes/time_control.tscn";
+
+    private static void AddTimeControl(Node3D sceneRoot)
+    {
+        var timeControlScene = GD.Load<PackedScene>(TimeControlScenePath);
+        if (timeControlScene == null)
+        {
+            GD.PushWarning("[RuntimeSceneBuilder] TimeControl scene not found");
+            return;
+        }
+
+        // Add to existing UILayer, or create one if missing
+        var uiLayer = sceneRoot.FindChild("UILayer", true, false) as CanvasLayer;
+        if (uiLayer == null)
+        {
+            GD.PushWarning("[RuntimeSceneBuilder] UILayer not found — creating one");
+            uiLayer = new CanvasLayer { Name = "UILayer" };
+            sceneRoot.AddChild(uiLayer);
+        }
+
+        var timeControl = timeControlScene.Instantiate();
+        timeControl.Name = "TimeControl";
+        uiLayer.AddChild(timeControl);
+    }
+
     // ── script assignment ─────────────────────────────────────────────
 
     /// <summary>
@@ -390,7 +427,9 @@ public static class RuntimeSceneBuilder
     {
         var id = obj.GetInstanceId();
         obj.SetScript(GD.Load<Script>(scriptPath));
-        return (T)GodotObject.InstanceFromId(id);
+        return (T)(GodotObject.InstanceFromId(id)
+            ?? throw new InvalidOperationException(
+                $"Failed to retrieve managed wrapper after SetScript: {scriptPath}"));
     }
 
     // ── ownership ───────────────────────────────────────────────────────

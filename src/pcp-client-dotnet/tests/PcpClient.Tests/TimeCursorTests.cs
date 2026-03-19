@@ -316,4 +316,150 @@ public class TimeCursorTests
         var expected = start.AddSeconds(90);
         Assert.Equal(expected, cursor.Position);
     }
+
+    // ── IN/OUT point properties ──
+
+    [Fact]
+    public void NewTimeCursor_InPoint_DefaultsToNull()
+    {
+        var cursor = new TimeCursor();
+        Assert.Null(cursor.InPoint);
+    }
+
+    [Fact]
+    public void NewTimeCursor_OutPoint_DefaultsToNull()
+    {
+        var cursor = new TimeCursor();
+        Assert.Null(cursor.OutPoint);
+    }
+
+    [Fact]
+    public void SetInOutRange_SetsInPointAndOutPoint()
+    {
+        var cursor = new TimeCursor();
+        var inPoint = new DateTime(2026, 3, 14, 0, 0, 0, DateTimeKind.Utc);
+        var outPoint = new DateTime(2026, 3, 17, 0, 0, 0, DateTimeKind.Utc);
+
+        cursor.SetInOutRange(inPoint, outPoint);
+
+        Assert.Equal(inPoint, cursor.InPoint);
+        Assert.Equal(outPoint, cursor.OutPoint);
+        Assert.Equal(outPoint, cursor.EndBound);
+        Assert.True(cursor.Loop);
+    }
+
+    [Fact]
+    public void ClearInOutRange_ResetsToNull()
+    {
+        var cursor = new TimeCursor();
+        cursor.SetInOutRange(
+            new DateTime(2026, 3, 14, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 3, 17, 0, 0, 0, DateTimeKind.Utc));
+
+        cursor.ClearInOutRange();
+
+        Assert.Null(cursor.InPoint);
+        Assert.Null(cursor.OutPoint);
+        Assert.Null(cursor.EndBound);
+        Assert.False(cursor.Loop);
+    }
+
+    [Fact]
+    public void AdvanceBy_WithInPoint_LoopsBackToInPoint()
+    {
+        var cursor = new TimeCursor();
+        var start = new DateTime(2026, 3, 10, 0, 0, 0, DateTimeKind.Utc);
+        var inPoint = new DateTime(2026, 3, 14, 0, 0, 0, DateTimeKind.Utc);
+        var outPoint = new DateTime(2026, 3, 14, 0, 1, 0, DateTimeKind.Utc);
+
+        cursor.StartPlayback(start);
+        cursor.SetInOutRange(inPoint, outPoint);
+
+        // Jump near out point, then advance past it
+        cursor.JumpTo(outPoint.AddSeconds(-5));
+        cursor.AdvanceBy(TimeSpan.FromSeconds(30));
+
+        // Should loop back to IN point, not StartTime
+        Assert.Equal(inPoint, cursor.Position);
+    }
+
+    [Fact]
+    public void ResetToLive_ClearsInOutPoints()
+    {
+        var cursor = new TimeCursor();
+        cursor.StartPlayback(DateTime.UtcNow);
+        cursor.SetInOutRange(
+            new DateTime(2026, 3, 14, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 3, 17, 0, 0, 0, DateTimeKind.Utc));
+
+        cursor.ResetToLive();
+
+        Assert.Null(cursor.InPoint);
+        Assert.Null(cursor.OutPoint);
+    }
+
+    // ── StepByInterval ──
+
+    [Fact]
+    public void StepByInterval_Forward_AdvancesPosition()
+    {
+        var cursor = new TimeCursor();
+        var start = new DateTime(2026, 3, 10, 14, 0, 0, DateTimeKind.Utc);
+        cursor.StartPlayback(start);
+        cursor.Pause();
+
+        cursor.StepByInterval(60.0, 1);
+
+        Assert.Equal(start.AddSeconds(60), cursor.Position);
+    }
+
+    [Fact]
+    public void StepByInterval_Backward_RewindsPosition()
+    {
+        var cursor = new TimeCursor();
+        var start = new DateTime(2026, 3, 10, 14, 0, 0, DateTimeKind.Utc);
+        cursor.StartPlayback(start);
+        cursor.AdvanceBy(TimeSpan.FromMinutes(5));
+        cursor.Pause();
+
+        cursor.StepByInterval(60.0, -1);
+
+        Assert.Equal(start.AddMinutes(5).AddSeconds(-60), cursor.Position);
+    }
+
+    [Fact]
+    public void StepByInterval_InLiveMode_DoesNothing()
+    {
+        var cursor = new TimeCursor();
+
+        cursor.StepByInterval(60.0, 1);
+
+        Assert.Equal(CursorMode.Live, cursor.Mode);
+    }
+
+    // ── JumpTo ──
+
+    [Fact]
+    public void JumpTo_SetsPositionDirectly()
+    {
+        var cursor = new TimeCursor();
+        var start = new DateTime(2026, 3, 10, 14, 0, 0, DateTimeKind.Utc);
+        cursor.StartPlayback(start);
+
+        var target = new DateTime(2026, 3, 15, 8, 30, 0, DateTimeKind.Utc);
+        cursor.JumpTo(target);
+
+        Assert.Equal(target, cursor.Position);
+    }
+
+    [Fact]
+    public void JumpTo_InLiveMode_DoesNothing()
+    {
+        var cursor = new TimeCursor();
+
+        cursor.JumpTo(new DateTime(2026, 3, 15, 8, 30, 0, DateTimeKind.Utc));
+
+        // Should remain in Live mode, position is not tracked
+        Assert.Equal(CursorMode.Live, cursor.Mode);
+    }
 }

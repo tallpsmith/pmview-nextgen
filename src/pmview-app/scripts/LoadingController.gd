@@ -23,12 +23,15 @@ var _has_error := false
 func _ready() -> void:
 	var config := SceneManager.connection_config
 	var endpoint: String = config.get("endpoint", "http://localhost:44322")
+	var mode: String = config.get("mode", "live")
+	var hostname: String = config.get("hostname", "")
+	var start_time: String = config.get("start_time", "")
 
 	pipeline.PhaseCompleted.connect(_on_phase_completed)
 	pipeline.PipelineCompleted.connect(_on_pipeline_completed)
 	pipeline.PipelineError.connect(_on_pipeline_error)
 
-	pipeline.StartPipeline(endpoint)
+	pipeline.StartPipeline(endpoint, mode, hostname, start_time)
 
 
 func _on_phase_completed(index: int, _phase_name: String) -> void:

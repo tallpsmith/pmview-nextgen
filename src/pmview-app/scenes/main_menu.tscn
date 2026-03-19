@@ -189,7 +189,7 @@ anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
 offset_left = -240.0
-offset_top = -340.0
+offset_top = -520.0
 offset_right = 240.0
 offset_bottom = -40.0
 grow_horizontal = 2
@@ -197,6 +197,7 @@ grow_vertical = 0
 
 [node name="VBoxContainer" type="VBoxContainer" parent="CanvasLayer/Control/CenterContainer" unique_id=1938259673]
 layout_mode = 2
+size_flags_vertical = 8
 theme_override_constants/separation = 8
 
 [node name="EndpointLabel" type="Label" parent="CanvasLayer/Control/CenterContainer/VBoxContainer" unique_id=462830367]
@@ -228,6 +229,7 @@ theme_override_constants/separation = 16
 alignment = 1
 
 [node name="LiveButton" type="Button" parent="CanvasLayer/Control/CenterContainer/VBoxContainer/ModeButtons" unique_id=247311621]
+unique_name_in_owner = true
 custom_minimum_size = Vector2(120, 32)
 layout_mode = 2
 toggle_mode = true
@@ -236,12 +238,51 @@ button_group = SubResource("mode_group")
 text = "LIVE"
 
 [node name="ArchiveButton" type="Button" parent="CanvasLayer/Control/CenterContainer/VBoxContainer/ModeButtons" unique_id=793248364]
+unique_name_in_owner = true
 custom_minimum_size = Vector2(120, 32)
 layout_mode = 2
-disabled = true
 toggle_mode = true
 button_group = SubResource("mode_group")
 text = "ARCHIVE"
+
+[node name="ArchivePanel" type="VBoxContainer" parent="CanvasLayer/Control/CenterContainer/VBoxContainer"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="HostLabel" type="Label" parent="CanvasLayer/Control/CenterContainer/VBoxContainer/ArchivePanel"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "SOURCE HOST"
+horizontal_alignment = 1
+
+[node name="HostDropdown" type="OptionButton" parent="CanvasLayer/Control/CenterContainer/VBoxContainer/ArchivePanel"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(400, 32)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+alignment = 1
+
+[node name="RangeLabel" type="Label" parent="CanvasLayer/Control/CenterContainer/VBoxContainer/ArchivePanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.976, 0.451, 0.086, 0.8)
+theme_override_font_sizes/font_size = 9
+horizontal_alignment = 1
+
+[node name="StartTimeLabel" type="Label" parent="CanvasLayer/Control/CenterContainer/VBoxContainer/ArchivePanel"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "START TIME (ISO 8601)"
+horizontal_alignment = 1
+
+[node name="StartTimeInput" type="LineEdit" parent="CanvasLayer/Control/CenterContainer/VBoxContainer/ArchivePanel"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(400, 32)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+alignment = 1
 
 [node name="HSeparator2" type="HSeparator" parent="CanvasLayer/Control/CenterContainer/VBoxContainer" unique_id=1033124559]
 layout_mode = 2

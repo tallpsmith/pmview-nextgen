@@ -8,6 +8,8 @@ public class HostProfileProvider : IHostProfileProvider
     {
         HostOs.Linux => LinuxProfile.GetZones(),
         HostOs.MacOs => MacOsProfile.GetZones(),
-        _ => throw new ArgumentException($"No profile available for OS: {os}")
+        // Archives may lack kernel.uname.sysname — fall back to Linux
+        // since PCP archives are overwhelmingly from Linux hosts.
+        HostOs.Unknown => LinuxProfile.GetZones(),
     };
 }

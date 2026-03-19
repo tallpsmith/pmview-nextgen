@@ -64,6 +64,17 @@ public static class PcpSeriesQuery
         return new Uri(baseUrl, $"/series/query?expr={Uri.EscapeDataString(expr)}");
     }
 
+    /// <summary>
+    /// Builds a /series/query URL with a hostname label filter.
+    /// pmproxy requires full RFC 3986 percent-encoding of the filter expression —
+    /// { } " = must all be encoded. Returns 400 Bad Request otherwise.
+    /// </summary>
+    public static Uri BuildHostnameFilteredQueryUrl(Uri baseUrl, string metricName, string hostname)
+    {
+        var filter = $"{metricName}{{hostname==\"{hostname}\"}}";
+        return new Uri(baseUrl, $"/series/query?expr={Uri.EscapeDataString(filter)}");
+    }
+
     public static Uri BuildValuesUrl(Uri baseUrl, IEnumerable<string> seriesIds)
     {
         var ids = string.Join(",", seriesIds);

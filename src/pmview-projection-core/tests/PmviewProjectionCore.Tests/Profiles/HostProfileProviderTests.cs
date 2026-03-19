@@ -32,8 +32,11 @@ public class HostProfileProviderTests
     }
 
     [Fact]
-    public void GetProfile_Unknown_ThrowsArgumentException()
+    public void GetProfile_Unknown_FallsBackToLinux()
     {
-        Assert.Throws<ArgumentException>(() => _provider.GetProfile(HostOs.Unknown));
+        var linux = _provider.GetProfile(HostOs.Linux);
+        var unknown = _provider.GetProfile(HostOs.Unknown);
+        Assert.Equal(linux.Count, unknown.Count);
+        Assert.Equal(linux.Select(z => z.Name), unknown.Select(z => z.Name));
     }
 }

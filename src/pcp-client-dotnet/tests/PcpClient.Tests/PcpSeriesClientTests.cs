@@ -146,4 +146,29 @@ public class PcpSeriesClientTests
         Assert.Single(result);
         Assert.Equal("sda", result["inst1"].Name);
     }
+
+    [Fact]
+    public async Task GetValuesAsync_WithTimeWindow_ReturnsValues()
+    {
+        var handler = new MockHttpHandler(req =>
+        {
+            var url = req.RequestUri!.ToString();
+            Assert.Contains("/series/values", url);
+            Assert.Contains("start=", url);
+            Assert.Contains("finish=", url);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    """[{"series": "abc123", "timestamp": 1773348826000.0, "value": "0.42"}]""",
+                    System.Text.Encoding.UTF8, "application/json")
+            };
+        });
+        var httpClient = new HttpClient(handler);
+        var client = new PcpSeriesClient(BaseUrl, httpClient);
+        var position = new DateTime(2026, 3, 15, 12, 0, 0, DateTimeKind.Utc);
+        var result = await client.GetValuesAsync(
+            new[] { "abc123" }, position, windowSeconds: 60.0);
+        Assert.Single(result);
+        Assert.Equal(0.42, result[0].NumericValue, precision: 2);
+    }
 }
