@@ -79,7 +79,13 @@ jobs:
       - name: Export Godot project
         run: |
           mkdir -p build
-          godot --headless --path src/pmview-app --export-release "${{ matrix.preset }}" "../../build/pmview"
+          # macOS requires .app extension; Linux auto-appends arch suffix
+          if [ "${{ matrix.preset }}" = "macOS" ]; then
+            EXPORT_PATH="../../build/pmview.app"
+          else
+            EXPORT_PATH="../../build/pmview"
+          fi
+          godot --headless --path src/pmview-app --export-release "${{ matrix.preset }}" "$EXPORT_PATH"
           echo "--- Exported files ---"
           ls -la build/
 
