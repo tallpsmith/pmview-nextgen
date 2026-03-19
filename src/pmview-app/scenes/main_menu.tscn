@@ -136,7 +136,7 @@ shader_parameter/color_right = Color(0.228, 0.525, 1, 1)
 render_priority = -1
 shader = ExtResource("5")
 shader_parameter/dot_spacing = 2.0
-shader_parameter/dot_radius = 0.06
+shader_parameter/dot_size = 0.08
 shader_parameter/dot_color = Color(0, 0.8, 0.3, 1)
 shader_parameter/fade_distance = 18.0
 
