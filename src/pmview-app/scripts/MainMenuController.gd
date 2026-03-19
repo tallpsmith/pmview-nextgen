@@ -1,12 +1,22 @@
 extends Node3D
 
-## Main menu controller — rotates 3D title letters, handles connection
-## form submission, drives KITT scanner hover, and manages archive mode UI.
+## Main menu controller — orbits the camera around the 3D title,
+## modulates camera elevation on a different frequency, handles
+## connection form submission, drives KITT scanner hover, and manages
+## archive mode UI.
 
-const ROTATION_SPEED := 0.3
-const PHASE_OFFSET := 0.4
+# --- Camera orbit ---
+@export_group("Camera Orbit")
+@export var orbit_speed := 0.3           ## Orbit angular velocity (rad/s)
+@export var orbit_radius := 7.5          ## Distance from camera to origin
 
-@onready var title_group: Node3D = $TitleGroup
+@export_group("Camera Elevation")
+@export var elevation_min := 1.5         ## Lowest camera Y during bob
+@export var elevation_max := 4.5         ## Highest camera Y during bob
+@export var elevation_speed := 0.2       ## Elevation oscillation speed (rad/s)
+
+@onready var camera_rig: Node3D = $CameraRig
+@onready var camera: Camera3D = $CameraRig/Camera3D
 @onready var endpoint_input: LineEdit = %EndpointInput
 @onready var launch_panel: Panel = %LaunchPanel
 @onready var kitt_rect: ColorRect = %KittRect
@@ -18,6 +28,8 @@ const PHASE_OFFSET := 0.4
 @onready var start_time_input: LineEdit = %StartTimeInput
 
 var _sweep_tween: Tween = null
+var _orbit_angle := 0.0
+var _elevation_angle := 0.0
 var _archive_start: String = ""
 var _archive_end: String = ""
 var _archive_start_epoch: float = 0.0
@@ -37,11 +49,22 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	_rotate_title_letters(delta)
+	_update_camera_orbit(delta)
 
 
-func _rotate_title_letters(delta: float) -> void:
-	title_group.rotate_y((ROTATION_SPEED + sin(Time.get_ticks_msec() * 0.001) * 0.15) * delta)
+func _update_camera_orbit(delta: float) -> void:
+	# Orbit around Y axis
+	_orbit_angle = wrapf(_orbit_angle + orbit_speed * delta, 0.0, TAU)
+	camera_rig.rotation.y = _orbit_angle
+
+	# Elevation bob on a different frequency
+	_elevation_angle = wrapf(_elevation_angle + elevation_speed * delta, 0.0, TAU)
+	var elevation_t := (sin(_elevation_angle) + 1.0) * 0.5  # 0..1
+	var cam_y := lerpf(elevation_min, elevation_max, elevation_t)
+
+	# Position camera at orbit radius, looking at origin
+	camera.position = Vector3(0.0, cam_y, orbit_radius)
+	camera.look_at(Vector3.ZERO, Vector3.UP)
 
 
 # --- Mode switching ---
@@ -111,7 +134,6 @@ func _set_launch_enabled(enabled: bool) -> void:
 	if enabled:
 		launch_panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		launch_panel.modulate = Color(1, 1, 1, 1)
-		# Restart KITT on hover if needed
 	else:
 		launch_panel.mouse_default_cursor_shape = Control.CURSOR_FORBIDDEN
 		launch_panel.modulate = Color(0.4, 0.4, 0.5, 0.6)
@@ -213,7 +235,9 @@ func _on_launch_hover() -> void:
 	var mat := kitt_rect.material as ShaderMaterial
 	if not mat:
 		return
+
 	mat.set_shader_parameter("intensity", 1.0)
+
 	_kill_sweep_tween()
 	_sweep_tween = create_tween().set_loops()
 	_sweep_tween.tween_property(mat, "shader_parameter/sweep_position", 1.4, 0.9)
@@ -225,6 +249,7 @@ func _on_launch_unhover() -> void:
 	if not mat:
 		return
 	_kill_sweep_tween()
+
 	var fade := create_tween()
 	fade.tween_property(mat, "shader_parameter/intensity", 0.0, 0.3)
 
