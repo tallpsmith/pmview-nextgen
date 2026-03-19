@@ -569,9 +569,8 @@ public partial class MetricPoller : Node
 
 				// Counters need 2 samples for rate conversion — widen the window
 				var isCounter = _rateConverter?.IsCounter(metricName) == true;
-				if (VerboseLogging && _rateConverter != null && metricName == realMetrics[0])
-					GD.Print($"[MetricPoller] Rate converter check: {metricName} isCounter={isCounter}, " +
-						$"_rateConverter={_rateConverter?.GetType().Name}");
+				if (VerboseLogging && metricName == realMetrics[0])
+					GD.Print($"[MetricPoller] Rate converter: null={_rateConverter == null}, isCounter={isCounter}");
 				var windowSeconds = isCounter
 					? _archiveSamplingIntervalSeconds * 2.5
 					: _archiveSamplingIntervalSeconds * 1.5;
