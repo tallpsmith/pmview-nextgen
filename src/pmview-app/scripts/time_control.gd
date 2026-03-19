@@ -10,14 +10,18 @@ signal range_cleared()
 signal panel_opened()
 signal panel_closed()
 
-const EDGE_TRIGGER_WIDTH := 60
-const BAR_MAX_LENGTH := 60.0
-const BAR_MIN_LENGTH := 8.0
-const BAR_HEIGHT := 3.0
-const BAR_SPACING := 4.0
-const ATTRACTION_RADIUS := 120.0
-const PANEL_WIDTH := 80.0
-const PANEL_PADDING := 20.0
+# Trigger zone — wider so the bars can grow visibly as mouse approaches
+const EDGE_TRIGGER_WIDTH := 200
+const EDGE_HIDE_MARGIN := 60
+
+# Bar dimensions — bigger, fewer, more readable
+const BAR_MAX_LENGTH := 120.0
+const BAR_MIN_LENGTH := 6.0
+const BAR_HEIGHT := 4.0
+const BAR_SPACING := 10.0
+const ATTRACTION_RADIUS := 200.0
+const PANEL_WIDTH := 140.0
+const PANEL_PADDING := 30.0
 
 var archive_start: float = 0.0
 var archive_end: float = 0.0
@@ -53,7 +57,7 @@ func _process(_delta: float) -> void:
 		if mouse_pos.x > viewport_size.x - EDGE_TRIGGER_WIDTH and not _f2_dismissed:
 			_show_panel()
 	else:
-		if mouse_pos.x < viewport_size.x - EDGE_TRIGGER_WIDTH - 40:
+		if mouse_pos.x < viewport_size.x - EDGE_TRIGGER_WIDTH - EDGE_HIDE_MARGIN:
 			_hide_panel()
 		queue_redraw()
 		_update_timestamp_tooltip()
@@ -98,6 +102,14 @@ func set_archive_bounds(start_epoch: float, end_epoch: float) -> void:
 	archive_end = end_epoch
 
 
+## Attempt to smooth the bar attraction using an ease-in-out curve
+## instead of linear falloff. This creates a gentler peak that
+## rolls off naturally rather than a harsh triangular shape.
+func _ease_in_out(t: float) -> float:
+	# Hermite smoothstep: 3t^2 - 2t^3
+	return t * t * (3.0 - 2.0 * t)
+
+
 func _draw() -> void:
 	if archive_end <= archive_start:
 		return
@@ -109,15 +121,23 @@ func _draw() -> void:
 	# Translucent background
 	draw_rect(Rect2(panel_x, 0, PANEL_WIDTH, rect.size.y), colour_panel_bg)
 
-	# Calculate bars
+	# Calculate bars — fewer, bigger bars for readability
 	var usable_height := rect.size.y - PANEL_PADDING * 2
 	var bar_count := int(usable_height / (BAR_HEIGHT + BAR_SPACING))
 	if bar_count <= 0:
 		return
 
 	var time_range := archive_end - archive_start
-	var bar_right := rect.size.x - 8.0
-	var time_per_bar := time_range / float(bar_count - 1) if bar_count > 1 else time_range
+	var bar_right := rect.size.x - 10.0
+	var time_per_bar := time_range / float(maxi(bar_count - 1, 1))
+
+	# Distance from mouse to right edge — drives overall bar growth
+	# as the mouse approaches (wider trigger zone = visible lerp)
+	var edge_distance: float = rect.size.x - mouse_pos.x
+	var edge_proximity := clampf(edge_distance / float(EDGE_TRIGGER_WIDTH), 0.0, 1.0)
+	# Invert: closer to edge = higher proximity
+	edge_proximity = 1.0 - edge_proximity
+	var edge_factor: float = _ease_in_out(edge_proximity)
 
 	for i in bar_count:
 		var y := PANEL_PADDING + i * (BAR_HEIGHT + BAR_SPACING)
@@ -134,27 +154,34 @@ func _draw() -> void:
 		else:
 			colour = colour_active
 
-		# Mouse attraction
+		# Mouse attraction — ease in/out curve for smooth peak rolloff
 		var distance: float = absf(mouse_pos.y - y)
-		var attraction := clampf(1.0 - distance / ATTRACTION_RADIUS, 0.0, 1.0)
-		var bar_length: float = BAR_MIN_LENGTH + (BAR_MAX_LENGTH - BAR_MIN_LENGTH) * attraction
+		var linear_attraction := clampf(1.0 - distance / ATTRACTION_RADIUS, 0.0, 1.0)
+		var attraction: float = _ease_in_out(linear_attraction)
 
-		# Special markers: playhead, IN, OUT
+		# Combine edge proximity (overall growth) with vertical attraction (peak)
+		var bar_length: float = BAR_MIN_LENGTH + (BAR_MAX_LENGTH - BAR_MIN_LENGTH) * attraction * edge_factor
+
+		# Special markers: playhead, IN, OUT — always prominent
 		var is_playhead: bool = absf(t - playhead_position) < time_per_bar * 0.5
 		var is_in: bool = in_point >= 0 and absf(t - in_point) < time_per_bar * 0.5
 		var is_out: bool = out_point >= 0 and absf(t - out_point) < time_per_bar * 0.5
 
 		if is_playhead:
 			colour = colour_playhead
-			bar_length = maxf(bar_length, BAR_MAX_LENGTH * 0.8)
+			bar_length = maxf(bar_length, BAR_MAX_LENGTH * 0.7 * edge_factor)
 		elif is_in:
 			colour = colour_in_point
-			bar_length = maxf(bar_length, BAR_MAX_LENGTH * 0.65)
+			bar_length = maxf(bar_length, BAR_MAX_LENGTH * 0.55 * edge_factor)
 		elif is_out:
 			colour = colour_out_point
-			bar_length = maxf(bar_length, BAR_MAX_LENGTH * 0.65)
+			bar_length = maxf(bar_length, BAR_MAX_LENGTH * 0.55 * edge_factor)
 
-		draw_rect(Rect2(bar_right - bar_length, y, bar_length, BAR_HEIGHT), colour)
+		# Ensure minimum visibility even at edge of trigger zone
+		bar_length = maxf(bar_length, BAR_MIN_LENGTH * edge_factor)
+
+		if bar_length > 0.5:
+			draw_rect(Rect2(bar_right - bar_length, y, bar_length, BAR_HEIGHT), colour)
 
 
 func _update_timestamp_tooltip() -> void:
@@ -169,7 +196,7 @@ func _update_timestamp_tooltip() -> void:
 	var hover_dt := Time.get_datetime_string_from_unix_time(int(hover_time))
 
 	timestamp_label.text = hover_dt + "Z"
-	timestamp_label.position = Vector2(rect.size.x - 220, mouse_pos.y - 10)
+	timestamp_label.position = Vector2(rect.size.x - 320, mouse_pos.y - 12)
 	timestamp_label.visible = true
 
 
@@ -181,7 +208,6 @@ func _gui_input(event: InputEvent) -> void:
 	if archive_end <= archive_start:
 		return
 
-	# Calculate timestamp from click position
 	var rect := get_rect()
 	var usable_height := rect.size.y - PANEL_PADDING * 2
 	var relative_y := clampf((event.position.y - PANEL_PADDING) / usable_height, 0.0, 1.0)
