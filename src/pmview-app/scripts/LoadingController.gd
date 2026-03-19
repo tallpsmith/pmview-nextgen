@@ -26,12 +26,13 @@ func _ready() -> void:
 	var mode: String = config.get("mode", "live")
 	var hostname: String = config.get("hostname", "")
 	var start_time: String = config.get("start_time", "")
+	var verbose: bool = config.get("verbose_logging", false)
 
 	pipeline.PhaseCompleted.connect(_on_phase_completed)
 	pipeline.PipelineCompleted.connect(_on_pipeline_completed)
 	pipeline.PipelineError.connect(_on_pipeline_error)
 
-	pipeline.StartPipeline(endpoint, mode, hostname, start_time)
+	pipeline.StartPipeline(endpoint, mode, hostname, start_time, verbose)
 
 
 func _on_phase_completed(index: int, _phase_name: String) -> void:

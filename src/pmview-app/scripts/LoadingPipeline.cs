@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Godot;
+using Microsoft.Extensions.Logging;
 using PcpClient;
 using PmviewProjectionCore.Discovery;
 using PmviewProjectionCore.Layout;
@@ -36,8 +37,10 @@ public partial class LoadingPipeline : Node
 	[Export] public int MinPhaseDelayMs { get; set; } = 500;
 
 	public async void StartPipeline(string endpoint, string mode = "live",
-		string hostname = "", string startTime = "")
+		string hostname = "", string startTime = "", bool verbose = false)
 	{
+		PmviewLogger.Verbose = verbose;
+
 		var currentPhase = 0;
 		PcpClientConnection? client = null;
 
@@ -107,7 +110,7 @@ public partial class LoadingPipeline : Node
 		}
 		catch (Exception ex)
 		{
-			GD.PrintErr($"Pipeline failed at phase {currentPhase}: {ex.Message}");
+			PmviewLogger.GetLogger("LoadingPipeline").LogError("Pipeline failed at phase {Phase}: {Error}", currentPhase, ex.Message);
 			EmitSignal(SignalName.PipelineError, currentPhase, ex.Message);
 
 			if (client != null)
