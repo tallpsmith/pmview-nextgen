@@ -44,7 +44,8 @@ public static class RuntimeSceneBuilder
         GD.Print("[RuntimeSceneBuilder] Build starting...");
         var root = CreateHostViewRoot();
         var hostname = hostnameOverride ?? layout.Hostname;
-        AddMetricPoller(root, pmproxyEndpoint, hostname);
+        AddMetricPoller(root, pmproxyEndpoint, hostname,
+            verboseLogging: mode == "archive");
         AddSceneBinder(root);
 
         GD.Print($"[RuntimeSceneBuilder] Building {layout.Zones.Count} zones...");
@@ -84,7 +85,8 @@ public static class RuntimeSceneBuilder
         return root;
     }
 
-    private static void AddMetricPoller(Node3D root, string endpoint, string hostname)
+    private static void AddMetricPoller(Node3D root, string endpoint, string hostname,
+        bool verboseLogging = false)
     {
         var poller = new Node { Name = "MetricPoller" };
         var script = GD.Load<Script>(MetricPollerScriptPath);
@@ -94,6 +96,8 @@ public static class RuntimeSceneBuilder
         GD.Print($"[RuntimeSceneBuilder] MetricPoller type after SetScript: {poller.GetClass()}, script: {poller.GetScript()}");
         poller.Set("Endpoint", endpoint);
         poller.Set("Hostname", hostname);
+        if (verboseLogging)
+            poller.Set("VerboseLogging", true);
         root.AddChild(poller);
     }
 
