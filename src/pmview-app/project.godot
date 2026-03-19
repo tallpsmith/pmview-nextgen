@@ -28,3 +28,7 @@ window/stretch/mode="viewport"
 [dotnet]
 
 project/assembly_name="pmview-app"
+
+[rendering]
+
+textures/vram_compression/import_etc2_astc=true
