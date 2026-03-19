@@ -326,6 +326,7 @@ public partial class MetricPoller : Node
 
 	private async Task InitialiseRateConverter()
 	{
+		GD.Print($"[MetricPoller] InitialiseRateConverter: _client={_client != null}, MetricNames={MetricNames.Length}");
 		if (_client == null || MetricNames.Length == 0)
 			return;
 
@@ -345,7 +346,7 @@ public partial class MetricPoller : Node
 		}
 		catch (Exception ex)
 		{
-			GD.PushWarning($"[MetricPoller] Could not describe metrics for rate conversion: {ex.Message}");
+			GD.PrintErr($"[MetricPoller] Rate converter FAILED: {ex.Message}");
 			_rateConverter = null;
 		}
 	}
