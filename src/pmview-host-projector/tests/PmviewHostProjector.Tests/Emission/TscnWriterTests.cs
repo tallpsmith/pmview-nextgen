@@ -408,15 +408,15 @@ public class TscnWriterTests
     public void Write_LoadSteps_EqualsExtResourcesPlusSubResources()
     {
         // MinimalLayout: 1 Bar shape.
-        // ext_resources (11): controller_script, metric_poller_script, scene_binder_script,
+        // ext_resources (12): controller_script, metric_poller_script, scene_binder_script,
         //                      metric_group_script, metric_grid_script, ground_bezel_script,
         //                      bar_scene, bindable_script, binding_res_script,
-        //                      range_tuning_panel_scene, hud_bar_scene
+        //                      range_tuning_panel_scene, help_panel_scene, help_hint_scene
         // sub_resources (1): binding for CPU_User
         // ambient labels (2): TimestampLabel, HostnameLabel
-        // = 11 + 1 + 2 = 14
+        // = 12 + 1 + 2 = 15
         var tscn = TscnWriter.Write(MinimalLayout());
-        Assert.Contains("load_steps=14 ", tscn);
+        Assert.Contains("load_steps=15 ", tscn);
     }
 
     // --- PlacedStack emission tests ---
@@ -510,15 +510,15 @@ public class TscnWriterTests
     public void Write_LoadSteps_WithPlacedStack_CountsCorrectly()
     {
         // Stack with 3 members:
-        // ext_resources (12): controller, metric_poller, scene_binder,
+        // ext_resources (13): controller, metric_poller, scene_binder,
         //                      metric_group_script, metric_grid_script, ground_bezel_script,
         //                      bar_scene, bindable, binding_res, stack_group_script,
-        //                      range_tuning_panel_scene, hud_bar_scene
+        //                      range_tuning_panel_scene, help_panel_scene, help_hint_scene
         // sub_resources (3): one binding per member
         // ambient (2)
-        // = 12 + 3 + 2 = 17
+        // = 13 + 3 + 2 = 18
         var tscn = TscnWriter.Write(LayoutWithCpuStack());
-        Assert.Contains("load_steps=17 ", tscn);
+        Assert.Contains("load_steps=18 ", tscn);
     }
 
     // --- Placeholder / ghost shape tests ---
@@ -558,14 +558,14 @@ public class TscnWriterTests
         ]);
         var tscn = TscnWriter.Write(layout);
 
-        // ext_resources (11): controller, metric_poller, scene_binder,
+        // ext_resources (12): controller, metric_poller, scene_binder,
         //                      metric_group, metric_grid, ground_bezel,
         //                      bar_scene, bindable_script, binding_res_script,
-        //                      range_tuning_panel_scene, hud_bar_scene
+        //                      range_tuning_panel_scene, help_panel_scene, help_hint_scene
         // sub_resources (0): placeholder has no binding
         // ambient (2): TimestampLabel, HostnameLabel
-        // = 11 + 0 + 2 = 13
-        Assert.Contains("load_steps=13 ", tscn);
+        // = 12 + 0 + 2 = 14
+        Assert.Contains("load_steps=14 ", tscn);
     }
 
     [Fact]
@@ -655,22 +655,38 @@ public class TscnWriterTests
         Assert.Contains("[node name=\"RangeTuningPanel\" parent=\"UILayer\" instance=ExtResource(\"range_tuning_panel_scene\")]", tscn);
     }
 
-    // --- HUD bar ---
+    // --- Help panel + hint ---
 
     [Fact]
-    public void Write_ContainsHudBarInstance()
+    public void Write_ContainsHelpPanelInstance()
     {
         var tscn = TscnWriter.Write(MinimalLayout());
-        Assert.Contains("hud_bar", tscn);
-        Assert.Contains("[node name=\"HudBar\" parent=\"UILayer\" instance=ExtResource(\"hud_bar_scene\")]", tscn);
+        Assert.Contains("help_panel", tscn);
+        Assert.Contains("[node name=\"HelpPanel\" parent=\"UILayer\" instance=ExtResource(\"help_panel_scene\")]", tscn);
     }
 
     [Fact]
-    public void Write_HasHudBarExtResource()
+    public void Write_HasHelpPanelExtResource()
     {
         var tscn = TscnWriter.Write(MinimalLayout());
-        Assert.Contains("res://addons/pmview-bridge/ui/hud_bar.tscn", tscn);
-        Assert.Contains("hud_bar_scene", tscn);
+        Assert.Contains("res://addons/pmview-bridge/ui/help_panel.tscn", tscn);
+        Assert.Contains("help_panel_scene", tscn);
+    }
+
+    [Fact]
+    public void Write_ContainsHelpHintInstance()
+    {
+        var tscn = TscnWriter.Write(MinimalLayout());
+        Assert.Contains("help_hint", tscn);
+        Assert.Contains("[node name=\"HelpHint\" parent=\"UILayer\" instance=ExtResource(\"help_hint_scene\")]", tscn);
+    }
+
+    [Fact]
+    public void Write_HasHelpHintExtResource()
+    {
+        var tscn = TscnWriter.Write(MinimalLayout());
+        Assert.Contains("res://addons/pmview-bridge/ui/help_hint.tscn", tscn);
+        Assert.Contains("help_hint_scene", tscn);
     }
 
     // --- macOS end-to-end integration test ---
