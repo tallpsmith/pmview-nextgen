@@ -143,7 +143,9 @@ mesh = SubResource("ground_plane_mesh")
 surface_material_override/0 = SubResource("ground_shader_mat")
 cast_shadow = 0
 
-[node name="Camera3D" type="Camera3D" parent="." unique_id=1337806946]
+[node name="CameraRig" type="Node3D" parent="."]
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig" unique_id=1337806946]
 transform = Transform3D(1, 0, 0, 0, 0.9847534, 0.17395642, 0, -0.17395642, 0.9847534, 0, 3, 7.535516)
 
 [node name="TitleGroup" type="Node3D" parent="." unique_id=948700113]
@@ -179,10 +181,11 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.625, 0, 0)
 mesh = SubResource("mesh_W")
 surface_material_override/0 = SubResource("mat_blue2")
 
-[node name="SubtitleLabel" type="Label3D" parent="." unique_id=628825361]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+[node name="SubtitleLabel" type="Label3D" parent="TitleGroup" unique_id=628825361]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.7, 0)
 pixel_size = 0.01
 modulate = Color(0.5, 0.55, 0.7, 0.7)
+billboard = 1
 text = "PERFORMANCE  CO-PILOT  VISUALISER"
 font = ExtResource("2")
 font_size = 24
