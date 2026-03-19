@@ -52,12 +52,22 @@ public partial class LoadingPipeline : Node
 			EmitSignal(SignalName.PhaseCompleted, 0, "CONNECTING");
 
 			// Phase 1: TOPOLOGY
-			// Both live and archive modes use the same /pmapi discovery for now.
-			// pmproxy exposes the same endpoints for archived hosts. The critical
-			// live/archive difference is in MetricPoller playback, not topology.
 			currentPhase = 1;
 			phaseStart = DateTime.UtcNow;
-			var topology = await MetricDiscovery.DiscoverAsync(client);
+			HostTopology topology;
+			if (mode == "archive" && !string.IsNullOrEmpty(hostname))
+			{
+				// Archive mode: discover topology from /series/* endpoints
+				// using hostname-filtered queries against the archive data.
+				var archiveDiscovery = new ArchiveMetricDiscovery(
+					new Uri(endpoint), new System.Net.Http.HttpClient());
+				topology = await archiveDiscovery.DiscoverAsync(hostname);
+			}
+			else
+			{
+				// Live mode: discover topology from /pmapi/* endpoints
+				topology = await MetricDiscovery.DiscoverAsync(client);
+			}
 			await EnforceMinPhaseDelay(phaseStart);
 			EmitSignal(SignalName.PhaseCompleted, 1, "TOPOLOGY");
 
