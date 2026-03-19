@@ -12,10 +12,10 @@ Automate building and packaging the pmview Godot application for macOS and Linux
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | What to ship | Godot app (`pmview-app`) only | CLI distribution deferred (tracked via GitHub issue) |
-| Target platforms | `osx-arm64`, `linux-x64`, `linux-arm64` | Covers Apple Silicon, common Linux, and ARM Linux |
+| Target platforms | `osx-universal`, `linux-x64`, `linux-arm64` | Universal binary covers both Intel and Apple Silicon Macs; Linux covers x64 and ARM |
 | Packaging | `.dmg` (macOS), `.tar.gz` (Linux) | Native format for each platform |
 | Versioning | Git tag is single source of truth | Tag `v1.2.3` → version `1.2.3` injected at build time. No version stored in repo files |
-| Code signing | Unsigned for v1 | Technical users can bypass Gatekeeper. Proper signing deferred (tracked via GitHub issue) |
+| Code signing | Ad-hoc for v1 (Godot preset default) | Users get Gatekeeper "unidentified developer" warning. Proper signing deferred (GitHub issue) |
 | Self-contained vs framework-dependent | Self-contained | Users download and run — no .NET SDK needed |
 | Workflow structure | Single `release.yml` with matrix strategy | One file, matrix handles platform parallelism |
 | Godot CI setup | `chickensoft-games/setup-godot` action | Handles Godot + export template installation |
@@ -35,9 +35,10 @@ Workflow fires when a Release is **published** in GitHub UI (not just tag push).
 ## Version Flow
 
 1. Create Release in GitHub UI, set tag (e.g., `v0.2.0`)
-2. Workflow extracts version from tag, strips `v` prefix
-3. Validates semver format — fails fast on malformed tags
+2. Workflow extracts version from tag: `VERSION=${GITHUB_REF_NAME#v}`
+3. Validates semver format via regex — fails fast on malformed tags
 4. Version injected into artifact filenames
+5. **Known limitation (v1):** Version is not injected into the Godot app's internal `application/version` fields (Info.plist on macOS will show empty version). Addressing this is a future improvement — requires pre-processing `export_presets.cfg` or `project.godot` before export.
 
 ## Workflow Structure
 
@@ -48,7 +49,7 @@ on: release published (tag matches v*)
     │   └─ Extract version, fail if not valid semver
     │
     └─ build-and-upload job (matrix, needs: validate-tag)
-        ├─ macos-latest / macOS / osx-arm64
+        ├─ macos-latest / macOS / osx-universal
         ├─ ubuntu-latest / Linux x64 / linux-x64
         └─ ubuntu-latest / Linux ARM64 / linux-arm64
 
@@ -66,41 +67,49 @@ on: release published (tag matches v*)
 
 | Runner | Platform | Export Preset | Package Format | Artifact Name |
 |--------|----------|---------------|----------------|---------------|
-| `macos-latest` | macOS ARM64 | `macOS` | `.dmg` | `pmview-<ver>-macos-arm64.dmg` |
-| `ubuntu-latest` | Linux x64 | `Linux x64` | `.tar.gz` | `pmview-<ver>-linux-x64.tar.gz` |
+| `macos-latest` | macOS Universal | `macOS` | `.dmg` | `pmview-<ver>-macos-universal.dmg` |
+| `ubuntu-latest` | Linux x64 | `Linux` | `.tar.gz` | `pmview-<ver>-linux-x64.tar.gz` |
 | `ubuntu-latest` | Linux ARM64 | `Linux ARM64` | `.tar.gz` | `pmview-<ver>-linux-arm64.tar.gz` |
 
 ## Packaging Details
 
 ### macOS (`.dmg`)
 
-Godot exports a `.app` bundle. Wrapped in a `.dmg` via `hdiutil`:
+Godot exports a universal `.app` bundle (x86_64 + arm64). Wrapped in a `.dmg` via `hdiutil`:
 
 ```bash
-hdiutil create -volname "pmview" -srcfolder pmview.app -ov -format UDZO pmview-<ver>-macos-arm64.dmg
+hdiutil create -volname "pmview" -srcfolder pmview.app -ov -format UDZO pmview-<ver>-macos-universal.dmg
 ```
 
 Simple disk image — no background image or Applications symlink for v1. Users mount, drag, run.
 
-**Unsigned** — users will see Gatekeeper "unidentified developer" warning. Bypass via right-click → Open or `xattr -cr pmview.app`.
+**Ad-hoc signed** (Godot preset `codesign/codesign=3`) — users will see Gatekeeper "unidentified developer" warning on first launch. Bypass via right-click → Open or `xattr -cr pmview.app`. The ad-hoc codesign setting should work in headless CI on macOS runners; if it causes issues, override to disabled (`codesign=0`) as a fallback.
 
 ### Linux (`.tar.gz`)
 
-Godot exports a binary + `.pck` data file:
+Godot exports a binary + `.pck` data file (`embed_pck=false` in preset). The workflow explicitly sets the output path to control filenames:
 
 ```bash
-tar czf pmview-<ver>-linux-x64.tar.gz pmview.x86_64 pmview.pck
+# x64
+godot --headless --path src/pmview-app --export-release "Linux" build/pmview.x86_64
+tar czf pmview-<ver>-linux-x64.tar.gz -C build pmview.x86_64 pmview.pck
+
+# arm64
+godot --headless --path src/pmview-app --export-release "Linux ARM64" build/pmview.arm64
+tar czf pmview-<ver>-linux-arm64.tar.gz -C build pmview.arm64 pmview.pck
 ```
 
 Users extract, `chmod +x`, run.
 
 ## Export Presets
 
-Three presets configured in `src/pmview-app/export_presets.cfg` (already created):
+Presets configured in `src/pmview-app/export_presets.cfg`:
 
-- `macOS` — ARM64 architecture
-- `Linux x64` — x86_64 architecture
-- `Linux ARM64` — ARM64 architecture (cross-exported from x64 runner)
+- `macOS` — universal architecture (x86_64 + arm64), ad-hoc codesign **(exists)**
+- `Linux` — x86_64 architecture **(exists)**
+- `Linux ARM64` — arm64 architecture, cross-exported from x64 runner **(needs to be added)**
+
+**Action required:** Add a `Linux ARM64` preset to `export_presets.cfg` before implementing the workflow. This is a copy of the `Linux` preset with `binary_format/architecture` changed to `arm64`.
 
 ## Permissions
 
@@ -108,8 +117,15 @@ Workflow needs `contents: write` to upload release assets.
 
 ## Prerequisites
 
-- Export presets committed to `src/pmview-app/export_presets.cfg` (done)
+- Export presets committed to `src/pmview-app/export_presets.cfg` (macOS + Linux x64 done; Linux ARM64 needs adding)
 - Export templates installed in CI via `chickensoft-games/setup-godot`
+
+## Documentation Deliverables
+
+Per project guidelines, documentation ships with the code:
+
+- **README.md** — Add a "Download" or "Installation" section with links to the latest GitHub Release, platform-specific download instructions, and macOS Gatekeeper bypass instructions
+- **Release page** — GitHub auto-generated release notes from PR titles/commits (no custom tooling needed)
 
 ## Deferred Work (GitHub Issues)
 
