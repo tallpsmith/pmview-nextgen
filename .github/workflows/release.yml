@@ -70,6 +70,24 @@ jobs:
       - name: Compute artifact name
         run: echo "ARTIFACT=pmview-${VERSION}-${{ matrix.artifact_suffix }}" >> "$GITHUB_ENV"
 
+      # The pmview-bridge addon is symlinked into the Godot project for dev
+      # ergonomics (src/pmview-app/addons/pmview-bridge -> ../../pmview-bridge-addon/...).
+      # Godot's export packer silently skips symlinks, so the addon's .tscn scenes
+      # and C# scripts don't make it into the .pck — producing a blank screen at
+      # runtime. We replace the symlink with a real copy before export.
+      - name: Resolve addon symlink for export
+        run: |
+          cd src/pmview-app
+          if [ -L addons/pmview-bridge ]; then
+            TARGET=$(readlink addons/pmview-bridge)
+            rm addons/pmview-bridge
+            cp -r "$TARGET" addons/pmview-bridge
+            echo "Resolved symlink to real copy"
+            ls -la addons/pmview-bridge/
+          else
+            echo "Not a symlink, nothing to do"
+          fi
+
       - name: Restore .NET dependencies
         run: dotnet restore src/pmview-app/pmview-app.csproj
 
