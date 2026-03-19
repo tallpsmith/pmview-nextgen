@@ -41,7 +41,14 @@ func _ready() -> void:
 
 		if _poller:
 			var start_time: String = config.get("start_time", "")
-			print("[HostView] Starting archive playback at: %s" % start_time)
+			if start_time.is_empty():
+				# No start time provided — default to 24h ago
+				var default_epoch := Time.get_unix_time_from_system() - 86400.0
+				start_time = Time.get_datetime_string_from_unix_time(
+					int(default_epoch)) + "Z"
+				print("[HostView] No start time in config, defaulting to: %s" % start_time)
+			else:
+				print("[HostView] Starting archive playback at: %s" % start_time)
 			# Defer StartPlayback so it runs after MetricPoller._Ready() has
 			# connected to pmproxy and started the poll timer via CallDeferred.
 			_poller.ConnectionStateChanged.connect(
