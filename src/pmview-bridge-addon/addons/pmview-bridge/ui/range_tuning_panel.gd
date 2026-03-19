@@ -4,6 +4,9 @@ extends Control
 ## Click a preset to instantly apply via SceneBinder.UpdateSourceRangeMax().
 ## F1 toggles open/close. ESC also closes.
 
+signal panel_opened
+signal panel_closed
+
 # -- Zone definitions: each maps a display label to API zone name(s) --
 # Disk and Per-Disk share the same presets.
 const DISK_PRESETS: Dictionary = {
@@ -73,19 +76,20 @@ func _open_panel() -> void:
 	visible = true
 	if _overlay:
 		_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	# Notify HUD bar
-	var hud = get_parent().find_child("HudBar")
-	if hud and hud.has_method("set_tuner_active"):
-		hud.set_tuner_active(true)
+	panel_opened.emit()
 
 
 func _close_panel() -> void:
 	visible = false
 	if _overlay:
 		_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var hud = get_parent().find_child("HudBar")
-	if hud and hud.has_method("set_tuner_active"):
-		hud.set_tuner_active(false)
+	panel_closed.emit()
+
+
+## Public API for external callers (panel exclusivity).
+func close_panel() -> void:
+	if visible:
+		_close_panel()
 
 
 func _build_ui() -> void:
