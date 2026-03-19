@@ -326,7 +326,6 @@ public partial class MetricPoller : Node
 
 	private async Task InitialiseRateConverter()
 	{
-		GD.Print($"[MetricPoller] InitialiseRateConverter: _client={_client != null}, MetricNames={MetricNames.Length}");
 		if (_client == null || MetricNames.Length == 0)
 			return;
 
@@ -335,7 +334,23 @@ public partial class MetricPoller : Node
 			var realMetrics = MetricNames
 				.Where(m => !m.StartsWith("pmview.meta.", StringComparison.Ordinal))
 				.ToArray();
-			var descriptors = await _client.DescribeMetricsAsync(realMetrics);
+
+			// Describe metrics individually — some may not exist on the live pmcd
+			// (archive metrics can differ from the local host's metrics).
+			var descriptors = new List<MetricDescriptor>();
+			foreach (var metric in realMetrics)
+			{
+				try
+				{
+					var descs = await _client.DescribeMetricsAsync(new[] { metric });
+					descriptors.AddRange(descs);
+				}
+				catch
+				{
+					// Metric not available on live pmcd — skip silently
+				}
+			}
+
 			_rateConverter = new MetricRateConverter(descriptors);
 			var counterNames = descriptors
 				.Where(d => d.Semantics == MetricSemantics.Counter)
@@ -346,7 +361,7 @@ public partial class MetricPoller : Node
 		}
 		catch (Exception ex)
 		{
-			GD.PrintErr($"[MetricPoller] Rate converter FAILED: {ex.Message}");
+			GD.PushWarning($"[MetricPoller] Could not describe metrics for rate conversion: {ex.Message}");
 			_rateConverter = null;
 		}
 	}
