@@ -4,6 +4,7 @@ using System.Linq;
 using Godot;
 using Microsoft.Extensions.Logging;
 using PcpGodotBridge;
+using PmviewApp;
 
 namespace PmviewNextgen.Bridge;
 

@@ -9,6 +9,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 /// PmviewLogger autoload (which owns a live ILoggerFactory) takes precedence
 /// and this file is not present.
 /// </summary>
+namespace PmviewApp;
+
 public partial class PmviewLogger
 {
 	/// <summary>Get a named ILogger — falls back to NullLogger when no factory is configured.</summary>

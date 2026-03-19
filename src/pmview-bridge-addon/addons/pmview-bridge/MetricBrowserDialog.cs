@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Godot;
 using Microsoft.Extensions.Logging;
 using PcpClient;
+using PmviewApp;
 
 namespace PmviewNextgen.Bridge;
 
