@@ -30,7 +30,8 @@ public static class RuntimeSceneBuilder
     private const string BarScenePath = "res://addons/pmview-bridge/building_blocks/grounded_bar.tscn";
     private const string CylinderScenePath = "res://addons/pmview-bridge/building_blocks/grounded_cylinder.tscn";
     private const string RangeTuningPanelScenePath = "res://addons/pmview-bridge/ui/range_tuning_panel.tscn";
-    private const string HudBarScenePath = "res://addons/pmview-bridge/ui/hud_bar.tscn";
+    private const string HelpPanelScenePath = "res://addons/pmview-bridge/ui/help_panel.tscn";
+    private const string HelpHintScenePath = "res://addons/pmview-bridge/ui/help_hint.tscn";
 
     // -- ambient label colours --
     private static readonly Color TimestampColour = new(0.976f, 0.451f, 0.086f, 1f);
@@ -376,12 +377,28 @@ public static class RuntimeSceneBuilder
 
         canvas.AddChild(panel);
 
-        var hudScene = GD.Load<PackedScene>(HudBarScenePath);
-        if (hudScene != null)
+        var helpPanelScene = GD.Load<PackedScene>(HelpPanelScenePath);
+        if (helpPanelScene != null)
         {
-            var hud = hudScene.Instantiate();
-            hud.Name = "HudBar";
-            canvas.AddChild(hud);
+            var helpPanel = helpPanelScene.Instantiate();
+            helpPanel.Name = "HelpPanel";
+            canvas.AddChild(helpPanel);
+        }
+        else
+        {
+            GD.PushWarning($"[RuntimeSceneBuilder] Failed to load HelpPanel scene: {HelpPanelScenePath}");
+        }
+
+        var helpHintScene = GD.Load<PackedScene>(HelpHintScenePath);
+        if (helpHintScene != null)
+        {
+            var helpHint = helpHintScene.Instantiate();
+            helpHint.Name = "HelpHint";
+            canvas.AddChild(helpHint);
+        }
+        else
+        {
+            GD.PushWarning($"[RuntimeSceneBuilder] Failed to load HelpHint scene: {HelpHintScenePath}");
         }
 
         sceneRoot.AddChild(canvas);

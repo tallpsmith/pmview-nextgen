@@ -13,6 +13,10 @@ enum Mode { ORBIT, FLY, TRANSITIONING }
 @export var mouse_sensitivity: float = 0.002
 @export var transition_speed: float = 0.3
 
+## When false, all movement and mouse-look input is ignored.
+## Used by panels (Help, Range Tuning) to suppress camera while open.
+var input_enabled: bool = true
+
 var _mode: Mode = Mode.ORBIT
 var _radius: float
 var _orbit_height: float
@@ -44,6 +48,8 @@ func _ready() -> void:
 	_orbit_angle = atan2(position.z - orbit_center.z, position.x - orbit_center.x)
 
 func _unhandled_input(event: InputEvent) -> void:
+	if not input_enabled:
+		return
 	if event is InputEventKey and event.pressed and event.physical_keycode == KEY_TAB:
 		_toggle_mode()
 		get_viewport().set_input_as_handled()
@@ -99,6 +105,8 @@ func _process_orbit(delta: float) -> void:
 	look_at(orbit_center, Vector3.UP)
 
 func _process_fly(delta: float) -> void:
+	if not input_enabled:
+		return
 	# Handle focus animation
 	if _focus_active:
 		_focus_progress += delta / FOCUS_DURATION

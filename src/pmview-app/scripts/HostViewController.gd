@@ -9,7 +9,9 @@ var _esc_pending := false
 var _esc_timer: SceneTreeTimer = null
 var _poller: Node = null
 var _time_control: Control = null
-var _hud_bar: Node = null
+var _help_panel: Node = null
+var _help_hint: Node = null
+var _camera: Node = null
 var _timestamp_label_3d: Node = null
 var _is_archive_mode := false
 var _poll_interval_seconds := 60.0
@@ -33,6 +35,25 @@ func _ready() -> void:
 	print("[HostView] Adding built scene to tree...")
 	add_child(scene)
 	print("[HostView] Built scene added to tree")
+
+	# Wire Help panel and hint
+	_help_panel = scene.find_child("HelpPanel", true, false)
+	_help_hint = scene.find_child("HelpHint", true, false)
+	_camera = get_viewport().get_camera_3d()
+	print("[HostView] HelpPanel found: %s, HelpHint found: %s, Camera found: %s" % [
+		_help_panel != null, _help_hint != null, _camera != null])
+
+	# Connect panel signals for camera suppression
+	if _help_panel:
+		_help_panel.panel_opened.connect(_on_help_opened)
+		_help_panel.panel_closed.connect(_on_help_closed)
+
+	# Wire RangeTuningPanel camera suppression
+	var tuning_panel = scene.find_child("RangeTuningPanel", true, false)
+	if tuning_panel:
+		if tuning_panel.has_signal("panel_opened"):
+			tuning_panel.panel_opened.connect(_on_tuner_opened)
+			tuning_panel.panel_closed.connect(_on_tuner_closed)
 
 	var config := SceneManager.connection_config
 	_is_archive_mode = config.get("mode", "live") == "archive"
@@ -73,8 +94,7 @@ func _ready() -> void:
 					print("[HostView] TimeControl bounds set: %s → %s" % [
 						Time.get_datetime_string_from_unix_time(int(arc_start)),
 						Time.get_datetime_string_from_unix_time(int(arc_end))])
-			# Show archive-specific HUD keys
-		_hud_bar = scene.find_child("HudBar", true, false)
+
 		# Find 3D timestamp label for pause ghost effect
 		_timestamp_label_3d = scene.find_child("TimestampLabel", true, false)
 
@@ -82,20 +102,20 @@ func _ready() -> void:
 		if _poller:
 			_poller.PlaybackPositionChanged.connect(_on_playback_position_changed)
 
-		_hud_bar = scene.find_child("HudBar", true, false)
-		if _hud_bar:
-			var f2_label = _hud_bar.find_child("F2Label", false, false)
-			var space_label = _hud_bar.find_child("SpaceLabel", false, false)
-			var arrows_label = _hud_bar.find_child("ArrowsLabel", false, false)
-			if f2_label:
-				f2_label.visible = true
-			if space_label:
-				space_label.visible = true
-			if arrows_label:
-				arrows_label.visible = true
-
 	else:
 			push_error("[HostView] MetricPoller not found in built scene")
+
+	# Setup help content (needs _is_archive_mode to be set)
+	if _help_panel:
+		print("[HostView] Setting up help content (archive=%s)" % _is_archive_mode)
+		_setup_help_content()
+	else:
+		push_warning("[HostView] HelpPanel not found — H key will not work")
+	if _help_hint:
+		print("[HostView] Starting help hint cycling")
+		_setup_help_hints()
+	else:
+		push_warning("[HostView] HelpHint not found — no cycling hints")
 
 
 func _on_poller_connected(state: String, start_time: String) -> void:
@@ -113,19 +133,6 @@ func _on_playback_position_changed(_position: String, mode: String) -> void:
 			_timestamp_label_3d.set("modulate", Color(0.976, 0.451, 0.086, 0.3))
 		else:
 			_timestamp_label_3d.set("modulate", Color(0.976, 0.451, 0.086, 1.0))
-
-	# Update HudBar play state
-	if _hud_bar:
-		var space_label = _hud_bar.find_child("SpaceLabel", false, false)
-		if space_label:
-			if mode == "Playback":
-				space_label.text = "SPACE ⏸"
-				space_label.add_theme_color_override("font_color",
-					Color(0.298, 0.686, 0.314))
-			else:
-				space_label.text = "SPACE ▶"
-				space_label.add_theme_color_override("font_color",
-					Color(0.976, 0.451, 0.086))
 
 
 func _on_playhead_jumped(timestamp: String) -> void:
@@ -154,6 +161,25 @@ func _on_panel_closed() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# H or ? — toggle help panel
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.physical_keycode == KEY_H:
+			if _help_panel:
+				_help_panel.toggle()
+				get_viewport().set_input_as_handled()
+			return
+		elif event.physical_keycode == KEY_SLASH and event.shift_pressed:
+			if _help_panel:
+				_help_panel.toggle()
+				get_viewport().set_input_as_handled()
+			return
+
+	# ESC — close help panel first if open
+	if event.is_action_pressed("ui_cancel") and _help_panel and _help_panel.visible:
+		_help_panel.hide_panel()
+		get_viewport().set_input_as_handled()
+		return
+
 	# ESC — double-press to return to menu
 	if event.is_action_pressed("ui_cancel"):
 		get_viewport().set_input_as_handled()
@@ -208,6 +234,84 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				if _time_control:
 					_time_control.toggle_panel()
+
+
+func _setup_help_content() -> void:
+	var orange := Color(0.94, 0.56, 0.13)
+	var purple := Color(0.322, 0.137, 0.925)
+
+	var camera_group := HelpGroup.create("Camera", orange, [
+		HelpGroup.HelpEntry.create("TAB", "Toggle Orbit / Free Look"),
+		HelpGroup.HelpEntry.create("W A S D", "Move (free look mode)"),
+		HelpGroup.HelpEntry.create("Q / E", "Descend / Ascend"),
+		HelpGroup.HelpEntry.create("SHIFT", "Sprint (hold with movement)"),
+		HelpGroup.HelpEntry.create("Right-click", "Look around (hold + drag)"),
+	])
+
+	var archive_group := HelpGroup.create("Archive Mode Playback", purple, [
+		HelpGroup.HelpEntry.create("SPACE", "Play / Pause"),
+		HelpGroup.HelpEntry.create("← →", "Scrub (poll interval)"),
+		HelpGroup.HelpEntry.create("⇧ ← →", "Scrub ±5 seconds"),
+		HelpGroup.HelpEntry.create("⌃⇧ ← →", "Scrub ±1 minute"),
+		HelpGroup.HelpEntry.create("R", "Reset time range"),
+		HelpGroup.HelpEntry.create("Mouse → edge", "Show timeline panel"),
+		HelpGroup.HelpEntry.create("Click", "Jump to time (on timeline)"),
+		HelpGroup.HelpEntry.create("⇧ Click", "Set IN / OUT range markers"),
+	], _is_archive_mode)
+
+	var panels_group := HelpGroup.create("Panels", orange, [
+		HelpGroup.HelpEntry.create("F1", "Range Tuning"),
+		HelpGroup.HelpEntry.create("F2", "Timeline Navigator", _is_archive_mode),
+		HelpGroup.HelpEntry.create("H / ?", "This help panel"),
+	])
+
+	var general_group := HelpGroup.create("General", orange, [
+		HelpGroup.HelpEntry.create("ESC × 2", "Return to main menu"),
+	])
+
+	_help_panel.set_groups([camera_group, archive_group, panels_group, general_group])
+
+
+func _setup_help_hints() -> void:
+	_help_hint.set_hints([
+		HelpHintEntry.create("H", "for Help"),
+		HelpHintEntry.create("TAB", "Orbit / Free Look"),
+	])
+	_help_hint.start_cycling()
+
+
+func _on_help_opened() -> void:
+	if _camera:
+		_camera.input_enabled = false
+	if _help_hint:
+		_help_hint.hide_hint()
+	# Panel exclusivity — close tuner if open
+	var scene_root := get_child(0) if get_child_count() > 0 else null
+	if scene_root:
+		var tuning_panel := scene_root.find_child("RangeTuningPanel", true, false)
+		if tuning_panel and tuning_panel.visible:
+			tuning_panel.close_panel()
+
+
+func _on_help_closed() -> void:
+	if _camera:
+		_camera.input_enabled = true
+	# Don't immediately resume hint — let the cycle timer handle it
+	if _help_hint:
+		_help_hint.resume_hint()
+
+
+func _on_tuner_opened() -> void:
+	if _camera:
+		_camera.input_enabled = false
+	# Panel exclusivity — close help if open
+	if _help_panel and _help_panel.visible:
+		_help_panel.hide_panel()
+
+
+func _on_tuner_closed() -> void:
+	if _camera:
+		_camera.input_enabled = true
 
 
 func _toggle_playback() -> void:
