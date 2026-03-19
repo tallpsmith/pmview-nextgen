@@ -1,0 +1,121 @@
+name: Release
+
+# TODO: Version is not yet injected into the Godot app's internal
+# application/version fields (macOS Info.plist will show empty version).
+# See spec for details on this known v1 limitation.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  validate-tag:
+    name: Validate Tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Extract and validate version from tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "::error::Tag '$TAG' is not valid semver (expected v1.2.3 or v1.2.3-beta.1)"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Validated version: $VERSION"
+
+  build-and-upload:
+    name: Build ${{ matrix.platform }}
+    needs: validate-tag
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            platform: macOS
+            preset: macOS
+            artifact_suffix: macos-universal.dmg
+          - runner: ubuntu-latest
+            platform: Linux x64
+            preset: Linux
+            artifact_suffix: linux-x64.tar.gz
+          - runner: ubuntu-latest
+            platform: Linux ARM64
+            preset: Linux ARM64
+            artifact_suffix: linux-arm64.tar.gz
+    env:
+      VERSION: ${{ needs.validate-tag.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Setup Godot
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.6.1
+          use-dotnet: true
+          include-templates: true
+
+      - name: Compute artifact name
+        run: echo "ARTIFACT=pmview-${VERSION}-${{ matrix.artifact_suffix }}" >> "$GITHUB_ENV"
+
+      - name: Restore .NET dependencies
+        run: dotnet restore src/pmview-app/pmview-app.csproj
+
+      - name: Build .NET assemblies
+        run: dotnet build src/pmview-app/pmview-app.csproj --no-restore -c Release
+
+      - name: Export Godot project
+        run: |
+          mkdir -p build
+          godot --headless --path src/pmview-app --export-release "${{ matrix.preset }}" "../../build/pmview"
+          echo "--- Exported files ---"
+          ls -la build/
+
+      - name: Package macOS (.dmg)
+        if: matrix.preset == 'macOS'
+        run: |
+          if [ ! -d build/pmview.app ]; then
+            echo "::error::Expected build/pmview.app but it does not exist"
+            ls -la build/
+            exit 1
+          fi
+          hdiutil create \
+            -volname "pmview" \
+            -srcfolder build/pmview.app \
+            -ov -format UDZO \
+            "build/${ARTIFACT}"
+
+      - name: Package Linux (.tar.gz)
+        if: matrix.preset != 'macOS'
+        run: |
+          cd build
+          # Find the exported binary (name varies by arch suffix)
+          BINARY=$(find . -maxdepth 1 -type f -executable ! -name "*.pck" | head -1)
+          if [ -z "$BINARY" ]; then
+            echo "::error::No exported binary found in build/"
+            ls -la
+            exit 1
+          fi
+          tar czf "${ARTIFACT}" \
+            "$(basename "$BINARY")" \
+            pmview.pck
+
+      - name: Upload to GitHub Release
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            "build/${ARTIFACT}" \
+            --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
