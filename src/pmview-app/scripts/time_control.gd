@@ -43,7 +43,7 @@ var colour_playhead := Color(0.976, 0.451, 0.086, 0.9)
 var colour_panel_bg := Color(0.05, 0.04, 0.08, 0.5)
 
 # IN/OUT markers use the active colour but thicker
-const IN_OUT_BAR_HEIGHT := 8.0
+const IN_OUT_BAR_HEIGHT := 16.0
 
 @onready var timestamp_label: Label = $TimestampLabel
 
@@ -123,6 +123,7 @@ func notify_scrub() -> void:
 		_is_visible = true
 		visible = true
 		# Don't emit panel_opened — scrubbing already pauses via StepPlayback
+	queue_redraw()
 
 
 ## Attempt to smooth the bar attraction using an ease-in-out curve

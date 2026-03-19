@@ -102,9 +102,23 @@ func _on_host_selected(index: int) -> void:
 	var hostname := host_dropdown.get_item_text(index)
 	range_label.text = "Probing..."
 	start_time_input.text = ""
-	start_time_input.editable = false
-	launch_panel.mouse_default_cursor_shape = Control.CURSOR_FORBIDDEN
+	_set_launch_enabled(false)
 	_probe_time_bounds(hostname)
+
+
+func _set_launch_enabled(enabled: bool) -> void:
+	start_time_input.editable = enabled
+	if enabled:
+		launch_panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		launch_panel.modulate = Color(1, 1, 1, 1)
+		# Restart KITT on hover if needed
+	else:
+		launch_panel.mouse_default_cursor_shape = Control.CURSOR_FORBIDDEN
+		launch_panel.modulate = Color(0.4, 0.4, 0.5, 0.6)
+		_kill_sweep_tween()
+		var mat := kitt_rect.material as ShaderMaterial
+		if mat:
+			mat.set_shader_parameter("intensity", 0.0)
 
 
 func _probe_time_bounds(hostname: String) -> void:
@@ -190,8 +204,7 @@ func _on_values_response(result: int, response_code: int,
 		default_start_epoch = min_ts / 1000.0
 	start_time_input.text = Time.get_datetime_string_from_unix_time(
 		int(default_start_epoch)) + "Z"
-	start_time_input.editable = true
-	launch_panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	_set_launch_enabled(true)
 
 
 # --- LAUNCH button hover: KITT scanner effect ---

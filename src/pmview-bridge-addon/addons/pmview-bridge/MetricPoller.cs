@@ -47,6 +47,7 @@ public partial class MetricPoller : Node
 	private readonly Dictionary<string, Dictionary<string, int>> _liveInstanceNames = new();
 	private readonly HashSet<string> _liveInstanceNamesPopulated = new();
 	private Godot.Collections.Dictionary? _lastEmittedMetrics;
+	private bool _skipNextAdvance;
 
 	public ConnectionState CurrentState => _client?.State ?? ConnectionState.Disconnected;
 	internal IPcpClient? Client => _client;
@@ -139,6 +140,9 @@ public partial class MetricPoller : Node
 		try
 		{
 			_timeCursor.Resume();
+			// Reset poll time so AdvanceBy doesn't jump by the time
+			// spent paused (e.g. in the TimeControl panel)
+			_lastPollTime = DateTime.UtcNow;
 			EmitSignal(SignalName.PlaybackPositionChanged,
 				_timeCursor.Position.ToString("o"), "Playback");
 		}
@@ -233,6 +237,7 @@ public partial class MetricPoller : Node
 
 			_timeCursor.JumpTo(target);
 			_lastEmittedTimestamp.Clear();
+			_skipNextAdvance = true;
 			EmitSignal(SignalName.PlaybackPositionChanged,
 				target.ToString("o"), "Paused");
 
@@ -389,13 +394,20 @@ public partial class MetricPoller : Node
 
 		if (_timeCursor.Mode == CursorMode.Playback)
 		{
-			// In archive playback, advance by the archive sampling interval
-			// so each poll tick lands on the next sample. At 1x speed with
-			// 60s intervals, the cursor jumps 60s per tick instead of ~1s.
-			var advanceAmount = _archiveSamplingIntervalSeconds > 0
-				? TimeSpan.FromSeconds(_archiveSamplingIntervalSeconds)
-				: elapsed;
-			_timeCursor.AdvanceBy(advanceAmount);
+			if (_skipNextAdvance)
+			{
+				// After a JumpTo, fetch at the current position without advancing
+				_skipNextAdvance = false;
+			}
+			else
+			{
+				// In archive playback, advance by the archive sampling interval
+				// so each poll tick lands on the next sample.
+				var advanceAmount = _archiveSamplingIntervalSeconds > 0
+					? TimeSpan.FromSeconds(_archiveSamplingIntervalSeconds)
+					: elapsed;
+				_timeCursor.AdvanceBy(advanceAmount);
+			}
 			EmitSignal(SignalName.PlaybackPositionChanged,
 				_timeCursor.Position.ToString("o"), "Playback");
 		}
