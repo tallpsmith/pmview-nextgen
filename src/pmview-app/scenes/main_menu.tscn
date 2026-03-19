@@ -107,6 +107,22 @@ corner_radius_top_right = 4
 corner_radius_bottom_right = 4
 corner_radius_bottom_left = 4
 
+[sub_resource type="StyleBoxFlat" id="ui_panel_bg"]
+bg_color = Color(0.04, 0.03, 0.08, 0.65)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.514, 0.22, 0.925, 0.3)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+content_margin_left = 24.0
+content_margin_top = 24.0
+content_margin_right = 24.0
+content_margin_bottom = 24.0
+
 [sub_resource type="ShaderMaterial" id="kitt_mat"]
 shader = ExtResource("3")
 shader_parameter/sweep_position = -0.4
@@ -201,32 +217,36 @@ grow_horizontal = 2
 grow_vertical = 2
 theme = ExtResource("4")
 
-[node name="CenterContainer" type="CenterContainer" parent="CanvasLayer/Control" unique_id=1773607422]
+[node name="UIPanel" type="PanelContainer" parent="CanvasLayer/Control"]
 layout_mode = 1
 anchors_preset = 7
 anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -240.0
+offset_left = -264.0
 offset_top = -520.0
-offset_right = 240.0
-offset_bottom = -40.0
+offset_right = 264.0
+offset_bottom = -16.0
 grow_horizontal = 2
 grow_vertical = 0
+theme_override_styles/panel = SubResource("ui_panel_bg")
 
-[node name="VBoxContainer" type="VBoxContainer" parent="CanvasLayer/Control/CenterContainer" unique_id=1938259673]
+[node name="CenterContainer" type="CenterContainer" parent="CanvasLayer/Control/UIPanel" unique_id=1773607422]
+layout_mode = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CanvasLayer/Control/UIPanel/CenterContainer" unique_id=1938259673]
 layout_mode = 2
 size_flags_vertical = 8
 theme_override_constants/separation = 8
 
-[node name="EndpointLabel" type="Label" parent="CanvasLayer/Control/CenterContainer/VBoxContainer" unique_id=462830367]
+[node name="EndpointLabel" type="Label" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer" unique_id=462830367]
 layout_mode = 2
 theme_override_font_sizes/font_size = 14
 text = "PMPROXY ENDPOINT"
 horizontal_alignment = 1
 
-[node name="EndpointInput" type="LineEdit" parent="CanvasLayer/Control/CenterContainer/VBoxContainer" unique_id=1498151106]
+[node name="EndpointInput" type="LineEdit" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer" unique_id=1498151106]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(480, 44)
 layout_mode = 2
@@ -234,21 +254,21 @@ theme_override_font_sizes/font_size = 16
 text = "http://localhost:44322"
 alignment = 1
 
-[node name="HSeparator" type="HSeparator" parent="CanvasLayer/Control/CenterContainer/VBoxContainer" unique_id=348019049]
+[node name="HSeparator" type="HSeparator" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer" unique_id=348019049]
 layout_mode = 2
 
-[node name="ModeLabel" type="Label" parent="CanvasLayer/Control/CenterContainer/VBoxContainer" unique_id=47923805]
+[node name="ModeLabel" type="Label" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer" unique_id=47923805]
 layout_mode = 2
 theme_override_font_sizes/font_size = 14
 text = "MODE"
 horizontal_alignment = 1
 
-[node name="ModeButtons" type="HBoxContainer" parent="CanvasLayer/Control/CenterContainer/VBoxContainer" unique_id=705198610]
+[node name="ModeButtons" type="HBoxContainer" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer" unique_id=705198610]
 layout_mode = 2
 theme_override_constants/separation = 16
 alignment = 1
 
-[node name="LiveButton" type="Button" parent="CanvasLayer/Control/CenterContainer/VBoxContainer/ModeButtons" unique_id=247311621]
+[node name="LiveButton" type="Button" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer/ModeButtons" unique_id=247311621]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(120, 32)
 layout_mode = 2
@@ -257,7 +277,7 @@ button_pressed = true
 button_group = SubResource("mode_group")
 text = "LIVE"
 
-[node name="ArchiveButton" type="Button" parent="CanvasLayer/Control/CenterContainer/VBoxContainer/ModeButtons" unique_id=793248364]
+[node name="ArchiveButton" type="Button" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer/ModeButtons" unique_id=793248364]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(120, 32)
 layout_mode = 2
@@ -265,56 +285,56 @@ toggle_mode = true
 button_group = SubResource("mode_group")
 text = "ARCHIVE"
 
-[node name="ArchivePanel" type="VBoxContainer" parent="CanvasLayer/Control/CenterContainer/VBoxContainer"]
+[node name="ArchivePanel" type="VBoxContainer" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="HostLabel" type="Label" parent="CanvasLayer/Control/CenterContainer/VBoxContainer/ArchivePanel"]
+[node name="HostLabel" type="Label" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer/ArchivePanel"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
 text = "SOURCE HOST"
 horizontal_alignment = 1
 
-[node name="HostDropdown" type="OptionButton" parent="CanvasLayer/Control/CenterContainer/VBoxContainer/ArchivePanel"]
+[node name="HostDropdown" type="OptionButton" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer/ArchivePanel"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(400, 32)
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
 alignment = 1
 
-[node name="RangeLabel" type="Label" parent="CanvasLayer/Control/CenterContainer/VBoxContainer/ArchivePanel"]
+[node name="RangeLabel" type="Label" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer/ArchivePanel"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.976, 0.451, 0.086, 0.8)
 theme_override_font_sizes/font_size = 9
 horizontal_alignment = 1
 
-[node name="StartTimeLabel" type="Label" parent="CanvasLayer/Control/CenterContainer/VBoxContainer/ArchivePanel"]
+[node name="StartTimeLabel" type="Label" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer/ArchivePanel"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
 text = "START TIME (ISO 8601)"
 horizontal_alignment = 1
 
-[node name="StartTimeInput" type="LineEdit" parent="CanvasLayer/Control/CenterContainer/VBoxContainer/ArchivePanel"]
+[node name="StartTimeInput" type="LineEdit" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer/ArchivePanel"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(400, 32)
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
 alignment = 1
 
-[node name="HSeparator2" type="HSeparator" parent="CanvasLayer/Control/CenterContainer/VBoxContainer" unique_id=1033124559]
+[node name="HSeparator2" type="HSeparator" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer" unique_id=1033124559]
 layout_mode = 2
 
-[node name="LaunchPanel" type="Panel" parent="CanvasLayer/Control/CenterContainer/VBoxContainer" unique_id=62087626]
+[node name="LaunchPanel" type="Panel" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer" unique_id=62087626]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(420, 56)
 layout_mode = 2
 mouse_default_cursor_shape = 2
 theme_override_styles/panel = SubResource("launch_panel_style")
 
-[node name="KittRect" type="ColorRect" parent="CanvasLayer/Control/CenterContainer/VBoxContainer/LaunchPanel" unique_id=240120845]
+[node name="KittRect" type="ColorRect" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer/LaunchPanel" unique_id=240120845]
 unique_name_in_owner = true
 material = SubResource("kitt_mat")
 layout_mode = 1
@@ -325,7 +345,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="LaunchLabel" type="Label" parent="CanvasLayer/Control/CenterContainer/VBoxContainer/LaunchPanel" unique_id=388614664]
+[node name="LaunchLabel" type="Label" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer/LaunchPanel" unique_id=388614664]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -337,7 +357,7 @@ text = "LAUNCH"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="VersionLabel" type="Label" parent="CanvasLayer/Control/CenterContainer/VBoxContainer" unique_id=1284117149]
+[node name="VersionLabel" type="Label" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer" unique_id=1284117149]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.4, 0.4, 0.5, 0.5)
 theme_override_font_sizes/font_size = 8
