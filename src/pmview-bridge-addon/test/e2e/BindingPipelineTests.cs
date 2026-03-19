@@ -10,13 +10,13 @@ namespace PmviewNextgen.Tests.E2E;
 /// E2E tests for the full binding pipeline: MetricPoller → SceneBinder.
 /// Verifies that real metric values from pmproxy flow through bindings
 /// and modify scene node properties.
-/// Requires docker-compose PCP stack running on localhost:44322.
+/// Requires docker-compose PCP stack running on localhost:54322.
 /// Skips gracefully when pmproxy is unavailable.
 /// </summary>
 [TestSuite]
 public partial class BindingPipelineTests
 {
-	private const string PmproxyEndpoint = "http://localhost:44322";
+	private const string PmproxyEndpoint = "http://localhost:54322";
 	private static readonly System.Net.Http.HttpClient _probe = new()
 	{
 		Timeout = TimeSpan.FromSeconds(2)
