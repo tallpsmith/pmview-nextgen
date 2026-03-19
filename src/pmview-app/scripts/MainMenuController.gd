@@ -20,6 +20,8 @@ const PHASE_OFFSET := 0.4
 var _sweep_tween: Tween = null
 var _archive_start: String = ""
 var _archive_end: String = ""
+var _archive_start_epoch: float = 0.0
+var _archive_end_epoch: float = 0.0
 
 
 func _ready() -> void:
@@ -175,6 +177,8 @@ func _on_values_response(result: int, response_code: int,
 	var end_dt := Time.get_datetime_string_from_unix_time(int(max_ts / 1000.0))
 	_archive_start = start_dt
 	_archive_end = end_dt
+	_archive_start_epoch = min_ts / 1000.0
+	_archive_end_epoch = max_ts / 1000.0
 	range_label.text = "RANGE: %s → %s" % [start_dt, end_dt]
 
 	# Default start time: end - 24h, clamped to archive start
@@ -234,6 +238,8 @@ func _launch() -> void:
 			"mode": "archive",
 			"hostname": hostname,
 			"start_time": start_time,
+			"archive_start_epoch": _archive_start_epoch,
+			"archive_end_epoch": _archive_end_epoch,
 		})
 	else:
 		SceneManager.go_to_loading({"endpoint": url, "mode": "live"})

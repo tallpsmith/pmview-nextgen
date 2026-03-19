@@ -62,6 +62,15 @@ func _ready() -> void:
 				_time_control.range_cleared.connect(_on_range_cleared)
 				_time_control.panel_opened.connect(_on_panel_opened)
 				_time_control.panel_closed.connect(_on_panel_closed)
+
+				# Pass archive bounds so TimeControl knows the timeline range
+				var arc_start: float = config.get("archive_start_epoch", 0.0)
+				var arc_end: float = config.get("archive_end_epoch", 0.0)
+				if arc_start > 0 and arc_end > 0:
+					_time_control.set_archive_bounds(arc_start, arc_end)
+					print("[HostView] TimeControl bounds set: %s → %s" % [
+						Time.get_datetime_string_from_unix_time(int(arc_start)),
+						Time.get_datetime_string_from_unix_time(int(arc_end))])
 		else:
 			push_error("[HostView] MetricPoller not found in built scene")
 
