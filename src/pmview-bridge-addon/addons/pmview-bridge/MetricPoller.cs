@@ -389,7 +389,13 @@ public partial class MetricPoller : Node
 
 		if (_timeCursor.Mode == CursorMode.Playback)
 		{
-			_timeCursor.AdvanceBy(elapsed);
+			// In archive playback, advance by the archive sampling interval
+			// so each poll tick lands on the next sample. At 1x speed with
+			// 60s intervals, the cursor jumps 60s per tick instead of ~1s.
+			var advanceAmount = _archiveSamplingIntervalSeconds > 0
+				? TimeSpan.FromSeconds(_archiveSamplingIntervalSeconds)
+				: elapsed;
+			_timeCursor.AdvanceBy(advanceAmount);
 			EmitSignal(SignalName.PlaybackPositionChanged,
 				_timeCursor.Position.ToString("o"), "Playback");
 		}
