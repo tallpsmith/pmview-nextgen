@@ -54,11 +54,11 @@ func _process(delta: float) -> void:
 
 func _update_camera_orbit(delta: float) -> void:
 	# Orbit around Y axis
-	_orbit_angle += orbit_speed * delta
+	_orbit_angle = wrapf(_orbit_angle + orbit_speed * delta, 0.0, TAU)
 	camera_rig.rotation.y = _orbit_angle
 
 	# Elevation bob on a different frequency
-	_elevation_angle += elevation_speed * delta
+	_elevation_angle = wrapf(_elevation_angle + elevation_speed * delta, 0.0, TAU)
 	var elevation_t := (sin(_elevation_angle) + 1.0) * 0.5  # 0..1
 	var cam_y := lerpf(elevation_min, elevation_max, elevation_t)
 
