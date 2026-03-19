@@ -15,7 +15,7 @@ pmview-nextgen is a next-generation performance monitoring visualization tool th
 </td>
 <td align="center" width="50%">
 <strong>pmview-nextgen (2026)</strong><br/>
-<img src="pmview-nextgen.png" alt="pmview-nextgen in 2026" width="400"/>
+<img src="pcp-pmview-nextgen.png" alt="pmview-nextgen in 2026" width="400"/>
 <br/><em>Same spirit, new engine — Godot 4.6, real-time 3D, living worlds</em>
 </td>
 </tr>
