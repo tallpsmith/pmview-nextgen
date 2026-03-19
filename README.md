@@ -6,6 +6,35 @@
 
 pmview-nextgen is a next-generation performance monitoring visualization tool that represents system performance metrics as living, breathing 3D environments. Inspired by the original PCP pmview, this project aims to restore humanity to system monitoring by bridging how systems naturally behave (alive, flowing, rhythmic) with how human brains naturally comprehend (spatial, environmental, emotional).
 
+## Download
+
+Pre-built binaries are available from the [latest GitHub Release](https://github.com/tallpsmith/pmview-nextgen/releases/latest).
+
+| Platform | Architecture | Download |
+|----------|-------------|----------|
+| macOS | Universal (Intel + Apple Silicon) | `pmview-<version>-macos-universal.dmg` |
+| Linux | x86_64 | `pmview-<version>-linux-x64.tar.gz` |
+| Linux | ARM64 | `pmview-<version>-linux-arm64.tar.gz` |
+
+### macOS
+
+1. Download the `.dmg` file
+2. Mount it (double-click)
+3. Drag `pmview.app` to your Applications folder (or wherever you like)
+4. **First launch:** macOS will show an "unidentified developer" warning. Right-click the app → Open, then click Open in the dialog. This is only needed once.
+
+### Linux
+
+1. Download the `.tar.gz` for your architecture
+2. Extract: `tar xzf pmview-<version>-linux-<arch>.tar.gz`
+3. Run the binary:
+   - **x86_64:** `chmod +x pmview.x86_64 && ./pmview.x86_64`
+   - **ARM64:** `chmod +x pmview.arm64 && ./pmview.arm64`
+
+### Build from source
+
+If you have the .NET 10+ SDK and Godot 4.6+ installed, you can build from source — see [Quick Start](#quick-start) below.
+
 ## The Vision
 
 > **"Make people see their system alive and say 'oh wow'"**
