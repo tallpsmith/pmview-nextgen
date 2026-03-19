@@ -39,7 +39,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 8.0.x
 
       - name: PcpClient integration tests
         run: dotnet test src/pcp-client-dotnet/PcpClient.sln --filter 'Category=Integration'
@@ -48,7 +48,7 @@ jobs:
         with:
           godot-version: '4.6.1'
           godot-net: true
-          dotnet-version: net10.0
+          dotnet-version: net8.0
           paths: test/e2e/
           project_dir: 'src/pmview-bridge-addon/'
           timeout: 15
