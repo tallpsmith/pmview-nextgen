@@ -85,8 +85,6 @@ jobs:
           # (SceneBinder, PcpBindingResource) import types from them and they
           # have no project-reference equivalent in pmview-app.
           rm -f src/pmview-app/addons/pmview-bridge/lib/PcpClient.dll
-          echo "--- Addon files copied (PcpClient.dll removed to avoid duplicate) ---"
-          ls -la src/pmview-app/addons/pmview-bridge/lib/
 
       - name: Restore .NET dependencies
         run: dotnet restore src/pmview-app/pmview-app.csproj
