@@ -6,6 +6,21 @@
 
 pmview-nextgen is a next-generation performance monitoring visualization tool that represents system performance metrics as living, breathing 3D environments. Inspired by the original PCP pmview, this project aims to restore humanity to system monitoring by bridging how systems naturally behave (alive, flowing, rhythmic) with how human brains naturally comprehend (spatial, environmental, emotional).
 
+<table>
+<tr>
+<td align="center" width="50%">
+<strong>pmview classic (1999)</strong><br/>
+<img src="pcp-pmview-original.gif" alt="Original PCP pmview from 1999" width="400"/>
+<br/><em>The original — Motif widgets, OpenGL, and pure 90s energy</em>
+</td>
+<td align="center" width="50%">
+<strong>pmview-nextgen (2026)</strong><br/>
+<img src="pmview-nextgen.png" alt="pmview-nextgen in 2026" width="400"/>
+<br/><em>Same spirit, new engine — Godot 4.6, real-time 3D, living worlds</em>
+</td>
+</tr>
+</table>
+
 ## Download
 
 Pre-built binaries are available from the [latest GitHub Release](https://github.com/tallpsmith/pmview-nextgen/releases/latest).
