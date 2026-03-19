@@ -8,13 +8,13 @@ namespace PmviewNextgen.Tests.E2E;
 
 /// <summary>
 /// E2E tests for live metric polling against a real pmproxy instance.
-/// Requires docker-compose PCP stack running on localhost:44322.
+/// Requires docker-compose PCP stack running on localhost:54322.
 /// Skips gracefully when pmproxy is unavailable (no PCP stack in CI unit tests).
 /// </summary>
 [TestSuite]
 public partial class LiveMetricPollingTests
 {
-	private const string PmproxyEndpoint = "http://localhost:44322";
+	private const string PmproxyEndpoint = "http://localhost:54322";
 	private static readonly System.Net.Http.HttpClient _probe = new()
 	{
 		Timeout = TimeSpan.FromSeconds(2)

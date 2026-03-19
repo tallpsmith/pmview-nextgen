@@ -11,7 +11,7 @@ namespace PcpClient.Tests.Integration;
 /// </summary>
 public abstract class IntegrationTestBase : IAsyncLifetime
 {
-    protected const string PmproxyEndpoint = "http://localhost:44322";
+    protected const string PmproxyEndpoint = "http://localhost:54322";
     protected static readonly Uri PmproxyUri = new(PmproxyEndpoint);
 
     protected PcpClientConnection Client { get; private set; } = null!;
