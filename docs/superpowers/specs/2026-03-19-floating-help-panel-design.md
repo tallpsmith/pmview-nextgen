@@ -1,7 +1,7 @@
 # Floating Help Panel — Design Spec
 
 **Date:** 2026-03-19
-**Status:** Draft
+**Status:** Implemented
 **Replaces:** HudBar (bottom-anchored key label bar)
 
 ## Problem
