@@ -4,7 +4,9 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Godot;
+using Microsoft.Extensions.Logging;
 using PcpClient;
+using PmviewApp;
 
 namespace PmviewNextgen.Bridge;
 
@@ -29,10 +31,12 @@ public partial class MetricPoller : Node
 	[Export] public int PollIntervalMs { get; set; } = 1000;
 	[Export] public string[] MetricNames { get; set; } = [];
 	[Export] public string Hostname { get; set; } = "";
-	[Export] public bool VerboseLogging { get; set; } = false;
 
 	[Signal]
 	public delegate void PlaybackPositionChangedEventHandler(string position, string mode);
+
+	private ILogger? _log;
+	private ILogger Log => _log ??= PmviewLogger.GetLogger("MetricPoller");
 
 	private readonly System.Net.Http.HttpClient _sharedHttpClient = new();
 	private IPcpClient? _client;
@@ -374,11 +378,11 @@ public partial class MetricPoller : Node
 				.Select(d => d.Name)
 				.ToList();
 			if (counterNames.Count > 0)
-				GD.Print($"[MetricPoller] Rate-converting counters: {string.Join(", ", counterNames)}");
+				Log.LogInformation("Rate-converting counters: {Counters}", string.Join(", ", counterNames));
 		}
 		catch (Exception ex)
 		{
-			GD.PushWarning($"[MetricPoller] Could not describe metrics for rate conversion: {ex.Message}");
+			Log.LogWarning("Could not describe metrics for rate conversion: {Message}", ex.Message);
 			_rateConverter = null;
 		}
 	}
@@ -467,7 +471,7 @@ public partial class MetricPoller : Node
 
 		if (_lastEmittedMetrics != null && _lastEmittedMetrics.Count > 0)
 		{
-			GD.Print($"[MetricPoller] Replaying {_lastEmittedMetrics.Count} cached metrics for new scene");
+			Log.LogInformation("Replaying {Count} cached metrics for new scene", _lastEmittedMetrics.Count);
 			var dict = _lastEmittedMetrics.Duplicate(true);   // deep copy — inner dicts are independent
 			InjectVirtualMetrics(dict);
 			EmitSignal(SignalName.MetricsUpdated, dict);
@@ -499,14 +503,14 @@ public partial class MetricPoller : Node
 					foreach (var inst in indom.Instances)
 						nameMap[inst.Name] = inst.Id;
 					_liveInstanceNames[metricName] = nameMap;
-					if (VerboseLogging)
-						GD.Print($"[MetricPoller] Live instance names for {metricName}: " +
-							string.Join(", ", nameMap.Select(kv => $"{kv.Key}→{kv.Value}")));
+					Log.LogInformation("Live instance names for {Metric}: {Names}",
+						metricName,
+						string.Join(", ", nameMap.Select(kv => $"{kv.Key}→{kv.Value}")));
 				}
 			}
 			catch (Exception ex)
 			{
-				GD.PushWarning($"[MetricPoller] Instance domain lookup failed for {metricName}: {ex.Message}");
+				Log.LogWarning("Instance domain lookup failed for {Metric}: {Message}", metricName, ex.Message);
 			}
 		}
 
@@ -564,22 +568,25 @@ public partial class MetricPoller : Node
 				if (bounds.HasValue)
 				{
 					_timeCursor.EndBound = bounds.Value.End;
-					if (VerboseLogging)
-						GD.Print($"[MetricPoller] Archive discovery: " +
-							$"sampling interval = {_archiveSamplingIntervalSeconds:F1}s, " +
-							$"sample bounds = {bounds.Value.Start:o} to {bounds.Value.End:o}");
+					Log.LogInformation(
+						"Archive discovery: sampling interval = {Interval:F1}s, sample bounds = {Start:o} to {End:o}",
+						_archiveSamplingIntervalSeconds,
+						bounds.Value.Start,
+						bounds.Value.End);
 				}
 			}
 
-			if (VerboseLogging)
-				GD.Print($"[MetricPoller] Archive query window: " +
-					$"{_archiveSamplingIntervalSeconds * 1.5:F1}s " +
-					$"(1.5x detected {_archiveSamplingIntervalSeconds:F1}s interval)");
+			Log.LogInformation(
+				"Archive query window: {Window:F1}s (1.5x detected {Interval:F1}s interval)",
+				_archiveSamplingIntervalSeconds * 1.5,
+				_archiveSamplingIntervalSeconds);
 		}
 		catch (Exception ex)
 		{
-			GD.PushWarning($"[MetricPoller] Archive discovery failed, " +
-				$"using default {_archiveSamplingIntervalSeconds}s: {ex.Message}");
+			Log.LogWarning(
+				"Archive discovery failed, using default {Default}s: {Message}",
+				_archiveSamplingIntervalSeconds,
+				ex.Message);
 		}
 	}
 
@@ -592,8 +599,7 @@ public partial class MetricPoller : Node
 			.Where(m => !m.StartsWith("pmview.meta.", StringComparison.Ordinal))
 			.ToArray();
 
-		if (VerboseLogging)
-			GD.Print($"[MetricPoller] Historical fetch at cursor: {cursorPosition:o}");
+		Log.LogInformation("Historical fetch at cursor: {Position:o}", cursorPosition);
 
 		foreach (var metricName in realMetrics)
 		{
@@ -606,7 +612,7 @@ public partial class MetricPoller : Node
 				if (!queryResponse.IsSuccessStatusCode)
 				{
 					var errorBody = await queryResponse.Content.ReadAsStringAsync();
-					GD.PrintErr($"[MetricPoller] Series query failed ({queryResponse.StatusCode}): {errorBody}");
+					Log.LogError("Series query failed ({StatusCode}): {Body}", queryResponse.StatusCode, errorBody);
 					continue;
 				}
 
@@ -633,7 +639,7 @@ public partial class MetricPoller : Node
 				if (!valuesResponse.IsSuccessStatusCode)
 				{
 					var errorBody = await valuesResponse.Content.ReadAsStringAsync();
-					GD.PrintErr($"[MetricPoller] Values query failed ({valuesResponse.StatusCode}): {errorBody}");
+					Log.LogError("Values query failed ({StatusCode}): {Body}", valuesResponse.StatusCode, errorBody);
 					continue;
 				}
 
@@ -642,9 +648,9 @@ public partial class MetricPoller : Node
 
 				if (seriesValues.Count == 0)
 				{
-					if (VerboseLogging)
-						GD.Print($"[MetricPoller] No values in window for {metricName} " +
-							$"(window: {windowSeconds:F1}s before {cursorPosition:o})");
+					Log.LogInformation(
+						"No values in window for {Metric} (window: {Window:F1}s before {Position:o})",
+						metricName, windowSeconds, cursorPosition);
 					continue;
 				}
 
@@ -656,9 +662,9 @@ public partial class MetricPoller : Node
 					var vals = group.OrderBy(v => v.Timestamp).ToList();
 					var valStrs = vals.Select(v =>
 						$"{v.NumericValue:F2}@{DateTimeOffset.FromUnixTimeMilliseconds((long)v.Timestamp).UtcDateTime:HH:mm:ss}");
-					if (VerboseLogging)
-						GD.Print($"[MetricPoller] {metricName} series {seriesLabel}: " +
-							$"{vals.Count} samples [{string.Join(", ", valStrs)}]");
+					Log.LogInformation(
+						"{Metric} series {Series}: {Count} samples [{Samples}]",
+						metricName, seriesLabel, vals.Count, string.Join(", ", valStrs));
 				}
 
 				// Sample-and-hold: skip if we already emitted this timestamp
@@ -671,9 +677,9 @@ public partial class MetricPoller : Node
 				}
 				_lastEmittedTimestamp[metricName] = latestTimestamp;
 
-				if (VerboseLogging)
-					GD.Print($"[MetricPoller] {metricName}: NEW sample detected " +
-						$"(ts={latestTimestamp:F3}, prev={lastTs:F3})");
+				Log.LogInformation(
+					"{Metric}: NEW sample detected (ts={Timestamp:F3}, prev={Prev:F3})",
+					metricName, latestTimestamp, lastTs);
 
 				// Counters: compute per-second rates from consecutive samples
 				// Instant/discrete: take latest timestamp's values directly
@@ -684,14 +690,14 @@ public partial class MetricPoller : Node
 					foreach (var rv in resolvedValues)
 					{
 						var seriesLabel = rv.SeriesId[..8];
-						if (VerboseLogging)
-							GD.Print($"[MetricPoller] {metricName} rate: series {seriesLabel} " +
-								$"= {rv.NumericValue:F4}/s");
+						Log.LogInformation(
+							"{Metric} rate: series {Series} = {Rate:F4}/s",
+							metricName, seriesLabel, rv.NumericValue);
 					}
 					if (resolvedValues.Count == 0)
-						if (VerboseLogging)
-							GD.Print($"[MetricPoller] {metricName}: rate computation returned 0 values " +
-								$"(need >=2 samples per series, got {seriesValues.Count} total)");
+						Log.LogInformation(
+							"{Metric}: rate computation returned 0 values (need >=2 samples per series, got {Count} total)",
+							metricName, seriesValues.Count);
 				}
 				else
 				{
@@ -720,9 +726,9 @@ public partial class MetricPoller : Node
 					instances[instanceKey] = sv.NumericValue;
 					if (matched != null)
 						matchedInstanceInfos.Add(matched);
-					if (VerboseLogging)
-						GD.Print($"[MetricPoller] {metricName}: instance {instanceKey} " +
-							$"= {sv.NumericValue:F4}");
+					Log.LogInformation(
+						"{Metric}: instance {InstanceKey} = {Value:F4}",
+						metricName, instanceKey, sv.NumericValue);
 				}
 
 				// Build name→id from only the instance entries that matched actual values.
@@ -743,8 +749,7 @@ public partial class MetricPoller : Node
 			}
 			catch (Exception ex)
 			{
-				GD.PrintErr(
-					$"[MetricPoller] Series query error for {metricName}: {ex.Message}");
+				Log.LogError("Series query error for {Metric}: {Message}", metricName, ex.Message);
 			}
 		}
 
@@ -755,8 +760,7 @@ public partial class MetricPoller : Node
 
 		if (dict.Count > 0)
 		{
-			if (VerboseLogging)
-				GD.Print($"[MetricPoller] Historical update: {dict.Count} metrics with new data");
+			Log.LogInformation("Historical update: {Count} metrics with new data", dict.Count);
 			_lastEmittedMetrics = dict;
 			EmitSignal(SignalName.MetricsUpdated, dict);
 		}
@@ -779,8 +783,9 @@ public partial class MetricPoller : Node
 
 			if (!response.IsSuccessStatusCode)
 			{
-				GD.PushWarning($"[MetricPoller] /series/instances failed for {metricName} " +
-					$"({response.StatusCode}) — falling back to singular mapping");
+				Log.LogWarning(
+					"/series/instances failed for {Metric} ({StatusCode}) — falling back to singular mapping",
+					metricName, response.StatusCode);
 				_seriesInstanceMap[metricName] = new Dictionary<string, SeriesInstanceInfo>();
 				return;
 			}
@@ -793,15 +798,12 @@ public partial class MetricPoller : Node
 			if (mapping.Count > 0)
 			{
 				var pairs = mapping.Select(kv => $"{kv.Key[..8]}..→{kv.Value.PcpInstanceId} ({kv.Value.Name})");
-				if (VerboseLogging)
-					GD.Print($"[MetricPoller] Instance mapping for {metricName}: " +
-						$"{string.Join(", ", pairs)}");
+				Log.LogInformation("Instance mapping for {Metric}: {Mapping}", metricName, string.Join(", ", pairs));
 			}
 		}
 		catch (Exception ex)
 		{
-			GD.PushWarning($"[MetricPoller] Instance mapping failed for {metricName}: " +
-				$"{ex.Message}");
+			Log.LogWarning("Instance mapping failed for {Metric}: {Message}", metricName, ex.Message);
 			_seriesInstanceMap[metricName] = new Dictionary<string, SeriesInstanceInfo>();
 		}
 	}

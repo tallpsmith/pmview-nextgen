@@ -26,6 +26,7 @@ extends Node3D
 @onready var host_dropdown: OptionButton = %HostDropdown
 @onready var range_label: Label = %RangeLabel
 @onready var start_time_input: LineEdit = %StartTimeInput
+@onready var verbose_check: CheckButton = %VerboseCheck
 
 var _sweep_tween: Tween = null
 var _orbit_angle := 0.0
@@ -285,6 +286,11 @@ func _launch() -> void:
 			"start_time": start_time,
 			"archive_start_epoch": _archive_start_epoch,
 			"archive_end_epoch": _archive_end_epoch,
+			"verbose_logging": verbose_check.button_pressed,
 		})
 	else:
-		SceneManager.go_to_loading({"endpoint": url, "mode": "live"})
+		SceneManager.go_to_loading({
+			"endpoint": url,
+			"mode": "live",
+			"verbose_logging": verbose_check.button_pressed,
+		})

@@ -3,7 +3,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Godot;
+using Microsoft.Extensions.Logging;
 using PcpClient;
+using PmviewApp;
 
 namespace PmviewNextgen.Bridge;
 
@@ -32,6 +34,9 @@ public partial class MetricBrowserDialog : Window
 	private OptionButton? _hostDropdown;
 	private ArchiveMetricDiscoverer? _discoverer;
 	private bool _isArchiveMode;
+
+	private ILogger? _log;
+	private ILogger Log => _log ??= PmviewLogger.GetLogger("MetricBrowser");
 
 	public override void _Ready()
 	{
@@ -117,7 +122,7 @@ public partial class MetricBrowserDialog : Window
 			"pmview/endpoint", "http://localhost:44322").AsString();
 
 		_isArchiveMode = ProjectSettings.GetSetting("pmview/mode", 0).AsInt32() == 0;
-		GD.Print($"[MetricBrowser] Opening — endpoint={endpoint}, mode={(_isArchiveMode ? "archive" : "live")}");
+		Log.LogInformation("Opening — endpoint={Endpoint}, mode={Mode}", endpoint, _isArchiveMode ? "archive" : "live");
 
 		if (string.IsNullOrEmpty(endpoint))
 		{
@@ -138,7 +143,7 @@ public partial class MetricBrowserDialog : Window
 	{
 		try
 		{
-			GD.Print($"[MetricBrowser] Live: connecting to {endpoint}...");
+			Log.LogInformation("Live: connecting to {Endpoint}...", endpoint);
 			_statusLabel!.Text = "Connecting...";
 			_retryButton!.Visible = false;
 
@@ -148,18 +153,18 @@ public partial class MetricBrowserDialog : Window
 			_client = new PcpClientConnection(new Uri(endpoint), _httpClient);
 			await _client.ConnectAsync();
 
-			GD.Print("[MetricBrowser] Live: connected, loading root namespace...");
+			Log.LogInformation("Live: connected, loading root namespace...");
 			_statusLabel.Text = $"Connected to {endpoint}";
 			await LoadChildren("");
 		}
 		catch (PcpConnectionException ex)
 		{
-			GD.PushWarning($"[MetricBrowser] Live: connection failed — {ex.Message}");
+			Log.LogWarning("Live: connection failed — {Message}", ex.Message);
 			ShowError($"Connection failed: {ex.Message}");
 		}
 		catch (Exception ex)
 		{
-			GD.PushWarning($"[MetricBrowser] Live: error — {ex.Message}");
+			Log.LogWarning("Live: error — {Message}", ex.Message);
 			ShowError($"Error: {ex.Message}");
 		}
 	}
@@ -168,7 +173,7 @@ public partial class MetricBrowserDialog : Window
 	{
 		try
 		{
-			GD.Print($"[MetricBrowser] Archive: discovering hosts at {endpoint}...");
+			Log.LogInformation("Archive: discovering hosts at {Endpoint}...", endpoint);
 			_statusLabel!.Text = "Discovering hosts...";
 			_retryButton!.Visible = false;
 			_hostDropdown!.Visible = true;
@@ -180,7 +185,7 @@ public partial class MetricBrowserDialog : Window
 			_discoverer = new ArchiveMetricDiscoverer(new Uri(endpoint), _httpClient);
 
 			var hosts = await _discoverer.GetHostnamesAsync();
-			GD.Print($"[MetricBrowser] Archive: found {hosts.Count} hosts: {string.Join(", ", hosts)}");
+			Log.LogInformation("Archive: found {HostCount} hosts: {Hosts}", hosts.Count, string.Join(", ", hosts));
 
 			if (hosts.Count == 0)
 			{
@@ -195,7 +200,7 @@ public partial class MetricBrowserDialog : Window
 		}
 		catch (Exception ex)
 		{
-			GD.PushWarning($"[MetricBrowser] Archive: host discovery failed — {ex.Message}");
+			Log.LogWarning("Archive: host discovery failed — {Message}", ex.Message);
 			ShowError($"Host discovery failed: {ex.Message}");
 		}
 	}
@@ -203,14 +208,14 @@ public partial class MetricBrowserDialog : Window
 	private async void OnHostSelected(long index)
 	{
 		var hostname = _hostDropdown!.GetItemText((int)index);
-		GD.Print($"[MetricBrowser] Archive: host selected — {hostname}");
+		Log.LogInformation("Archive: host selected — {Hostname}", hostname);
 		_statusLabel!.Text = $"Archive: {hostname} — loading metrics...";
 		_tree!.Clear();
 
 		try
 		{
 			var metricNames = await _discoverer!.DiscoverMetricsForHostAsync(hostname);
-			GD.Print($"[MetricBrowser] Archive: discovered {metricNames.Count} metrics for {hostname}");
+			Log.LogInformation("Archive: discovered {MetricCount} metrics for {Hostname}", metricNames.Count, hostname);
 
 			if (metricNames.Count == 0)
 			{
@@ -228,7 +233,7 @@ public partial class MetricBrowserDialog : Window
 		}
 		catch (Exception ex)
 		{
-			GD.PushWarning($"[MetricBrowser] Archive: metric discovery failed — {ex.Message}");
+			Log.LogWarning("Archive: metric discovery failed — {Message}", ex.Message);
 			ShowError($"Metric discovery failed: {ex.Message}");
 		}
 	}
@@ -264,7 +269,7 @@ public partial class MetricBrowserDialog : Window
 
 		try
 		{
-			GD.Print($"[MetricBrowser] Live: loading children for prefix='{prefix}'");
+			Log.LogInformation("Live: loading children for prefix='{Prefix}'", prefix);
 			var ns = await _client.GetChildrenAsync(prefix);
 
 			TreeItem parent;
@@ -344,7 +349,7 @@ public partial class MetricBrowserDialog : Window
 
 		_selectedMetric = path;
 		_confirmButton!.Disabled = false;
-		GD.Print($"[MetricBrowser] Leaf selected: {path}");
+		Log.LogInformation("Leaf selected: {Path}", path);
 
 		if (_isArchiveMode)
 		{
@@ -365,7 +370,7 @@ public partial class MetricBrowserDialog : Window
 		try
 		{
 			var detail = await _discoverer.DescribeMetricAsync(metricName, hostname);
-			GD.Print($"[MetricBrowser] Archive describe: {detail.Name} — type={detail.Type}, semantics={detail.Semantics}, instances={detail.Instances.Count}");
+			Log.LogInformation("Archive describe: {MetricName} — type={Type}, semantics={Semantics}, instances={InstanceCount}", detail.Name, detail.Type, detail.Semantics, detail.Instances.Count);
 
 			_descriptionLabel!.Text = $"{detail.Name}";
 			if (detail.Semantics != null)
@@ -395,7 +400,7 @@ public partial class MetricBrowserDialog : Window
 		try
 		{
 			var descriptors = await _client.DescribeMetricsAsync(new[] { metricName });
-			GD.Print($"[MetricBrowser] Live describe: got {descriptors.Count} descriptors for {metricName}");
+			Log.LogInformation("Live describe: got {DescriptorCount} descriptors for {MetricName}", descriptors.Count, metricName);
 			if (descriptors.Count > 0)
 			{
 				var desc = descriptors[0];
@@ -433,7 +438,7 @@ public partial class MetricBrowserDialog : Window
 	{
 		if (_targetBinding != null && !string.IsNullOrEmpty(_selectedMetric))
 		{
-			GD.Print($"[MetricBrowser] Confirmed: metric={_selectedMetric}");
+			Log.LogInformation("Confirmed: metric={Metric}", _selectedMetric);
 			_targetBinding.MetricName = _selectedMetric;
 
 			var selectedIdx = _instanceList?.GetSelectedItems();
