@@ -40,6 +40,8 @@ func _ready() -> void:
 	_help_panel = scene.find_child("HelpPanel", true, false)
 	_help_hint = scene.find_child("HelpHint", true, false)
 	_camera = get_viewport().get_camera_3d()
+	print("[HostView] HelpPanel found: %s, HelpHint found: %s, Camera found: %s" % [
+		_help_panel != null, _help_hint != null, _camera != null])
 
 	# Connect panel signals for camera suppression
 	if _help_panel:
@@ -105,9 +107,15 @@ func _ready() -> void:
 
 	# Setup help content (needs _is_archive_mode to be set)
 	if _help_panel:
+		print("[HostView] Setting up help content (archive=%s)" % _is_archive_mode)
 		_setup_help_content()
+	else:
+		push_warning("[HostView] HelpPanel not found — H key will not work")
 	if _help_hint:
+		print("[HostView] Starting help hint cycling")
 		_setup_help_hints()
+	else:
+		push_warning("[HostView] HelpHint not found — no cycling hints")
 
 
 func _on_poller_connected(state: String, start_time: String) -> void:

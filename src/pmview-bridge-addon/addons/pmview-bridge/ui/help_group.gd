@@ -20,7 +20,8 @@ static func create(p_name: String, p_color: Color, p_entries: Array[HelpEntry],
 	return g
 
 
-class HelpEntry extends RefCounted:
+class HelpEntry:
+	extends RefCounted
 	var key_text: String
 	var action_text: String
 	var enabled: bool = true

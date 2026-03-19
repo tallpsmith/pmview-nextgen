@@ -384,6 +384,10 @@ public static class RuntimeSceneBuilder
             helpPanel.Name = "HelpPanel";
             canvas.AddChild(helpPanel);
         }
+        else
+        {
+            GD.PushWarning($"[RuntimeSceneBuilder] Failed to load HelpPanel scene: {HelpPanelScenePath}");
+        }
 
         var helpHintScene = GD.Load<PackedScene>(HelpHintScenePath);
         if (helpHintScene != null)
@@ -391,6 +395,10 @@ public static class RuntimeSceneBuilder
             var helpHint = helpHintScene.Instantiate();
             helpHint.Name = "HelpHint";
             canvas.AddChild(helpHint);
+        }
+        else
+        {
+            GD.PushWarning($"[RuntimeSceneBuilder] Failed to load HelpHint scene: {HelpHintScenePath}");
         }
 
         sceneRoot.AddChild(canvas);
