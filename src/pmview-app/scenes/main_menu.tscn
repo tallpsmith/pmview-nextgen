@@ -4,6 +4,7 @@
 [ext_resource type="FontFile" uid="uid://cuocu3qcqxof0" path="res://assets/fonts/PressStart2P-Regular.ttf" id="2"]
 [ext_resource type="Shader" uid="uid://bcggy68gfvh22" path="res://shaders/kitt_scanner.gdshader" id="3"]
 [ext_resource type="Theme" path="res://assets/themes/arcade_theme.tres" id="4"]
+[ext_resource type="Shader" path="res://shaders/retro_dot_grid.gdshader" id="5"]
 
 [sub_resource type="ProceduralSkyMaterial" id="sky_mat"]
 sky_top_color = Color(0.02, 0.02, 0.06, 1)
@@ -115,6 +116,17 @@ shader_parameter/color_left = Color(1, 0, 0.43, 1)
 shader_parameter/color_mid = Color(0.514, 0.22, 0.925, 1)
 shader_parameter/color_right = Color(0.228, 0.525, 1, 1)
 
+[sub_resource type="ShaderMaterial" id="ground_shader_mat"]
+render_priority = -1
+shader = ExtResource("5")
+shader_parameter/dot_spacing = 2.0
+shader_parameter/dot_radius = 0.06
+shader_parameter/dot_color = Color(0, 0.8, 0.3, 1)
+shader_parameter/fade_distance = 18.0
+
+[sub_resource type="PlaneMesh" id="ground_plane_mesh"]
+size = Vector2(60, 60)
+
 [node name="MainMenu" type="Node3D" unique_id=1656159036]
 script = ExtResource("1")
 
@@ -125,6 +137,11 @@ environment = SubResource("env")
 transform = Transform3D(0.866, -0.354, 0.354, 0, 0.707, 0.707, -0.5, -0.612, 0.612, 2, 4, 2)
 light_color = Color(0.6, 0.55, 0.8, 1)
 light_energy = 0.4
+
+[node name="GroundPlane" type="MeshInstance3D" parent="."]
+mesh = SubResource("ground_plane_mesh")
+surface_material_override/0 = SubResource("ground_shader_mat")
+cast_shadow = 0
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=1337806946]
 transform = Transform3D(1, 0, 0, 0, 0.9847534, 0.17395642, 0, -0.17395642, 0.9847534, 0, 3, 7.535516)
