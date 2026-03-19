@@ -79,12 +79,14 @@ jobs:
         run: |
           mkdir -p src/pmview-app/addons
           cp -r src/pmview-bridge-addon/addons/pmview-bridge src/pmview-app/addons/
-          # Remove pre-built DLLs — CI builds everything from source via
-          # project references. Leaving them causes CS1704 "duplicate assembly"
-          # conflicts between the pre-built DLLs and the freshly compiled ones.
-          rm -rf src/pmview-app/addons/pmview-bridge/lib/
-          echo "--- Addon files copied (lib/ excluded) ---"
-          ls -la src/pmview-app/addons/pmview-bridge/
+          # Only remove PcpClient.dll — it conflicts with the copy built from
+          # source via PmviewProjectionCore's transitive project reference.
+          # PcpGodotBridge.dll and Tomlyn.dll must stay: the addon's C# files
+          # (SceneBinder, PcpBindingResource) import types from them and they
+          # have no project-reference equivalent in pmview-app.
+          rm -f src/pmview-app/addons/pmview-bridge/lib/PcpClient.dll
+          echo "--- Addon files copied (PcpClient.dll removed to avoid duplicate) ---"
+          ls -la src/pmview-app/addons/pmview-bridge/lib/
 
       - name: Restore .NET dependencies
         run: dotnet restore src/pmview-app/pmview-app.csproj
