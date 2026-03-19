@@ -270,8 +270,19 @@ public partial class MetricPoller : Node
 		{
 			_timeCursor.SetInOutRange(inPoint, outPoint);
 
+			// If playhead is outside the new range, jump to IN point
+			if (_timeCursor.Position < inPoint || _timeCursor.Position > outPoint)
+			{
+				_timeCursor.JumpTo(inPoint);
+				_lastEmittedTimestamp.Clear();
+				_skipNextAdvance = true;
+			}
+
 			if (_timeCursor.Mode == CursorMode.Paused)
 				_timeCursor.Resume();
+
+			EmitSignal(SignalName.PlaybackPositionChanged,
+				_timeCursor.Position.ToString("o"), "Playback");
 		}
 		else
 		{
@@ -736,11 +747,15 @@ public partial class MetricPoller : Node
 			}
 		}
 
+		// Always inject virtual metrics (timestamp, hostname) so the 3D
+		// display stays in sync with the cursor position, even when no
+		// new sample data is available (sample-and-hold between intervals).
+		InjectVirtualMetrics(dict);
+
 		if (dict.Count > 0)
 		{
 			if (VerboseLogging)
 				GD.Print($"[MetricPoller] Historical update: {dict.Count} metrics with new data");
-			InjectVirtualMetrics(dict);
 			_lastEmittedMetrics = dict;
 			EmitSignal(SignalName.MetricsUpdated, dict);
 		}

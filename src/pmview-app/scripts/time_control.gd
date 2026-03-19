@@ -14,7 +14,7 @@ signal panel_closed()
 const EDGE_TRIGGER_WIDTH := 200
 const EDGE_HIDE_MARGIN := 60
 
-# Bar dimensions — bigger, fewer, more readable
+# Bar dimensions
 const BAR_MAX_LENGTH := 120.0
 const BAR_MIN_LENGTH := 6.0
 const BAR_HEIGHT := 4.0
@@ -22,6 +22,9 @@ const BAR_SPACING := 10.0
 const ATTRACTION_RADIUS := 200.0
 const PANEL_WIDTH := 140.0
 const PANEL_PADDING := 30.0
+
+# IN/OUT markers use the active colour but thicker
+const IN_OUT_BAR_HEIGHT := 16.0
 
 var archive_start: float = 0.0
 var archive_end: float = 0.0
@@ -42,10 +45,10 @@ var colour_inactive := Color(0.3, 0.3, 0.3, 0.3)
 var colour_playhead := Color(0.976, 0.451, 0.086, 0.9)
 var colour_panel_bg := Color(0.05, 0.04, 0.08, 0.5)
 
-# IN/OUT markers use the active colour but thicker
-const IN_OUT_BAR_HEIGHT := 16.0
-
+# Hover label follows mouse — shows where you'd jump to
 @onready var timestamp_label: Label = $TimestampLabel
+# Playhead label stays at the playhead bar — shows current position
+@onready var playhead_label: Label = $PlayheadLabel
 
 
 func _ready() -> void:
@@ -72,7 +75,7 @@ func _process(delta: float) -> void:
 			if mouse_pos.x < viewport_size.x - EDGE_TRIGGER_WIDTH - EDGE_HIDE_MARGIN:
 				_hide_panel()
 		queue_redraw()
-		_update_timestamp_tooltip()
+		_update_labels()
 
 
 func _show_panel() -> void:
@@ -115,23 +118,31 @@ func set_archive_bounds(start_epoch: float, end_epoch: float) -> void:
 
 
 ## Called by HostViewController when arrow keys scrub the timeline.
-## Shows the panel temporarily and resets the auto-hide timer.
 func notify_scrub() -> void:
 	_scrub_hide_timer = SCRUB_HIDE_DELAY
 	if not _is_visible:
 		_scrub_auto_shown = true
 		_is_visible = true
 		visible = true
-		# Don't emit panel_opened — scrubbing already pauses via StepPlayback
 	queue_redraw()
 
 
-## Attempt to smooth the bar attraction using an ease-in-out curve
-## instead of linear falloff. This creates a gentler peak that
-## rolls off naturally rather than a harsh triangular shape.
 func _ease_in_out(t: float) -> float:
-	# Hermite smoothstep: 3t^2 - 2t^3
 	return t * t * (3.0 - 2.0 * t)
+
+
+## Convert a Y position to the corresponding epoch time
+func _y_to_time(y_pos: float, usable_height: float) -> float:
+	var relative := clampf((y_pos - PANEL_PADDING) / usable_height, 0.0, 1.0)
+	return archive_start + relative * (archive_end - archive_start)
+
+
+## Convert an epoch time to a Y position
+func _time_to_y(t: float, usable_height: float) -> float:
+	if archive_end <= archive_start:
+		return PANEL_PADDING
+	var relative := clampf((t - archive_start) / (archive_end - archive_start), 0.0, 1.0)
+	return PANEL_PADDING + relative * usable_height
 
 
 func _draw() -> void:
@@ -139,13 +150,13 @@ func _draw() -> void:
 		return
 
 	var rect := get_rect()
-	var panel_x := rect.size.x - PANEL_WIDTH
 	var mouse_pos := get_local_mouse_position()
 
 	# Translucent background
+	var panel_x := rect.size.x - PANEL_WIDTH
 	draw_rect(Rect2(panel_x, 0, PANEL_WIDTH, rect.size.y), colour_panel_bg)
 
-	# Calculate bars — fewer, bigger bars for readability
+	# Calculate bars
 	var usable_height := rect.size.y - PANEL_PADDING * 2
 	var bar_count := int(usable_height / (BAR_HEIGHT + BAR_SPACING))
 	if bar_count <= 0:
@@ -155,11 +166,9 @@ func _draw() -> void:
 	var bar_right := rect.size.x - 10.0
 	var time_per_bar := time_range / float(maxi(bar_count - 1, 1))
 
-	# Distance from mouse to right edge — drives overall bar growth
-	# as the mouse approaches (wider trigger zone = visible lerp)
+	# Edge proximity for lerp effect
 	var edge_distance: float = rect.size.x - mouse_pos.x
 	var edge_proximity := clampf(edge_distance / float(EDGE_TRIGGER_WIDTH), 0.0, 1.0)
-	# Invert: closer to edge = higher proximity
 	edge_proximity = 1.0 - edge_proximity
 	var edge_factor: float = _ease_in_out(edge_proximity)
 
@@ -178,15 +187,14 @@ func _draw() -> void:
 		else:
 			colour = colour_active
 
-		# Mouse attraction — ease in/out curve for smooth peak rolloff
+		# Mouse attraction — ease in/out for smooth rolloff
 		var distance: float = absf(mouse_pos.y - y)
 		var linear_attraction := clampf(1.0 - distance / ATTRACTION_RADIUS, 0.0, 1.0)
 		var attraction: float = _ease_in_out(linear_attraction)
 
-		# Combine edge proximity (overall growth) with vertical attraction (peak)
 		var bar_length: float = BAR_MIN_LENGTH + (BAR_MAX_LENGTH - BAR_MIN_LENGTH) * attraction * edge_factor
 
-		# Special markers: playhead uses orange, IN/OUT use thicker active bars
+		# Special markers
 		var is_playhead: bool = absf(t - playhead_position) < time_per_bar * 0.5
 		var is_in: bool = in_point >= 0 and absf(t - in_point) < time_per_bar * 0.5
 		var is_out: bool = out_point >= 0 and absf(t - out_point) < time_per_bar * 0.5
@@ -197,33 +205,40 @@ func _draw() -> void:
 			bar_length = maxf(bar_length, BAR_MAX_LENGTH * 0.7 * edge_factor)
 			this_bar_height = IN_OUT_BAR_HEIGHT
 		elif is_in or is_out:
-			# Same active colour but thicker — cleaner than separate colours
 			bar_length = maxf(bar_length, BAR_MAX_LENGTH * 0.55 * edge_factor)
 			this_bar_height = IN_OUT_BAR_HEIGHT
 
-		# Ensure minimum visibility even at edge of trigger zone
 		bar_length = maxf(bar_length, BAR_MIN_LENGTH * edge_factor)
 
 		if bar_length > 0.5:
-			# Centre thicker bars vertically on the bar position
 			var y_offset := y - (this_bar_height - BAR_HEIGHT) * 0.5
 			draw_rect(Rect2(bar_right - bar_length, y_offset, bar_length, this_bar_height), colour)
 
 
-func _update_timestamp_tooltip() -> void:
-	if not timestamp_label or archive_end <= archive_start:
+func _update_labels() -> void:
+	if archive_end <= archive_start:
 		return
 
 	var rect := get_rect()
 	var mouse_pos := get_local_mouse_position()
 	var usable_height := rect.size.y - PANEL_PADDING * 2
-	var relative_y := clampf((mouse_pos.y - PANEL_PADDING) / usable_height, 0.0, 1.0)
-	var hover_time := archive_start + relative_y * (archive_end - archive_start)
-	var hover_dt := Time.get_datetime_string_from_unix_time(int(hover_time))
+	var label_x := rect.size.x - 360
 
-	timestamp_label.text = hover_dt + "Z"
-	timestamp_label.position = Vector2(rect.size.x - 320, mouse_pos.y - 12)
-	timestamp_label.visible = true
+	# Hover label — follows mouse, shows potential jump target
+	if timestamp_label:
+		var hover_time := _y_to_time(mouse_pos.y, usable_height)
+		var hover_dt := Time.get_datetime_string_from_unix_time(int(hover_time))
+		timestamp_label.text = hover_dt + "Z"
+		timestamp_label.position = Vector2(label_x, mouse_pos.y - 12)
+		timestamp_label.visible = true
+
+	# Playhead label — stays at playhead position, shows current time
+	if playhead_label:
+		var playhead_y := _time_to_y(playhead_position, usable_height)
+		var playhead_dt := Time.get_datetime_string_from_unix_time(int(playhead_position))
+		playhead_label.text = "▶ " + playhead_dt + "Z"
+		playhead_label.position = Vector2(label_x, playhead_y - 12)
+		playhead_label.visible = true
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -236,8 +251,7 @@ func _gui_input(event: InputEvent) -> void:
 
 	var rect := get_rect()
 	var usable_height := rect.size.y - PANEL_PADDING * 2
-	var relative_y := clampf((event.position.y - PANEL_PADDING) / usable_height, 0.0, 1.0)
-	var clicked_time := archive_start + relative_y * (archive_end - archive_start)
+	var clicked_time := _y_to_time(event.position.y, usable_height)
 	var clicked_iso := Time.get_datetime_string_from_unix_time(int(clicked_time)) + "Z"
 
 	if event.shift_pressed:
