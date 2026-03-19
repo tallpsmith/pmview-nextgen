@@ -127,14 +127,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _toggle_playback() -> void:
-	if not _poller:
-		return
-	# TimeCursor.Mode: 0=Live, 1=Playback, 2=Paused
-	var cursor_mode: int = _poller.TimeCursor.Mode
-	if cursor_mode == 1:  # Playback
-		_poller.PausePlayback()
-	elif cursor_mode == 2:  # Paused
-		_poller.ResumePlayback()
+	if _poller:
+		_poller.TogglePlayback()
 
 
 func _dismiss_esc() -> void:

@@ -163,6 +163,27 @@ public partial class MetricPoller : Node
 	}
 
 	/// <summary>
+	/// Returns true if currently in Playback mode (not paused, not live).
+	/// GDScript-callable — TimeCursor is not visible to GDScript.
+	/// </summary>
+	public bool IsPlaying()
+	{
+		return _timeCursor.Mode == CursorMode.Playback;
+	}
+
+	/// <summary>
+	/// Toggles between Playback and Paused modes.
+	/// No-op in Live mode. GDScript-callable.
+	/// </summary>
+	public void TogglePlayback()
+	{
+		if (_timeCursor.Mode == CursorMode.Playback)
+			PausePlayback();
+		else if (_timeCursor.Mode == CursorMode.Paused)
+			ResumePlayback();
+	}
+
+	/// <summary>
 	/// Steps the playback position by a fixed interval.
 	/// Direction: +1 = forward, -1 = backward.
 	/// Pauses playback if currently playing, then fetches data at new position.

@@ -38,11 +38,13 @@ public static class RuntimeSceneBuilder
     /// mirroring the structure TscnWriter emits to .tscn.
     /// </summary>
     public static Node3D Build(SceneLayout layout, string pmproxyEndpoint,
-        string mode = "live", IProgress<float>? progress = null)
+        string mode = "live", string? hostnameOverride = null,
+        IProgress<float>? progress = null)
     {
         GD.Print("[RuntimeSceneBuilder] Build starting...");
         var root = CreateHostViewRoot();
-        AddMetricPoller(root, pmproxyEndpoint, layout.Hostname);
+        var hostname = hostnameOverride ?? layout.Hostname;
+        AddMetricPoller(root, pmproxyEndpoint, hostname);
         AddSceneBinder(root);
 
         GD.Print($"[RuntimeSceneBuilder] Building {layout.Zones.Count} zones...");

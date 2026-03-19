@@ -84,7 +84,9 @@ public partial class LoadingPipeline : Node
 			// Phase 5: BUILDING
 			currentPhase = 5;
 			phaseStart = DateTime.UtcNow;
-			BuiltScene = RuntimeSceneBuilder.Build(layout, endpoint, mode);
+			var hostnameOverride = mode == "archive" && !string.IsNullOrEmpty(hostname)
+				? hostname : null;
+			BuiltScene = RuntimeSceneBuilder.Build(layout, endpoint, mode, hostnameOverride);
 			await EnforceMinPhaseDelay(phaseStart);
 			EmitSignal(SignalName.PhaseCompleted, 5, "BUILDING");
 
