@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using Microsoft.Extensions.Logging;
 using PcpGodotBridge;
 
 namespace PmviewNextgen.Bridge;
@@ -28,11 +29,8 @@ public partial class SceneBinder : Node
 	/// </summary>
 	[Export] public float SmoothSpeed { get; set; } = 5.0f;
 
-	/// <summary>
-	/// Enables per-tick diagnostic logging in ApplyMetrics.
-	/// Off by default — turn on in editor or via GDScript for debugging.
-	/// </summary>
-	[Export] public bool VerboseLogging { get; set; } = false;
+	private ILogger? _log;
+	private ILogger Log => _log ??= PmviewLogger.GetLogger("SceneBinder");
 
 	private Node? _currentScene;
 	private readonly List<ActiveBinding> _activeBindings = new();
@@ -145,11 +143,12 @@ public partial class SceneBinder : Node
 					metricBinding.TargetRangeMin, metricBinding.TargetRangeMax);
 				ApplyProperty(new ActiveBinding(resolved, ownerNode), (float)normalisedInitial);
 
-				GD.Print($"[SceneBinder] Bound from scene: {ownerNode.Name}.{metricBinding.Property} <- {metricBinding.Metric}");
+				Log.LogInformation("Bound from scene: {Node}.{Property} <- {Metric}",
+					ownerNode.Name, metricBinding.Property, metricBinding.Metric);
 			}
 		}
 
-		GD.Print($"[SceneBinder] {_activeBindings.Count} bindings from scene properties");
+		Log.LogInformation("{Count} bindings from scene properties", _activeBindings.Count);
 		IsBound = true;
 		EmitSignal(SignalName.BindingsReady);
 		return metricNames.ToArray();
@@ -186,15 +185,12 @@ public partial class SceneBinder : Node
 			double? rawValue = ExtractValue(binding, instances, nameToId);
 			if (rawValue == null)
 			{
-				if (VerboseLogging)
-				{
-					var instanceLabel = binding.InstanceName != null
-						? $"name='{binding.InstanceName}'"
-						: $"id={binding.InstanceId}";
-					GD.Print($"[SceneBinder] {binding.SceneNode}: no value for " +
-						$"{binding.Metric}[{instanceLabel}] " +
-						$"(available keys: {string.Join(",", instances.Keys)})");
-				}
+				var instanceLabel = binding.InstanceName != null
+					? $"name='{binding.InstanceName}'"
+					: $"id={binding.InstanceId}";
+				Log.LogInformation("{Node}: no value for {Metric}[{Instance}] (available keys: {Keys})",
+					binding.SceneNode, binding.Metric, instanceLabel,
+					string.Join(",", instances.Keys));
 				continue;
 			}
 
@@ -202,11 +198,10 @@ public partial class SceneBinder : Node
 				binding.SourceRangeMin, binding.SourceRangeMax,
 				binding.TargetRangeMin, binding.TargetRangeMax);
 
-			if (VerboseLogging)
-				GD.Print($"[SceneBinder] {binding.SceneNode}.{binding.Property}: " +
-					$"raw={rawValue.Value:F4} -> normalised={normalised:F4} " +
-					$"(src [{binding.SourceRangeMin}-{binding.SourceRangeMax}] " +
-					$"-> tgt [{binding.TargetRangeMin}-{binding.TargetRangeMax}])");
+			Log.LogInformation("{Node}.{Property}: raw={Raw:F4} -> normalised={Normalised:F4} (src [{SrcMin}-{SrcMax}] -> tgt [{TgtMin}-{TgtMax}])",
+				binding.SceneNode, binding.Property, rawValue.Value, normalised,
+				binding.SourceRangeMin, binding.SourceRangeMax,
+				binding.TargetRangeMin, binding.TargetRangeMax);
 
 			if (IsSmoothable(active))
 				SetSmoothTarget(active, (float)normalised);
@@ -244,18 +239,20 @@ public partial class SceneBinder : Node
 
 			_activeBindings[i] = newActive;
 			updated++;
-			GD.Print($"[SceneBinder] {oldBinding.Metric}: SourceRangeMax {oldMax} -> {newMax}");
+			Log.LogInformation("{Metric}: SourceRangeMax {OldMax} -> {NewMax}",
+				oldBinding.Metric, oldMax, newMax);
 		}
 
 		if (updated == 0)
 		{
-			GD.PushWarning($"[SceneBinder] UpdateSourceRangeMax('{zoneName}', {newMax}): " +
-				$"NO bindings matched! Active bindings: {_activeBindings.Count}, " +
-				$"zones present: {string.Join(", ", _activeBindings.Select(a => a.Resolved.Binding.ZoneName ?? "(null)"))}");
+			Log.LogWarning("UpdateSourceRangeMax('{Zone}', {NewMax}): NO bindings matched! Active bindings: {Count}, zones present: {Zones}",
+				zoneName, newMax, _activeBindings.Count,
+				string.Join(", ", _activeBindings.Select(a => a.Resolved.Binding.ZoneName ?? "(null)")));
 		}
 		else
 		{
-			GD.Print($"[SceneBinder] Updated {updated} bindings for zone '{zoneName}' to {newMax}");
+			Log.LogInformation("Updated {Count} bindings for zone '{Zone}' to {NewMax}",
+				updated, zoneName, newMax);
 		}
 	}
 
@@ -318,8 +315,7 @@ public partial class SceneBinder : Node
 		var templateNode = _currentScene.GetNodeOrNull<Node3D>(templateNodePath);
 		if (templateNode == null)
 		{
-			GD.PushWarning(
-				$"[SceneBinder] Template node not found: '{templateNodePath}'");
+			Log.LogWarning("Template node not found: '{Path}'", templateNodePath);
 			return;
 		}
 
@@ -348,15 +344,15 @@ public partial class SceneBinder : Node
 			_activeBindings.Add(new ActiveBinding(resolved, clone));
 			createdNodes.Add(clone);
 
-			GD.Print($"[SceneBinder] Instance binding: {clone.Name}.{property} " +
-					 $"<- {metricName}[{instanceName}]");
+			Log.LogInformation("Instance binding: {Node}.{Property} <- {Metric}[{Instance}]",
+				clone.Name, property, metricName, instanceName);
 		}
 
 		_instanceNodes[metricName] = createdNodes;
 		templateNode.Visible = false;
 
-		GD.Print($"[SceneBinder] Created {createdNodes.Count} per-instance nodes " +
-				 $"for {metricName}");
+		Log.LogInformation("Created {Count} per-instance nodes for {Metric}",
+			createdNodes.Count, metricName);
 	}
 
 	public void UnloadCurrentScene()
@@ -438,12 +434,11 @@ public partial class SceneBinder : Node
 		}
 
 		var availableStr = available.Count > 0
-			? $" Available script properties: {string.Join(", ", available)}"
-			: " No script properties found on this node.";
+			? $"Available script properties: {string.Join(", ", available)}"
+			: "No script properties found on this node.";
 
-		GD.PushWarning(
-			$"[SceneBinder] Property '{resolved.GodotPropertyName}' not found on " +
-			$"node '{resolved.Binding.SceneNode}'.{availableStr}");
+		Log.LogWarning("Property '{Property}' not found on node '{Node}'. {Available}",
+			resolved.GodotPropertyName, resolved.Binding.SceneNode, availableStr);
 		EmitSignal(SignalName.BindingError,
 			$"Property '{resolved.GodotPropertyName}' not found on " +
 			$"'{resolved.Binding.SceneNode}'");
@@ -459,9 +454,7 @@ public partial class SceneBinder : Node
 		{
 			if (!nameToId.ContainsKey(binding.InstanceName))
 			{
-				GD.Print($"[SceneBinder] {binding.SceneNode}: instance name " +
-					$"'{binding.InstanceName}' not found for {binding.Metric} " +
-					$"(available: {string.Join(", ", nameToId.Keys)})");
+				// Note: static method — no Log access here; caller logs if needed
 				return null;
 			}
 			var resolvedId = nameToId[binding.InstanceName].AsInt32();
@@ -526,8 +519,8 @@ public partial class SceneBinder : Node
 	{
 		if (node is not Node3D node3D)
 		{
-			GD.PushWarning($"[SceneBinder] Built-in property '{property}' requires " +
-						   $"Node3D but got {node.GetClass()}");
+			Log.LogWarning("Built-in property '{Property}' requires Node3D but got {NodeClass}",
+				property, node.GetClass());
 			return;
 		}
 
