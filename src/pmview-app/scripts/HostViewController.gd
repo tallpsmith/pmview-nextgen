@@ -9,6 +9,7 @@ var _esc_pending := false
 var _esc_timer: SceneTreeTimer = null
 var _poller: Node = null
 var _time_control: Control = null
+var _hud_bar: Node = null
 var _is_archive_mode := false
 var _poll_interval_seconds := 60.0
 
@@ -71,7 +72,20 @@ func _ready() -> void:
 					print("[HostView] TimeControl bounds set: %s → %s" % [
 						Time.get_datetime_string_from_unix_time(int(arc_start)),
 						Time.get_datetime_string_from_unix_time(int(arc_end))])
-		else:
+			# Show archive-specific HUD keys
+		_hud_bar = scene.find_child("HudBar", true, false)
+		if _hud_bar:
+			var f2_label = _hud_bar.find_child("F2Label", false, false)
+			var space_label = _hud_bar.find_child("SpaceLabel", false, false)
+			var arrows_label = _hud_bar.find_child("ArrowsLabel", false, false)
+			if f2_label:
+				f2_label.visible = true
+			if space_label:
+				space_label.visible = true
+			if arrows_label:
+				arrows_label.visible = true
+
+	else:
 			push_error("[HostView] MetricPoller not found in built scene")
 
 
@@ -79,6 +93,9 @@ func _on_poller_connected(state: String, start_time: String) -> void:
 	if state == "Connected":
 		print("[HostView] Poller connected, starting archive playback")
 		_poller.StartPlayback(start_time)
+		# Brief delay to let StartPlayback async complete before checking state
+		await get_tree().create_timer(0.5).timeout
+		_update_play_state_hud()
 	else:
 		push_error("[HostView] Poller connection state: %s" % state)
 
@@ -86,6 +103,7 @@ func _on_poller_connected(state: String, start_time: String) -> void:
 func _on_playhead_jumped(timestamp: String) -> void:
 	if _poller:
 		_poller.JumpToTimestamp(timestamp)
+		_update_play_state_hud()
 
 
 func _on_range_set(in_time: String, out_time: String) -> void:
@@ -135,11 +153,15 @@ func _unhandled_input(event: InputEvent) -> void:
 				if _poller:
 					var step := 5.0 if event.shift_pressed else _poll_interval_seconds
 					_poller.StepPlayback(step, -1)
+				if _time_control:
+					_time_control.notify_scrub()
 			KEY_RIGHT:
 				get_viewport().set_input_as_handled()
 				if _poller:
 					var step := 5.0 if event.shift_pressed else _poll_interval_seconds
 					_poller.StepPlayback(step, 1)
+				if _time_control:
+					_time_control.notify_scrub()
 			KEY_R:
 				if not event.shift_pressed:
 					get_viewport().set_input_as_handled()
@@ -156,6 +178,18 @@ func _unhandled_input(event: InputEvent) -> void:
 func _toggle_playback() -> void:
 	if _poller:
 		_poller.TogglePlayback()
+		_update_play_state_hud()
+
+
+func _update_play_state_hud() -> void:
+	if not _hud_bar:
+		return
+	var space_label = _hud_bar.find_child("SpaceLabel", false, false)
+	if space_label:
+		var is_playing: bool = _poller.IsPlaying() if _poller else false
+		space_label.text = "SPACE ▶ Playing" if is_playing else "SPACE ⏸ Paused"
+		space_label.add_theme_color_override("font_color",
+			Color(0.298, 0.686, 0.314) if is_playing else Color(0.976, 0.451, 0.086))
 
 
 func _dismiss_esc() -> void:

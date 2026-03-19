@@ -101,6 +101,9 @@ func _on_hostnames_response(result: int, response_code: int,
 func _on_host_selected(index: int) -> void:
 	var hostname := host_dropdown.get_item_text(index)
 	range_label.text = "Probing..."
+	start_time_input.text = ""
+	start_time_input.editable = false
+	launch_panel.mouse_default_cursor_shape = Control.CURSOR_FORBIDDEN
 	_probe_time_bounds(hostname)
 
 
@@ -187,6 +190,8 @@ func _on_values_response(result: int, response_code: int,
 		default_start_epoch = min_ts / 1000.0
 	start_time_input.text = Time.get_datetime_string_from_unix_time(
 		int(default_start_epoch)) + "Z"
+	start_time_input.editable = true
+	launch_panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
 
 # --- LAUNCH button hover: KITT scanner effect ---
@@ -231,6 +236,8 @@ func _launch() -> void:
 		url = "http://localhost:44322"
 
 	if archive_button.button_pressed:
+		if not start_time_input.editable:
+			return  # Still probing — don't launch yet
 		var hostname := host_dropdown.get_item_text(host_dropdown.selected)
 		var start_time := start_time_input.text.strip_edges()
 		SceneManager.go_to_loading({

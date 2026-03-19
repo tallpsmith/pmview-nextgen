@@ -30,6 +30,9 @@ var in_point: float = -1.0
 var out_point: float = -1.0
 var _is_visible := false
 var _f2_dismissed := false
+var _scrub_auto_shown := false
+var _scrub_hide_timer: float = 0.0
+const SCRUB_HIDE_DELAY := 2.0
 
 enum RangeState { NO_RANGE, IN_SET, RANGE_COMPLETE }
 var _range_state: RangeState = RangeState.NO_RANGE
@@ -37,9 +40,10 @@ var _range_state: RangeState = RangeState.NO_RANGE
 var colour_active := Color(0.514, 0.22, 0.925, 0.7)
 var colour_inactive := Color(0.3, 0.3, 0.3, 0.3)
 var colour_playhead := Color(0.976, 0.451, 0.086, 0.9)
-var colour_in_point := Color(0.298, 0.686, 0.314, 0.9)
-var colour_out_point := Color(0.937, 0.325, 0.314, 0.9)
 var colour_panel_bg := Color(0.05, 0.04, 0.08, 0.5)
+
+# IN/OUT markers use the active colour but thicker
+const IN_OUT_BAR_HEIGHT := 8.0
 
 @onready var timestamp_label: Label = $TimestampLabel
 
@@ -49,16 +53,24 @@ func _ready() -> void:
 	visible = false
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	var viewport_size := get_viewport_rect().size
 	var mouse_pos := get_global_mouse_position()
+
+	# Auto-hide after scrub quiescence
+	if _scrub_auto_shown and _scrub_hide_timer > 0:
+		_scrub_hide_timer -= delta
+		if _scrub_hide_timer <= 0:
+			_scrub_auto_shown = false
+			_hide_panel()
 
 	if not _is_visible:
 		if mouse_pos.x > viewport_size.x - EDGE_TRIGGER_WIDTH and not _f2_dismissed:
 			_show_panel()
 	else:
-		if mouse_pos.x < viewport_size.x - EDGE_TRIGGER_WIDTH - EDGE_HIDE_MARGIN:
-			_hide_panel()
+		if not _scrub_auto_shown:
+			if mouse_pos.x < viewport_size.x - EDGE_TRIGGER_WIDTH - EDGE_HIDE_MARGIN:
+				_hide_panel()
 		queue_redraw()
 		_update_timestamp_tooltip()
 
@@ -100,6 +112,17 @@ func update_playhead(position_iso: String, _mode: String) -> void:
 func set_archive_bounds(start_epoch: float, end_epoch: float) -> void:
 	archive_start = start_epoch
 	archive_end = end_epoch
+
+
+## Called by HostViewController when arrow keys scrub the timeline.
+## Shows the panel temporarily and resets the auto-hide timer.
+func notify_scrub() -> void:
+	_scrub_hide_timer = SCRUB_HIDE_DELAY
+	if not _is_visible:
+		_scrub_auto_shown = true
+		_is_visible = true
+		visible = true
+		# Don't emit panel_opened — scrubbing already pauses via StepPlayback
 
 
 ## Attempt to smooth the bar attraction using an ease-in-out curve
@@ -162,26 +185,28 @@ func _draw() -> void:
 		# Combine edge proximity (overall growth) with vertical attraction (peak)
 		var bar_length: float = BAR_MIN_LENGTH + (BAR_MAX_LENGTH - BAR_MIN_LENGTH) * attraction * edge_factor
 
-		# Special markers: playhead, IN, OUT — always prominent
+		# Special markers: playhead uses orange, IN/OUT use thicker active bars
 		var is_playhead: bool = absf(t - playhead_position) < time_per_bar * 0.5
 		var is_in: bool = in_point >= 0 and absf(t - in_point) < time_per_bar * 0.5
 		var is_out: bool = out_point >= 0 and absf(t - out_point) < time_per_bar * 0.5
 
+		var this_bar_height := BAR_HEIGHT
 		if is_playhead:
 			colour = colour_playhead
 			bar_length = maxf(bar_length, BAR_MAX_LENGTH * 0.7 * edge_factor)
-		elif is_in:
-			colour = colour_in_point
+			this_bar_height = IN_OUT_BAR_HEIGHT
+		elif is_in or is_out:
+			# Same active colour but thicker — cleaner than separate colours
 			bar_length = maxf(bar_length, BAR_MAX_LENGTH * 0.55 * edge_factor)
-		elif is_out:
-			colour = colour_out_point
-			bar_length = maxf(bar_length, BAR_MAX_LENGTH * 0.55 * edge_factor)
+			this_bar_height = IN_OUT_BAR_HEIGHT
 
 		# Ensure minimum visibility even at edge of trigger zone
 		bar_length = maxf(bar_length, BAR_MIN_LENGTH * edge_factor)
 
 		if bar_length > 0.5:
-			draw_rect(Rect2(bar_right - bar_length, y, bar_length, BAR_HEIGHT), colour)
+			# Centre thicker bars vertically on the bar position
+			var y_offset := y - (this_bar_height - BAR_HEIGHT) * 0.5
+			draw_rect(Rect2(bar_right - bar_length, y_offset, bar_length, this_bar_height), colour)
 
 
 func _update_timestamp_tooltip() -> void:

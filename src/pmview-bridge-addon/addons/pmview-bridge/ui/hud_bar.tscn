@@ -30,29 +30,50 @@ theme_override_constants/separation = 24
 layout_mode = 2
 text = "TAB Mode"
 theme_override_colors/font_color = Color(0.97, 0.57, 0.09, 1.0)
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 16
 
 [node name="WasdKey" type="Label" parent="Keys"]
 layout_mode = 2
 text = "WASD Move"
 theme_override_colors/font_color = Color(0.97, 0.57, 0.09, 1.0)
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 16
 
 [node name="QeKey" type="Label" parent="Keys"]
 layout_mode = 2
 text = "Q/E Elevation"
 theme_override_colors/font_color = Color(0.97, 0.57, 0.09, 1.0)
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 16
 
 [node name="F1Label" type="Label" parent="Keys"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "F1 Tuner"
 theme_override_colors/font_color = Color(0.97, 0.57, 0.09, 1.0)
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 16
+
+[node name="F2Label" type="Label" parent="Keys"]
+visible = false
+layout_mode = 2
+text = "F2 Timeline"
+theme_override_colors/font_color = Color(0.97, 0.57, 0.09, 1.0)
+theme_override_font_sizes/font_size = 16
+
+[node name="SpaceLabel" type="Label" parent="Keys"]
+visible = false
+layout_mode = 2
+text = "SPACE Play/Pause"
+theme_override_colors/font_color = Color(0.97, 0.57, 0.09, 1.0)
+theme_override_font_sizes/font_size = 16
+
+[node name="ArrowsLabel" type="Label" parent="Keys"]
+visible = false
+layout_mode = 2
+text = "←→ Scrub"
+theme_override_colors/font_color = Color(0.97, 0.57, 0.09, 1.0)
+theme_override_font_sizes/font_size = 16
 
 [node name="EscKey" type="Label" parent="Keys"]
 layout_mode = 2
 text = "ESC Menu"
 theme_override_colors/font_color = Color(0.97, 0.57, 0.09, 1.0)
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 16
