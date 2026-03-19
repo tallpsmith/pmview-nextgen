@@ -79,7 +79,11 @@ jobs:
         run: |
           mkdir -p src/pmview-app/addons
           cp -r src/pmview-bridge-addon/addons/pmview-bridge src/pmview-app/addons/
-          echo "--- Addon files copied ---"
+          # Remove pre-built DLLs — CI builds everything from source via
+          # project references. Leaving them causes CS1704 "duplicate assembly"
+          # conflicts between the pre-built DLLs and the freshly compiled ones.
+          rm -rf src/pmview-app/addons/pmview-bridge/lib/
+          echo "--- Addon files copied (lib/ excluded) ---"
           ls -la src/pmview-app/addons/pmview-bridge/
 
       - name: Restore .NET dependencies
