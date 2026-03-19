@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Godot;
+using Microsoft.Extensions.Logging;
 using PmviewProjectionCore.Models;
 
 namespace PmviewApp;
@@ -12,6 +13,8 @@ namespace PmviewApp;
 /// </summary>
 public static class RuntimeSceneBuilder
 {
+    private static readonly ILogger _log = PmviewLogger.GetLogger("RuntimeSceneBuilder");
+
     // -- script paths --
     private const string ControllerScriptPath = "res://addons/pmview-bridge/host_view_controller.gd";
     private const string MetricPollerScriptPath = "res://addons/pmview-bridge/MetricPoller.cs";
@@ -41,14 +44,13 @@ public static class RuntimeSceneBuilder
         string mode = "live", string? hostnameOverride = null,
         IProgress<float>? progress = null)
     {
-        GD.Print("[RuntimeSceneBuilder] Build starting...");
+        _log.LogInformation("Build starting...");
         var root = CreateHostViewRoot();
         var hostname = hostnameOverride ?? layout.Hostname;
-        AddMetricPoller(root, pmproxyEndpoint, hostname,
-            verboseLogging: mode == "archive");
+        AddMetricPoller(root, pmproxyEndpoint, hostname);
         AddSceneBinder(root);
 
-        GD.Print($"[RuntimeSceneBuilder] Building {layout.Zones.Count} zones...");
+        _log.LogInformation("Building {ZoneCount} zones...", layout.Zones.Count);
         for (var i = 0; i < layout.Zones.Count; i++)
         {
             BuildZone(root, layout.Zones[i]);
@@ -65,7 +67,7 @@ public static class RuntimeSceneBuilder
         // programmatic nodes don't get an owner automatically unlike .tscn scenes.
         SetOwnerRecursive(root, root);
 
-        GD.Print($"[RuntimeSceneBuilder] Build complete. Root children: {root.GetChildCount()}");
+        _log.LogInformation("Build complete. Root children: {ChildCount}", root.GetChildCount());
         return root;
     }
 
@@ -76,28 +78,25 @@ public static class RuntimeSceneBuilder
         var root = new Node3D { Name = "HostView" };
         var script = GD.Load<Script>(ControllerScriptPath);
         if (script == null)
-            GD.PrintErr($"[RuntimeSceneBuilder] FAILED to load controller script: {ControllerScriptPath}");
+            _log.LogError("FAILED to load controller script: {ScriptPath}", ControllerScriptPath);
         else
-            GD.Print($"[RuntimeSceneBuilder] Loaded controller script: {script.ResourcePath}");
+            _log.LogInformation("Loaded controller script: {ScriptPath}", script.ResourcePath);
         if (script != null)
             root.SetScript(script);
-        GD.Print($"[RuntimeSceneBuilder] Root script after SetScript: {root.GetScript()}");
+        _log.LogInformation("Root script after SetScript: {Script}", root.GetScript());
         return root;
     }
 
-    private static void AddMetricPoller(Node3D root, string endpoint, string hostname,
-        bool verboseLogging = false)
+    private static void AddMetricPoller(Node3D root, string endpoint, string hostname)
     {
         var poller = new Node { Name = "MetricPoller" };
         var script = GD.Load<Script>(MetricPollerScriptPath);
         if (script == null)
-            GD.PrintErr($"[RuntimeSceneBuilder] FAILED to load MetricPoller script: {MetricPollerScriptPath}");
+            _log.LogError("FAILED to load MetricPoller script: {ScriptPath}", MetricPollerScriptPath);
         poller = SetCSharpScript<Node>(poller, MetricPollerScriptPath);
-        GD.Print($"[RuntimeSceneBuilder] MetricPoller type after SetScript: {poller.GetClass()}, script: {poller.GetScript()}");
+        _log.LogInformation("MetricPoller type after SetScript: {NodeClass}, script: {Script}", poller.GetClass(), poller.GetScript());
         poller.Set("Endpoint", endpoint);
         poller.Set("Hostname", hostname);
-        if (verboseLogging)
-            poller.Set("VerboseLogging", true);
         root.AddChild(poller);
     }
 
@@ -106,9 +105,9 @@ public static class RuntimeSceneBuilder
         var binder = new Node { Name = "SceneBinder" };
         var script = GD.Load<Script>(SceneBinderScriptPath);
         if (script == null)
-            GD.PrintErr($"[RuntimeSceneBuilder] FAILED to load SceneBinder script: {SceneBinderScriptPath}");
+            _log.LogError("FAILED to load SceneBinder script: {ScriptPath}", SceneBinderScriptPath);
         binder = SetCSharpScript<Node>(binder, SceneBinderScriptPath);
-        GD.Print($"[RuntimeSceneBuilder] SceneBinder type after SetScript: {binder.GetClass()}, script: {binder.GetScript()}");
+        _log.LogInformation("SceneBinder type after SetScript: {NodeClass}, script: {Script}", binder.GetClass(), binder.GetScript());
         root.AddChild(binder);
     }
 
@@ -199,7 +198,7 @@ public static class RuntimeSceneBuilder
         var packedScene = GD.Load<PackedScene>(scenePath);
         if (packedScene == null)
         {
-            GD.PrintErr($"[RuntimeSceneBuilder] Failed to load shape scene: {scenePath}");
+            _log.LogError("Failed to load shape scene: {ScenePath}", scenePath);
             return;
         }
         var instance = packedScene.Instantiate<Node3D>();
@@ -365,7 +364,7 @@ public static class RuntimeSceneBuilder
         var panelScene = GD.Load<PackedScene>(RangeTuningPanelScenePath);
         if (panelScene == null)
         {
-            GD.PushWarning("[RuntimeSceneBuilder] RangeTuningPanel scene not found");
+            _log.LogWarning("RangeTuningPanel scene not found");
             return;
         }
 
@@ -398,7 +397,7 @@ public static class RuntimeSceneBuilder
         var timeControlScene = GD.Load<PackedScene>(TimeControlScenePath);
         if (timeControlScene == null)
         {
-            GD.PushWarning("[RuntimeSceneBuilder] TimeControl scene not found");
+            _log.LogWarning("TimeControl scene not found");
             return;
         }
 
@@ -406,7 +405,7 @@ public static class RuntimeSceneBuilder
         var uiLayer = sceneRoot.FindChild("UILayer", true, false) as CanvasLayer;
         if (uiLayer == null)
         {
-            GD.PushWarning("[RuntimeSceneBuilder] UILayer not found — creating one");
+            _log.LogWarning("UILayer not found — creating one");
             uiLayer = new CanvasLayer { Name = "UILayer" };
             sceneRoot.AddChild(uiLayer);
         }
