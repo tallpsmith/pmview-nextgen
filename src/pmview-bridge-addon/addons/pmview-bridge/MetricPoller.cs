@@ -203,10 +203,11 @@ public partial class MetricPoller : Node
 		if (_timeCursor.Mode == CursorMode.Live)
 			return;
 
-		if (_timeCursor.Mode == CursorMode.Playback)
-			_timeCursor.Pause();
-
+		// Step without pausing — playback continues from the new position.
+		// If paused, stay paused but update the position.
 		_timeCursor.StepByInterval(intervalSeconds, direction);
+		_lastEmittedTimestamp.Clear();
+		_skipNextAdvance = true;
 		EmitSignal(SignalName.PlaybackPositionChanged,
 			_timeCursor.Position.ToString("o"), "Paused");
 

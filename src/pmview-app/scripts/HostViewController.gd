@@ -10,6 +10,7 @@ var _esc_timer: SceneTreeTimer = null
 var _poller: Node = null
 var _time_control: Control = null
 var _hud_bar: Node = null
+var _timestamp_label_3d: Node = null
 var _is_archive_mode := false
 var _poll_interval_seconds := 60.0
 
@@ -74,6 +75,14 @@ func _ready() -> void:
 						Time.get_datetime_string_from_unix_time(int(arc_end))])
 			# Show archive-specific HUD keys
 		_hud_bar = scene.find_child("HudBar", true, false)
+		# Find 3D timestamp label for pause ghost effect
+		_timestamp_label_3d = scene.find_child("TimestampLabel", true, false)
+
+		# Wire PlaybackPositionChanged for mode-aware UI updates
+		if _poller:
+			_poller.PlaybackPositionChanged.connect(_on_playback_position_changed)
+
+		_hud_bar = scene.find_child("HudBar", true, false)
 		if _hud_bar:
 			var f2_label = _hud_bar.find_child("F2Label", false, false)
 			var space_label = _hud_bar.find_child("SpaceLabel", false, false)
@@ -93,17 +102,35 @@ func _on_poller_connected(state: String, start_time: String) -> void:
 	if state == "Connected":
 		print("[HostView] Poller connected, starting archive playback")
 		_poller.StartPlayback(start_time)
-		# Brief delay to let StartPlayback async complete before checking state
-		await get_tree().create_timer(0.5).timeout
-		_update_play_state_hud()
 	else:
 		push_error("[HostView] Poller connection state: %s" % state)
+
+
+func _on_playback_position_changed(_position: String, mode: String) -> void:
+	# Ghost the 3D timestamp when paused
+	if _timestamp_label_3d:
+		if mode == "Paused":
+			_timestamp_label_3d.set("modulate", Color(0.976, 0.451, 0.086, 0.3))
+		else:
+			_timestamp_label_3d.set("modulate", Color(0.976, 0.451, 0.086, 1.0))
+
+	# Update HudBar play state
+	if _hud_bar:
+		var space_label = _hud_bar.find_child("SpaceLabel", false, false)
+		if space_label:
+			if mode == "Playback":
+				space_label.text = "SPACE ⏸"
+				space_label.add_theme_color_override("font_color",
+					Color(0.298, 0.686, 0.314))
+			else:
+				space_label.text = "SPACE ▶"
+				space_label.add_theme_color_override("font_color",
+					Color(0.976, 0.451, 0.086))
 
 
 func _on_playhead_jumped(timestamp: String) -> void:
 	if _poller:
 		_poller.JumpToTimestamp(timestamp)
-		_update_play_state_hud()
 
 
 func _on_range_set(in_time: String, out_time: String) -> void:
@@ -151,14 +178,22 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_LEFT:
 				get_viewport().set_input_as_handled()
 				if _poller:
-					var step := 5.0 if event.shift_pressed else _poll_interval_seconds
+					var step := _poll_interval_seconds
+					if event.ctrl_pressed and event.shift_pressed:
+						step = 60.0
+					elif event.shift_pressed:
+						step = 5.0
 					_poller.StepPlayback(step, -1)
 				if _time_control:
 					_time_control.notify_scrub()
 			KEY_RIGHT:
 				get_viewport().set_input_as_handled()
 				if _poller:
-					var step := 5.0 if event.shift_pressed else _poll_interval_seconds
+					var step := _poll_interval_seconds
+					if event.ctrl_pressed and event.shift_pressed:
+						step = 60.0
+					elif event.shift_pressed:
+						step = 5.0
 					_poller.StepPlayback(step, 1)
 				if _time_control:
 					_time_control.notify_scrub()
@@ -178,18 +213,6 @@ func _unhandled_input(event: InputEvent) -> void:
 func _toggle_playback() -> void:
 	if _poller:
 		_poller.TogglePlayback()
-		_update_play_state_hud()
-
-
-func _update_play_state_hud() -> void:
-	if not _hud_bar:
-		return
-	var space_label = _hud_bar.find_child("SpaceLabel", false, false)
-	if space_label:
-		var is_playing: bool = _poller.IsPlaying() if _poller else false
-		space_label.text = "SPACE ▶ Playing" if is_playing else "SPACE ⏸ Paused"
-		space_label.add_theme_color_override("font_color",
-			Color(0.298, 0.686, 0.314) if is_playing else Color(0.976, 0.451, 0.086))
 
 
 func _dismiss_esc() -> void:
