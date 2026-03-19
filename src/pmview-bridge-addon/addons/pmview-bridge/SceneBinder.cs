@@ -84,7 +84,7 @@ public partial class SceneBinder : Node
 	internal void AdvanceInterpolations(float delta)
 	{
 		var smoothFactor = 1f - MathF.Exp(-delta * SmoothSpeed);
-		List<ActiveBinding> toRemove = null;
+		List<ActiveBinding>? toRemove = null;
 		foreach (var (key, (current, target)) in _smoothValues)
 		{
 			if (!IsInstanceValid(key.TargetNode))

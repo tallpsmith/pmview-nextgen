@@ -76,7 +76,8 @@ public static class RuntimeSceneBuilder
             GD.PrintErr($"[RuntimeSceneBuilder] FAILED to load controller script: {ControllerScriptPath}");
         else
             GD.Print($"[RuntimeSceneBuilder] Loaded controller script: {script.ResourcePath}");
-        root.SetScript(script);
+        if (script != null)
+            root.SetScript(script);
         GD.Print($"[RuntimeSceneBuilder] Root script after SetScript: {root.GetScript()}");
         return root;
     }
@@ -420,7 +421,9 @@ public static class RuntimeSceneBuilder
     {
         var id = obj.GetInstanceId();
         obj.SetScript(GD.Load<Script>(scriptPath));
-        return (T)GodotObject.InstanceFromId(id);
+        return (T)(GodotObject.InstanceFromId(id)
+            ?? throw new InvalidOperationException(
+                $"Failed to retrieve managed wrapper after SetScript: {scriptPath}"));
     }
 
     // ── ownership ───────────────────────────────────────────────────────
