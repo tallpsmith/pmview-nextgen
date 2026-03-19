@@ -42,7 +42,10 @@ func _ready() -> void:
 		if _poller:
 			var start_time: String = config.get("start_time", "")
 			print("[HostView] Starting archive playback at: %s" % start_time)
-			_poller.StartPlayback(start_time)
+			# Defer StartPlayback so it runs after MetricPoller._Ready() has
+			# connected to pmproxy and started the poll timer via CallDeferred.
+			_poller.ConnectionStateChanged.connect(
+				_on_poller_connected.bind(start_time), CONNECT_ONE_SHOT)
 
 			if _time_control:
 				_poller.PlaybackPositionChanged.connect(
@@ -54,6 +57,14 @@ func _ready() -> void:
 				_time_control.panel_closed.connect(_on_panel_closed)
 		else:
 			push_error("[HostView] MetricPoller not found in built scene")
+
+
+func _on_poller_connected(state: String, start_time: String) -> void:
+	if state == "Connected":
+		print("[HostView] Poller connected, starting archive playback")
+		_poller.StartPlayback(start_time)
+	else:
+		push_error("[HostView] Poller connection state: %s" % state)
 
 
 func _on_playhead_jumped(timestamp: String) -> void:
