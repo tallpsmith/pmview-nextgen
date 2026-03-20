@@ -36,7 +36,7 @@ var _orbit_look_easing_back: bool = false
 var _orbit_look_ease_progress: float = 0.0
 var _orbit_look_ease_start_yaw: float = 0.0
 var _orbit_look_ease_start_pitch: float = 0.0
-const ORBIT_LOOK_TIMEOUT: float = 10.0
+const ORBIT_LOOK_TIMEOUT: float = 5.0
 const ORBIT_LOOK_EASE_DURATION: float = 0.5
 
 # Transition state
