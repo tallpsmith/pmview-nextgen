@@ -19,18 +19,12 @@ public static class LayoutCalculator
 
     public static SceneLayout Calculate(IReadOnlyList<ZoneDefinition> zones, HostTopology topology)
     {
-        var foreground = BuildRow(zones.Where(z => z.Row == ZoneRow.Foreground).ToList(), topology, zOffset: 0f);
-        var background = BuildRow(zones.Where(z => z.Row == ZoneRow.Background).ToList(), topology, zOffset: BackgroundZOffset);
-        return new SceneLayout(topology.Hostname, [.. foreground, .. background]);
-    }
+        var fgDefs = zones.Where(z => z.Row == ZoneRow.Foreground).ToList();
+        var bgDefs = zones.Where(z => z.Row == ZoneRow.Background).ToList();
 
-    private static IReadOnlyList<PlacedZone> BuildRow(
-        IList<ZoneDefinition> rowZones,
-        HostTopology topology,
-        float zOffset)
-    {
-        var placedZones = rowZones.Select(z => PlaceZone(z, topology)).ToList();
-        return CenterRowOnXZero(placedZones, zOffset);
+        var foreground = BuildGroupedRow(fgDefs, topology, zOffset: 0f);
+        var background = AlignBackgroundToForeground(bgDefs, topology, foreground);
+        return new SceneLayout(topology.Hostname, [.. foreground, .. background]);
     }
 
     private static PlacedZone PlaceZone(ZoneDefinition zone, HostTopology topology)
@@ -58,7 +52,7 @@ public static class LayoutCalculator
             GroundDepth:      groundDepth,
             MetricLabels:     metricLabels,
             InstanceLabels:   instanceLabels,
-            RotateYNinetyDeg: zone.RotateYNinetyDeg);
+            YRotationDegrees: zone.YRotationDegrees);
     }
 
     private static (float Width, float Depth) ComputeGroundExtent(
@@ -266,6 +260,208 @@ public static class LayoutCalculator
         return result;
     }
 
+    /// <summary>
+    /// Builds a foreground row, handling grouped zones as single layout units.
+    /// Within a group, the anchor (non-rotated) zone is centred, with rotated
+    /// wing zones placed on either side.
+    /// </summary>
+    private static IReadOnlyList<PlacedZone> BuildGroupedRow(
+        IList<ZoneDefinition> rowZones,
+        HostTopology topology,
+        float zOffset)
+    {
+        var placedZones = rowZones.Select(z => PlaceZone(z, topology)).ToList();
+
+        // Identify groups: map group name → list of (index, placed zone, definition)
+        var groups = new Dictionary<string, List<(int Index, PlacedZone Zone, ZoneDefinition Def)>>();
+        for (int i = 0; i < placedZones.Count; i++)
+        {
+            var def = rowZones[i];
+            if (def.GroupName != null)
+            {
+                if (!groups.ContainsKey(def.GroupName))
+                    groups[def.GroupName] = [];
+                groups[def.GroupName].Add((i, placedZones[i], def));
+            }
+        }
+
+        if (groups.Count == 0)
+            return CenterRowOnXZero(placedZones, zOffset);
+
+        // Build layout units: each unit is either a standalone zone or a group.
+        // A layout unit contributes a single width to the centering calculation.
+        var units = new List<LayoutUnit>();
+        var consumed = new HashSet<int>();
+
+        for (int i = 0; i < placedZones.Count; i++)
+        {
+            if (consumed.Contains(i)) continue;
+
+            var def = rowZones[i];
+            if (def.GroupName != null && groups.TryGetValue(def.GroupName, out var members))
+            {
+                foreach (var m in members) consumed.Add(m.Index);
+                units.Add(BuildGroupUnit(members));
+            }
+            else
+            {
+                consumed.Add(i);
+                units.Add(new LayoutUnit([placedZones[i]], ZoneWidth(placedZones[i]),
+                    AnchorIndex: 0, AnchorOffset: 0f));
+            }
+        }
+
+        // Center the units on X=0
+        var totalWidth = units.Sum(u => u.TotalWidth) + ZoneGap * (units.Count - 1);
+        var cursor = -totalWidth / 2f;
+        var result = new List<PlacedZone>();
+
+        foreach (var unit in units)
+        {
+            for (int i = 0; i < unit.Zones.Count; i++)
+            {
+                var zone = unit.Zones[i];
+                var relativeX = unit.ZoneOffsets[i];
+                result.Add(zone with { Position = new Vec3(cursor + relativeX, 0f, zOffset) });
+            }
+            cursor += unit.TotalWidth + ZoneGap;
+        }
+
+        return result;
+    }
+
+    private static LayoutUnit BuildGroupUnit(List<(int Index, PlacedZone Zone, ZoneDefinition Def)> members)
+    {
+        const float IntraGroupGap = 2.0f;
+
+        // Anchor = the non-rotated zone in the group
+        var anchor = members.FirstOrDefault(m => m.Def.YRotationDegrees == 0f);
+        var wings = members.Where(m => m.Def.YRotationDegrees != 0f).ToList();
+
+        // First wing goes left, second goes right (by declaration order within group)
+        var leftWings = wings.Take(1).ToList();
+        var rightWings = wings.Skip(1).ToList();
+
+        // If no anchor found, treat first zone as anchor and compute offsets
+        if (anchor.Zone == null)
+        {
+            var zones = members.Select(m => m.Zone).ToList();
+            var fallbackOffsets = new List<float>();
+            float fallbackCursor = 0f;
+            foreach (var z in zones)
+            {
+                fallbackOffsets.Add(fallbackCursor);
+                fallbackCursor += ZoneWidth(z) + IntraGroupGap;
+            }
+            var width = fallbackCursor - IntraGroupGap;
+            return new LayoutUnit(zones, width, 0, 0f, fallbackOffsets);
+        }
+
+        // Compute layout: left wings | anchor | right wings
+        var allZones = new List<PlacedZone>();
+        var offsets = new List<float>();
+        float cursorOffset = 0f;
+
+        foreach (var w in leftWings)
+        {
+            allZones.Add(w.Zone);
+            offsets.Add(cursorOffset);
+            cursorOffset += ZoneWidth(w.Zone) + IntraGroupGap;
+        }
+
+        float anchorOffset = cursorOffset;
+        allZones.Add(anchor.Zone);
+        offsets.Add(cursorOffset);
+        cursorOffset += ZoneWidth(anchor.Zone) + IntraGroupGap;
+
+        foreach (var w in rightWings)
+        {
+            allZones.Add(w.Zone);
+            offsets.Add(cursorOffset);
+            cursorOffset += ZoneWidth(w.Zone) + IntraGroupGap;
+        }
+
+        // Total width (remove trailing gap)
+        float totalWidth = cursorOffset - IntraGroupGap;
+
+        int anchorIdx = leftWings.Count;
+        return new LayoutUnit(allZones, totalWidth, anchorIdx, anchorOffset, offsets);
+    }
+
+    /// <summary>
+    /// Positions background zones aligned to their foreground partner's X-centre.
+    /// Falls back to independent centering for zones without a partner.
+    /// </summary>
+    private static IReadOnlyList<PlacedZone> AlignBackgroundToForeground(
+        IList<ZoneDefinition> bgDefs,
+        HostTopology topology,
+        IReadOnlyList<PlacedZone> foreground)
+    {
+        var placed = bgDefs.Select(z => PlaceZone(z, topology)).ToList();
+
+        // Build foreground X-centre lookup
+        var fgCentres = new Dictionary<string, float>();
+        foreach (var fz in foreground)
+        {
+            var w = ZoneWidth(fz);
+            fgCentres[fz.Name] = fz.Position.X + w / 2f;
+        }
+
+        // Initial placement: centre each background zone on its foreground partner
+        var result = new List<PlacedZone>();
+        for (int i = 0; i < placed.Count; i++)
+        {
+            var zone = placed[i];
+            var def = bgDefs[i];
+
+            if (def.AlignWithForegroundZone != null && fgCentres.TryGetValue(def.AlignWithForegroundZone, out var fgCenter))
+            {
+                // Align on GroundWidth (shape extent), not ZoneWidth (which includes
+                // RowHeaderReservation on the right — asymmetric, would shift shapes left).
+                var bgX = fgCenter - zone.GroundWidth / 2f;
+                result.Add(zone with { Position = new Vec3(bgX, 0f, BackgroundZOffset) });
+            }
+            else
+            {
+                result.Add(zone with { Position = new Vec3(0f, 0f, BackgroundZOffset) });
+            }
+        }
+
+        // Resolve overlaps: push zones apart if they collide
+        var sorted = result
+            .Select((z, i) => (Zone: z, Index: i))
+            .OrderBy(x => x.Zone.Position.X)
+            .ToList();
+
+        for (int i = 1; i < sorted.Count; i++)
+        {
+            var prev = sorted[i - 1];
+            var curr = sorted[i];
+            var prevEnd = prev.Zone.Position.X + ZoneWidth(prev.Zone);
+            var minStart = prevEnd + ZoneGap;
+
+            if (curr.Zone.Position.X < minStart)
+            {
+                var shifted = curr.Zone with { Position = curr.Zone.Position with { X = minStart } };
+                sorted[i] = (shifted, curr.Index);
+                result[curr.Index] = shifted;
+            }
+        }
+
+        return result;
+    }
+
+    private record LayoutUnit(
+        IReadOnlyList<PlacedZone> Zones,
+        float TotalWidth,
+        int AnchorIndex,
+        float AnchorOffset,
+        IReadOnlyList<float>? ZoneOffsets = null)
+    {
+        public IReadOnlyList<float> ZoneOffsets { get; } = ZoneOffsets
+            ?? (Zones.Count == 1 ? new[] { 0f } : []);
+    }
+
     private static float ZoneWidth(PlacedZone zone)
     {
         // Grid zones: shapes are at Vec3.Zero (positioned by MetricGrid at runtime).
@@ -274,7 +470,7 @@ public static class LayoutCalculator
             return zone.GroundWidth + RowHeaderReservation;
         if (zone.Items.Count == 0) return 0f;
         // Rotated zones (Ry 90°): local Z becomes world X, so visual width = GroundDepth.
-        if (zone.RotateYNinetyDeg) return zone.GroundDepth;
+        if (zone.YRotationDegrees != 0f) return zone.GroundDepth;
         // Use GroundWidth (visual footprint = shape origins + shape width + padding),
         // not just the rightmost shape X-origin, so centering reflects the actual extent.
         return zone.GroundWidth;

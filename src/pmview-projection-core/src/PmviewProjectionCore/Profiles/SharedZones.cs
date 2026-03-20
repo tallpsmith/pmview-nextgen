@@ -31,7 +31,8 @@ internal static class SharedZones
             new("kernel.all.cpu.nice", ShapeType.Bar, "Nice", Cyan,  0f, 100f, 0.2f, 5.0f),
         ],
         InstanceMetricSource: null,
-        StackGroups: [new MetricStackGroupDefinition("CPU", StackMode.Proportional, ["Sys", "User", "Nice"])]);
+        StackGroups: [new MetricStackGroupDefinition("CPU", StackMode.Proportional, ["Sys", "User", "Nice"])],
+        GroupName: "System");
 
     internal static ZoneDefinition LoadZone() => new(
         Name: "Load",
@@ -46,7 +47,9 @@ internal static class SharedZones
             new("kernel.all.load", ShapeType.Bar, "15m", Indigo, 0f, 10f, 0.2f, 5.0f,
                 InstanceName: "15 minute"),
         ],
-        InstanceMetricSource: null);
+        InstanceMetricSource: null,
+        YRotationDegrees: 90f,
+        GroupName: "System");
 
     internal static ZoneDefinition DiskTotalsZone() => new(
         Name: "Disk",
@@ -70,7 +73,8 @@ internal static class SharedZones
             new("kernel.percpu.cpu.nice", ShapeType.Bar, "Nice", Cyan,  0f, 100f, 0.2f, 5.0f),
         ],
         InstanceMetricSource: "kernel.percpu.cpu.user",
-        StackGroups: [new MetricStackGroupDefinition("CPU", StackMode.Proportional, ["Sys", "User", "Nice"])]);
+        StackGroups: [new MetricStackGroupDefinition("CPU", StackMode.Proportional, ["Sys", "User", "Nice"])],
+        AlignWithForegroundZone: "CPU");
 
     internal static ZoneDefinition PerDiskZone() => new(
         Name: "Per-Disk",
@@ -81,7 +85,8 @@ internal static class SharedZones
             new("disk.dev.read_bytes",  ShapeType.Cylinder, "Read",  DarkGreen, 0f, 550_000_000f, 0.2f, 5.0f),
             new("disk.dev.write_bytes", ShapeType.Cylinder, "Write", DarkGreen, 0f, 550_000_000f, 0.2f, 5.0f),
         ],
-        InstanceMetricSource: "disk.dev.read_bytes");
+        InstanceMetricSource: "disk.dev.read_bytes",
+        AlignWithForegroundZone: "Disk");
 
     internal static ZoneDefinition NetworkInZone() => new(
         Name: "Network In",
@@ -93,7 +98,8 @@ internal static class SharedZones
             new("network.interface.in.packets", ShapeType.Bar, "Pkts",   Blue, 0f, 100_000f,     0.2f, 5.0f),
             new("network.interface.in.errors",  ShapeType.Bar, "Errors", Red,  0f, 100f,         0.2f, 5.0f),
         ],
-        InstanceMetricSource: "network.interface.in.bytes");
+        InstanceMetricSource: "network.interface.in.bytes",
+        AlignWithForegroundZone: "Net-In");
 
     internal static ZoneDefinition NetworkOutZone() => new(
         Name: "Network Out",
@@ -105,7 +111,8 @@ internal static class SharedZones
             new("network.interface.out.packets", ShapeType.Bar, "Pkts",   Rose, 0f, 100_000f,     0.2f, 5.0f),
             new("network.interface.out.errors",  ShapeType.Bar, "Errors", Red,  0f, 100f,         0.2f, 5.0f),
         ],
-        InstanceMetricSource: "network.interface.out.bytes");
+        InstanceMetricSource: "network.interface.out.bytes",
+        AlignWithForegroundZone: "Net-Out");
 
     internal static ZoneDefinition NetworkInAggregateZone() => new(
         Name: "Net-In",

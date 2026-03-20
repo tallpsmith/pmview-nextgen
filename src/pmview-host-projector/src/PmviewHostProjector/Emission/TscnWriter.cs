@@ -280,8 +280,14 @@ public static class TscnWriter
         sb.AppendLine($"[node name=\"{zone.Name}\" type=\"Node3D\" parent=\".\"]");
         sb.AppendLine("script = ExtResource(\"metric_group_script\")");
 
-        if (zone.RotateYNinetyDeg)
-            sb.AppendLine($"transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, {F(pos.X)}, {F(pos.Y)}, {F(pos.Z)})");
+        if (zone.YRotationDegrees != 0f)
+        {
+            var rad = zone.YRotationDegrees * MathF.PI / 180f;
+            var c = MathF.Cos(rad);
+            var s = MathF.Sin(rad);
+            // Y-axis rotation matrix (column-major for Godot Transform3D)
+            sb.AppendLine($"transform = Transform3D({F(c)}, 0, {F(s)}, 0, 1, 0, {F(-s)}, 0, {F(c)}, {F(pos.X)}, {F(pos.Y)}, {F(pos.Z)})");
+        }
         else if (pos.X != 0f || pos.Y != 0f || pos.Z != 0f)
             sb.AppendLine($"transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, {F(pos.X)}, {F(pos.Y)}, {F(pos.Z)})");
 

@@ -157,7 +157,7 @@ public class LayoutCalculatorForegroundTests
         {
             var left  = foreground[i];
             var right = foreground[i + 1];
-            var leftVisualWidth = left.RotateYNinetyDeg ? left.GroundDepth : left.GroundWidth;
+            var leftVisualWidth = left.YRotationDegrees != 0f ? left.GroundDepth : left.GroundWidth;
             var leftFootprintEnd = left.Position.X + leftVisualWidth;
             var gap = right.Position.X - leftFootprintEnd;
             Assert.True(gap <= 2.5f,
@@ -172,9 +172,9 @@ public class LayoutCalculatorForegroundTests
         var disk = layout.Zones.Single(z => z.Name == "Disk");
         var netIn = layout.Zones.Single(z => z.Name == "Net-In" && !z.HasGrid);
         var netOut = layout.Zones.Single(z => z.Name == "Net-Out" && !z.HasGrid);
-        Assert.False(disk.RotateYNinetyDeg);
-        Assert.False(netIn.RotateYNinetyDeg);
-        Assert.False(netOut.RotateYNinetyDeg);
+        Assert.False(disk.YRotationDegrees != 0f);
+        Assert.False(netIn.YRotationDegrees != 0f);
+        Assert.False(netOut.YRotationDegrees != 0f);
     }
 
     [Fact]
@@ -435,10 +435,8 @@ public class LayoutCalculatorBackgroundTests
     }
 
     [Fact]
-    public void Calculate_AdjacentBackgroundZones_StrideIncludesRowHeaderReservation()
+    public void Calculate_BackgroundZones_DoNotOverlap()
     {
-        const float ZoneGap = 2.0f;
-        const float RowHeaderReservation = 2.0f;
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology(cpus: 2, nics: 2));
         var background = layout.Zones
             .Where(z => z.HasGrid)
@@ -449,9 +447,114 @@ public class LayoutCalculatorBackgroundTests
         {
             var left = background[i];
             var right = background[i + 1];
-            var stride = right.Position.X - left.Position.X;
-            Assert.True(stride >= left.GroundWidth + RowHeaderReservation + ZoneGap,
-                $"Zone '{left.Name}' → '{right.Name}': stride {stride:F2} < {left.GroundWidth + RowHeaderReservation + ZoneGap:F2} (bezel + reservation + gap)");
+            var leftEnd = left.Position.X + left.GroundWidth;
+            Assert.True(right.Position.X >= leftEnd,
+                $"Zone '{left.Name}' overlaps '{right.Name}': left ends at {leftEnd:F2}, right starts at {right.Position.X:F2}");
         }
+    }
+}
+
+public class LayoutCalculatorAlignmentTests
+{
+    private static HostTopology MakeTopology(int cpus = 4, int disks = 2, int nics = 3) =>
+        new(HostOs.Linux, "testhost",
+            Enumerable.Range(0, cpus).Select(i => $"cpu{i}").ToList(),
+            Enumerable.Range(0, disks).Select(i => $"sda{i}").ToList(),
+            Enumerable.Range(0, nics).Select(i => $"eth{i}").ToList(),
+            PhysicalMemoryBytes: 16_000_000_000L);
+
+    private static IReadOnlyList<ZoneDefinition> LinuxZones => LinuxProfile.GetZones();
+
+    /// <summary>
+    /// Shape-centre X: uses GroundWidth (not ZoneWidth) because alignment
+    /// is on the shape extent, not including the asymmetric RowHeaderReservation.
+    /// </summary>
+    private static float ZoneShapeCenter(PlacedZone z)
+    {
+        var width = z.YRotationDegrees != 0f ? z.GroundDepth : z.GroundWidth;
+        return z.Position.X + width / 2f;
+    }
+
+    [Fact]
+    public void Calculate_CpuAndPerCpu_XCentersAligned()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var cpu = layout.Zones.Single(z => z.Name == "CPU");
+        var perCpu = layout.Zones.Single(z => z.Name == "Per-CPU");
+        // Tolerance is wider because overlap resolution may push background zones
+        Assert.True(Math.Abs(ZoneShapeCenter(cpu) - ZoneShapeCenter(perCpu)) < 1.5f,
+            $"CPU X-center {ZoneShapeCenter(cpu):F2} should be close to Per-CPU X-center {ZoneShapeCenter(perCpu):F2}");
+    }
+
+    [Fact]
+    public void Calculate_DiskAndPerDisk_XCentersAligned()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var disk = layout.Zones.Single(z => z.Name == "Disk");
+        var perDisk = layout.Zones.Single(z => z.Name == "Per-Disk");
+        Assert.True(Math.Abs(ZoneShapeCenter(disk) - ZoneShapeCenter(perDisk)) < 1.5f,
+            $"Disk X-center {ZoneShapeCenter(disk):F2} should be close to Per-Disk X-center {ZoneShapeCenter(perDisk):F2}");
+    }
+
+    [Fact]
+    public void Calculate_NetInDetail_IsNotLeftOfForegroundNetIn()
+    {
+        // Background Network In may be pushed right by collision resolution
+        // when background zones are wider than foreground, but should never
+        // end up to the LEFT of its foreground partner.
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var netInFg = layout.Zones.Single(z => z.Name == "Net-In" && !z.HasGrid);
+        var netInBg = layout.Zones.Single(z => z.Name == "Network In");
+        Assert.True(netInBg.Position.X >= netInFg.Position.X - 1f,
+            $"Network In bg X {netInBg.Position.X:F2} should not be far left of Net-In fg X {netInFg.Position.X:F2}");
+    }
+
+    [Fact]
+    public void Calculate_SystemGroup_LoadIsLeftOfCpu()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var cpu = layout.Zones.Single(z => z.Name == "CPU");
+        var load = layout.Zones.Single(z => z.Name == "Load");
+        Assert.True(load.Position.X < cpu.Position.X,
+            $"Load X {load.Position.X:F2} should be left of CPU X {cpu.Position.X:F2}");
+    }
+
+    [Fact]
+    public void Calculate_SystemGroup_MemoryIsRightOfCpu()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var cpu = layout.Zones.Single(z => z.Name == "CPU");
+        var memory = layout.Zones.Single(z => z.Name == "Memory");
+        Assert.True(memory.Position.X > cpu.Position.X,
+            $"Memory X {memory.Position.X:F2} should be right of CPU X {cpu.Position.X:F2}");
+    }
+
+    [Fact]
+    public void Calculate_SystemGroup_LoadAndMemory_AreRotated()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var load = layout.Zones.Single(z => z.Name == "Load");
+        var memory = layout.Zones.Single(z => z.Name == "Memory");
+        Assert.True(load.YRotationDegrees != 0f);
+        Assert.True(memory.YRotationDegrees != 0f);
+    }
+
+    [Fact]
+    public void Calculate_SystemGroup_TighterThanUngroupedLayout()
+    {
+        var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
+        var cpu = layout.Zones.Single(z => z.Name == "CPU");
+        var load = layout.Zones.Single(z => z.Name == "Load");
+        var memory = layout.Zones.Single(z => z.Name == "Memory");
+
+        // The rotated Load and Memory zones should use GroundDepth as width,
+        // making the system group much narrower than if they were unrotated
+        var loadVisualWidth = load.GroundDepth; // rotated: depth becomes visual width
+        var memVisualWidth = memory.GroundDepth;
+        var groupSpan = (memory.Position.X + memVisualWidth) - load.Position.X;
+
+        // The whole system group should be narrower than 3 unrotated zones would be
+        Assert.True(groupSpan < 15f,
+            $"System group span {groupSpan:F2} should be compact (< 15)");
     }
 }

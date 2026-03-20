@@ -218,4 +218,55 @@ public class LinuxProfileTests
         var bytes = netIn.Metrics.Single(m => m.MetricName.Contains("bytes"));
         Assert.Equal(125_000_000f, bytes.SourceRangeMax);
     }
+
+    [Fact]
+    public void SystemGroup_CpuLoadMemory_ShareGroupName()
+    {
+        var cpu = _zones.Single(z => z.Name == "CPU");
+        var load = _zones.Single(z => z.Name == "Load");
+        var memory = _zones.Single(z => z.Name == "Memory");
+        Assert.Equal("System", cpu.GroupName);
+        Assert.Equal("System", load.GroupName);
+        Assert.Equal("System", memory.GroupName);
+    }
+
+    [Fact]
+    public void SystemGroup_LoadAndMemory_AreRotated()
+    {
+        var load = _zones.Single(z => z.Name == "Load");
+        var memory = _zones.Single(z => z.Name == "Memory");
+        Assert.True(load.YRotationDegrees != 0f);
+        Assert.True(memory.YRotationDegrees != 0f);
+    }
+
+    [Fact]
+    public void SystemGroup_Cpu_IsNotRotated()
+    {
+        var cpu = _zones.Single(z => z.Name == "CPU");
+        Assert.False(cpu.YRotationDegrees != 0f);
+    }
+
+    [Fact]
+    public void NonSystemForegroundZones_HaveNoGroupName()
+    {
+        var disk = _zones.Single(z => z.Name == "Disk");
+        var netIn = _zones.Single(z => z.Name == "Net-In");
+        var netOut = _zones.Single(z => z.Name == "Net-Out");
+        Assert.Null(disk.GroupName);
+        Assert.Null(netIn.GroupName);
+        Assert.Null(netOut.GroupName);
+    }
+
+    [Fact]
+    public void BackgroundZones_AlignWithForegroundPartners()
+    {
+        var perCpu = _zones.Single(z => z.Name == "Per-CPU");
+        var perDisk = _zones.Single(z => z.Name == "Per-Disk");
+        var netIn = _zones.Single(z => z.Name == "Network In");
+        var netOut = _zones.Single(z => z.Name == "Network Out");
+        Assert.Equal("CPU", perCpu.AlignWithForegroundZone);
+        Assert.Equal("Disk", perDisk.AlignWithForegroundZone);
+        Assert.Equal("Net-In", netIn.AlignWithForegroundZone);
+        Assert.Equal("Net-Out", netOut.AlignWithForegroundZone);
+    }
 }

@@ -28,5 +28,7 @@ public static class LinuxProfile
             new("mem.util.cached", ShapeType.Bar, "Cached",  SharedZones.Green, 0f, 0f, 0.2f, 5.0f),
             new("mem.util.bufmem", ShapeType.Bar, "Buffers", SharedZones.Green, 0f, 0f, 0.2f, 5.0f),
         ],
-        InstanceMetricSource: null);
+        InstanceMetricSource: null,
+        YRotationDegrees: -90f,
+        GroupName: "System");
 }
