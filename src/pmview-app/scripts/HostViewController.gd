@@ -202,27 +202,29 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				_toggle_playback()
 			KEY_LEFT:
-				get_viewport().set_input_as_handled()
-				if _poller:
-					var step := _poll_interval_seconds
-					if event.ctrl_pressed and event.shift_pressed:
-						step = 60.0
-					elif event.shift_pressed:
-						step = 5.0
-					_poller.StepPlayback(step, -1)
-				if _time_control:
-					_time_control.notify_scrub()
+				if event.shift_pressed:
+					get_viewport().set_input_as_handled()
+					if _poller:
+						var step := 15.0
+						if event.alt_pressed and event.ctrl_pressed:
+							step = 300.0  # 5 minutes
+						elif event.ctrl_pressed:
+							step = 60.0
+						_poller.StepPlayback(step, -1)
+					if _time_control:
+						_time_control.notify_scrub()
 			KEY_RIGHT:
-				get_viewport().set_input_as_handled()
-				if _poller:
-					var step := _poll_interval_seconds
-					if event.ctrl_pressed and event.shift_pressed:
-						step = 60.0
-					elif event.shift_pressed:
-						step = 5.0
-					_poller.StepPlayback(step, 1)
-				if _time_control:
-					_time_control.notify_scrub()
+				if event.shift_pressed:
+					get_viewport().set_input_as_handled()
+					if _poller:
+						var step := 15.0
+						if event.alt_pressed and event.ctrl_pressed:
+							step = 300.0  # 5 minutes
+						elif event.ctrl_pressed:
+							step = 60.0
+						_poller.StepPlayback(step, 1)
+					if _time_control:
+						_time_control.notify_scrub()
 			KEY_R:
 				if not event.shift_pressed:
 					get_viewport().set_input_as_handled()
@@ -246,13 +248,14 @@ func _setup_help_content() -> void:
 		HelpGroup.HelpEntry.create("Q / E", "Descend / Ascend"),
 		HelpGroup.HelpEntry.create("SHIFT", "Sprint (hold with movement)"),
 		HelpGroup.HelpEntry.create("Right-click", "Look around (hold + drag)"),
+		HelpGroup.HelpEntry.create("← → ↑ ↓", "Look around (arrow keys)"),
 	])
 
 	var archive_group := HelpGroup.create("Archive Mode Playback", purple, [
 		HelpGroup.HelpEntry.create("SPACE", "Play / Pause"),
-		HelpGroup.HelpEntry.create("← →", "Scrub (poll interval)"),
-		HelpGroup.HelpEntry.create("⇧ ← →", "Scrub ±5 seconds"),
+		HelpGroup.HelpEntry.create("⇧ ← →", "Scrub ±15 seconds"),
 		HelpGroup.HelpEntry.create("⌃⇧ ← →", "Scrub ±1 minute"),
+		HelpGroup.HelpEntry.create("⌥⌃⇧ ← →", "Scrub ±5 minutes"),
 		HelpGroup.HelpEntry.create("R", "Reset time range"),
 		HelpGroup.HelpEntry.create("Mouse → edge", "Show timeline panel"),
 		HelpGroup.HelpEntry.create("Click", "Jump to time (on timeline)"),
