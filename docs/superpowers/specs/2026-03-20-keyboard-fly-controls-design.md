@@ -1,7 +1,7 @@
 # Keyboard Fly Controls — Design Spec
 
 **Date:** 2026-03-20
-**Status:** Draft
+**Status:** Implemented
 
 ## Problem
 
