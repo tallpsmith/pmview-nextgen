@@ -54,4 +54,6 @@ public record ZoneDefinition(
     IReadOnlyList<MetricShapeMapping> Metrics,
     string? InstanceMetricSource = null,
     bool RotateYNinetyDeg = false,
-    IReadOnlyList<MetricStackGroupDefinition>? StackGroups = null);
+    IReadOnlyList<MetricStackGroupDefinition>? StackGroups = null,
+    string? GroupName = null,
+    string? AlignWithForegroundZone = null);
