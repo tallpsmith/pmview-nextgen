@@ -10,7 +10,7 @@ extends Node3D
 const VIEWPOINTS := [
 	[KEY_1, "System", [], Vector3(0, 15, 20)],
 	[KEY_2, "CPU", ["CPU"], Vector3(0, 3, 5)],
-	[KEY_3, "Disk", ["Disk", "Per-Disk"], Vector3(0, 3, 5)],
+	[KEY_3, "Disk", ["Disk"], Vector3(0, 3, 5)],
 	[KEY_4, "Network", ["Net-In", "Net-Out"], Vector3(0, 3, 5)],
 ]
 
