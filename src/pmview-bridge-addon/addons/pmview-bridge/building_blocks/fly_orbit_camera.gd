@@ -12,6 +12,7 @@ enum Mode { ORBIT, FLY, TRANSITIONING }
 @export var sprint_multiplier: float = 2.0
 @export var mouse_sensitivity: float = 0.002
 @export var transition_speed: float = 0.3
+@export var keyboard_look_speed: float = 90.0  ## degrees/second for arrow-key look
 
 ## When false, all movement and mouse-look input is ignored.
 ## Used by panels (Help, Range Tuning) to suppress camera while open.
@@ -26,6 +27,17 @@ var _orbit_angle: float
 var _fly_yaw: float = 0.0
 var _fly_pitch: float = 0.0
 var _is_right_clicking: bool = false
+
+# Orbit look override state (arrow-key temporary look)
+var _orbit_look_yaw_offset: float = 0.0
+var _orbit_look_pitch_offset: float = 0.0
+var _orbit_look_timer: float = 0.0
+var _orbit_look_easing_back: bool = false
+var _orbit_look_ease_progress: float = 0.0
+var _orbit_look_ease_start_yaw: float = 0.0
+var _orbit_look_ease_start_pitch: float = 0.0
+const ORBIT_LOOK_TIMEOUT: float = 5.0
+const ORBIT_LOOK_EASE_DURATION: float = 0.5
 
 # Transition state
 var _transition_start_pos: Vector3
@@ -77,6 +89,10 @@ func _process(delta: float) -> void:
 func _toggle_mode() -> void:
 	match _mode:
 		Mode.ORBIT:
+			# Reset any orbit look override
+			_orbit_look_yaw_offset = 0.0
+			_orbit_look_pitch_offset = 0.0
+			_orbit_look_easing_back = false
 			# Orbit -> Fly: instant, capture current orientation
 			_mode = Mode.FLY
 			var euler := global_transform.basis.get_euler()
@@ -102,7 +118,56 @@ func _process_orbit(delta: float) -> void:
 		_orbit_height,
 		orbit_center.z + _radius * sin(_orbit_angle)
 	)
-	look_at(orbit_center, Vector3.UP)
+
+	# Arrow-key look override
+	if input_enabled:
+		var arrow_input := false
+		if Input.is_physical_key_pressed(KEY_LEFT):
+			_orbit_look_yaw_offset += deg_to_rad(keyboard_look_speed) * delta
+			arrow_input = true
+		if Input.is_physical_key_pressed(KEY_RIGHT):
+			_orbit_look_yaw_offset -= deg_to_rad(keyboard_look_speed) * delta
+			arrow_input = true
+		if Input.is_physical_key_pressed(KEY_UP):
+			_orbit_look_pitch_offset += deg_to_rad(keyboard_look_speed) * delta
+			arrow_input = true
+		if Input.is_physical_key_pressed(KEY_DOWN):
+			_orbit_look_pitch_offset -= deg_to_rad(keyboard_look_speed) * delta
+			arrow_input = true
+		_orbit_look_pitch_offset = clampf(
+			_orbit_look_pitch_offset, -PI / 2.0 + 0.1, PI / 2.0 - 0.1)
+
+		if arrow_input:
+			_orbit_look_timer = 0.0
+			_orbit_look_easing_back = false
+		elif _orbit_look_yaw_offset != 0.0 or _orbit_look_pitch_offset != 0.0:
+			_orbit_look_timer += delta
+			if _orbit_look_timer >= ORBIT_LOOK_TIMEOUT and not _orbit_look_easing_back:
+				_orbit_look_easing_back = true
+				_orbit_look_ease_progress = 0.0
+				_orbit_look_ease_start_yaw = _orbit_look_yaw_offset
+				_orbit_look_ease_start_pitch = _orbit_look_pitch_offset
+
+	# Ease back to centre
+	if _orbit_look_easing_back:
+		_orbit_look_ease_progress += delta / ORBIT_LOOK_EASE_DURATION
+		var t := _ease_in_out(_orbit_look_ease_progress)
+		_orbit_look_yaw_offset = lerpf(_orbit_look_ease_start_yaw, 0.0, t)
+		_orbit_look_pitch_offset = lerpf(_orbit_look_ease_start_pitch, 0.0, t)
+		if _orbit_look_ease_progress >= 1.0:
+			_orbit_look_yaw_offset = 0.0
+			_orbit_look_pitch_offset = 0.0
+			_orbit_look_easing_back = false
+
+	# Apply look direction
+	if _orbit_look_yaw_offset == 0.0 and _orbit_look_pitch_offset == 0.0:
+		look_at(orbit_center, Vector3.UP)
+	else:
+		look_at(orbit_center, Vector3.UP)
+		var base_basis := global_transform.basis
+		var offset_basis := Basis.from_euler(Vector3(
+			_orbit_look_pitch_offset, _orbit_look_yaw_offset, 0.0))
+		global_transform.basis = base_basis * offset_basis
 
 func _process_fly(delta: float) -> void:
 	if not input_enabled:
@@ -134,8 +199,24 @@ func _process_fly(delta: float) -> void:
 	if Input.is_physical_key_pressed(KEY_E):
 		input_dir.y += 1.0
 
+	# Arrow-key look (yaw/pitch)
+	var look_input := false
+	if Input.is_physical_key_pressed(KEY_LEFT):
+		_fly_yaw += deg_to_rad(keyboard_look_speed) * delta
+		look_input = true
+	if Input.is_physical_key_pressed(KEY_RIGHT):
+		_fly_yaw -= deg_to_rad(keyboard_look_speed) * delta
+		look_input = true
+	if Input.is_physical_key_pressed(KEY_UP):
+		_fly_pitch += deg_to_rad(keyboard_look_speed) * delta
+		look_input = true
+	if Input.is_physical_key_pressed(KEY_DOWN):
+		_fly_pitch -= deg_to_rad(keyboard_look_speed) * delta
+		look_input = true
+	_fly_pitch = clampf(_fly_pitch, -PI / 2.0 + 0.1, PI / 2.0 - 0.1)
+
 	# Cancel focus if user takes manual control
-	if input_dir.length_squared() > 0.0:
+	if input_dir.length_squared() > 0.0 or look_input:
 		_focus_active = false
 
 	# Build orientation from yaw/pitch
