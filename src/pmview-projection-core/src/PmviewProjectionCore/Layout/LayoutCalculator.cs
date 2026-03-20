@@ -416,8 +416,9 @@ public static class LayoutCalculator
 
             if (def.AlignWithForegroundZone != null && fgCentres.TryGetValue(def.AlignWithForegroundZone, out var fgCenter))
             {
-                var bgWidth = ZoneWidth(zone);
-                var bgX = fgCenter - bgWidth / 2f;
+                // Align on GroundWidth (shape extent), not ZoneWidth (which includes
+                // RowHeaderReservation on the right — asymmetric, would shift shapes left).
+                var bgX = fgCenter - zone.GroundWidth / 2f;
                 result.Add(zone with { Position = new Vec3(bgX, 0f, BackgroundZOffset) });
             }
             else
