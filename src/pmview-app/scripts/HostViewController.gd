@@ -5,6 +5,15 @@ extends Node3D
 
 @onready var esc_label: Label = %EscLabel
 
+## Viewpoint presets: [key, name, zone_names, offset_from_centroid]
+## Empty zone_names means "scene centre" (system overview).
+const VIEWPOINTS := [
+	[KEY_1, "System", [], Vector3(0, 15, 20)],
+	[KEY_2, "CPU", ["CPU"], Vector3(0, 3, 5)],
+	[KEY_3, "Disk", ["Disk", "Per-Disk"], Vector3(0, 3, 5)],
+	[KEY_4, "Network", ["Net-In", "Net-Out"], Vector3(0, 3, 5)],
+]
+
 var _esc_pending := false
 var _esc_timer: SceneTreeTimer = null
 var _poller: Node = null
@@ -12,9 +21,11 @@ var _time_control: Control = null
 var _help_panel: Node = null
 var _help_hint: Node = null
 var _camera: Node = null
+var _scene_binder: Node = null
 var _timestamp_label_3d: Node = null
 var _is_archive_mode := false
 var _poll_interval_seconds := 60.0
+var _active_viewpoint_key: int = -1  ## Currently active viewpoint key, or -1 for none
 
 
 func _ready() -> void:
@@ -40,8 +51,9 @@ func _ready() -> void:
 	_help_panel = scene.find_child("HelpPanel", true, false)
 	_help_hint = scene.find_child("HelpHint", true, false)
 	_camera = get_viewport().get_camera_3d()
-	print("[HostView] HelpPanel found: %s, HelpHint found: %s, Camera found: %s" % [
-		_help_panel != null, _help_hint != null, _camera != null])
+	_scene_binder = scene.find_child("SceneBinder", true, false)
+	print("[HostView] HelpPanel found: %s, HelpHint found: %s, Camera found: %s, SceneBinder found: %s" % [
+		_help_panel != null, _help_hint != null, _camera != null, _scene_binder != null])
 
 	# Connect panel signals for camera suppression
 	if _help_panel:
@@ -174,9 +186,25 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 			return
 
+	# Viewpoint keys 1-4 — fly to zone preset
+	if event is InputEventKey and event.pressed and not event.echo:
+		for vp in VIEWPOINTS:
+			if event.physical_keycode == vp[0]:
+				_activate_viewpoint(vp)
+				get_viewport().set_input_as_handled()
+				return
+
 	# ESC — close help panel first if open
 	if event.is_action_pressed("ui_cancel") and _help_panel and _help_panel.visible:
 		_help_panel.hide_panel()
+		get_viewport().set_input_as_handled()
+		return
+
+	# ESC — return to orbit from a viewpoint
+	if event.is_action_pressed("ui_cancel") and _active_viewpoint_key >= 0:
+		if _camera and _camera.has_method("return_to_orbit"):
+			_camera.return_to_orbit()
+		_active_viewpoint_key = -1
 		get_viewport().set_input_as_handled()
 		return
 
@@ -238,9 +266,44 @@ func _unhandled_input(event: InputEvent) -> void:
 					_time_control.toggle_panel()
 
 
+func _activate_viewpoint(vp: Array) -> void:
+	var vp_key: int = vp[0]
+	if vp_key == _active_viewpoint_key:
+		return  # Already at this viewpoint
+
+	if not _camera or not _camera.has_method("fly_to_viewpoint"):
+		return
+
+	var zone_names: Array = vp[2]
+	var offset: Vector3 = vp[3]
+	var centroid := _compute_viewpoint_centroid(zone_names)
+	var camera_pos := centroid + offset
+
+	_camera.fly_to_viewpoint(camera_pos, centroid)
+	_active_viewpoint_key = vp_key
+
+
+func _compute_viewpoint_centroid(zone_names: Array) -> Vector3:
+	if zone_names.is_empty() or not _scene_binder:
+		return Vector3.ZERO  # Scene centre for System overview
+
+	var sum := Vector3.ZERO
+	var count := 0
+	for zone_name: String in zone_names:
+		var centroid: Vector3 = _scene_binder.GetZoneCentroid(zone_name)
+		if centroid != Vector3.ZERO:
+			sum += centroid
+			count += 1
+
+	if count == 0:
+		return Vector3.ZERO
+	return sum / float(count)
+
+
 func _setup_help_content() -> void:
 	var orange := Color(0.94, 0.56, 0.13)
 	var purple := Color(0.322, 0.137, 0.925)
+	var teal := Color(0.13, 0.84, 0.78)
 
 	var camera_group := HelpGroup.create("Camera", orange, [
 		HelpGroup.HelpEntry.create("TAB", "Toggle Orbit / Free Look"),
@@ -249,6 +312,14 @@ func _setup_help_content() -> void:
 		HelpGroup.HelpEntry.create("SHIFT", "Sprint (hold with movement)"),
 		HelpGroup.HelpEntry.create("Right-click", "Look around (hold + drag)"),
 		HelpGroup.HelpEntry.create("← → ↑ ↓", "Look around (arrow keys)"),
+	])
+
+	var viewpoints_group := HelpGroup.create("Viewpoints", teal, [
+		HelpGroup.HelpEntry.create("1", "System overview"),
+		HelpGroup.HelpEntry.create("2", "CPU close-up"),
+		HelpGroup.HelpEntry.create("3", "Disk close-up"),
+		HelpGroup.HelpEntry.create("4", "Network close-up"),
+		HelpGroup.HelpEntry.create("ESC", "Return to orbit"),
 	])
 
 	var archive_group := HelpGroup.create("Archive Mode Playback", purple, [
@@ -272,13 +343,14 @@ func _setup_help_content() -> void:
 		HelpGroup.HelpEntry.create("ESC × 2", "Return to main menu"),
 	])
 
-	_help_panel.set_groups([camera_group, archive_group, panels_group, general_group])
+	_help_panel.set_groups([camera_group, viewpoints_group, archive_group, panels_group, general_group])
 
 
 func _setup_help_hints() -> void:
 	_help_hint.set_hints([
 		HelpHintEntry.create("H", "for Help"),
 		HelpHintEntry.create("TAB", "Orbit / Free Look"),
+		HelpHintEntry.create("1-4", "Viewpoints"),
 	])
 	_help_hint.start_cycling()
 

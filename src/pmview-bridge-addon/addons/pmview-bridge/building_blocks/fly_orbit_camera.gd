@@ -4,7 +4,7 @@ extends Camera3D
 ## Tab toggles between modes. Orbit mode auto-rotates around orbit_center.
 ## Fly mode: WASD move, Q/E elevation, right-click+drag mouse look, Shift sprint.
 
-enum Mode { ORBIT, FLY, TRANSITIONING }
+enum Mode { ORBIT, FLY, TRANSITIONING, FLYING_TO_VIEWPOINT }
 
 @export var orbit_speed: float = 20.0
 @export var orbit_center: Vector3 = Vector3.ZERO
@@ -54,6 +54,14 @@ var _focus_target_pitch: float = 0.0
 var _focus_progress: float = 0.0
 const FOCUS_DURATION: float = 0.5
 
+# Fly-to-viewpoint state (cinematic move to a preset position)
+var _flyto_start_pos: Vector3 = Vector3.ZERO
+var _flyto_start_basis: Basis = Basis.IDENTITY
+var _flyto_target_pos: Vector3 = Vector3.ZERO
+var _flyto_target_look_at: Vector3 = Vector3.ZERO
+var _flyto_progress: float = 0.0
+const FLYTO_DURATION: float = 1.2
+
 func _ready() -> void:
 	_orbit_height = position.y
 	_radius = Vector2(position.x - orbit_center.x, position.z - orbit_center.z).length()
@@ -65,13 +73,22 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and event.physical_keycode == KEY_TAB:
 		_toggle_mode()
 		get_viewport().set_input_as_handled()
+	# Cancel fly-to-viewpoint on manual movement input
+	if _mode == Mode.FLYING_TO_VIEWPOINT:
+		if event is InputEventMouseMotion and _is_right_clicking:
+			_cancel_flyto()
+		elif event is InputEventKey and event.pressed:
+			if event.physical_keycode in [KEY_W, KEY_A, KEY_S, KEY_D, KEY_Q, KEY_E]:
+				_cancel_flyto()
+
 	# Cancel focus animation on any manual camera input
 	if _focus_active:
 		if event is InputEventMouseMotion and _is_right_clicking:
 			_focus_active = false
-	if _mode == Mode.FLY:
+	if _mode == Mode.FLY or _mode == Mode.FLYING_TO_VIEWPOINT:
 		if event is InputEventMouseButton:
 			_is_right_clicking = event.pressed and event.button_index == MOUSE_BUTTON_RIGHT
+	if _mode == Mode.FLY:
 		if event is InputEventMouseMotion and _is_right_clicking:
 			_fly_yaw -= event.relative.x * mouse_sensitivity
 			_fly_pitch -= event.relative.y * mouse_sensitivity
@@ -85,6 +102,8 @@ func _process(delta: float) -> void:
 			_process_fly(delta)
 		Mode.TRANSITIONING:
 			_process_transition(delta)
+		Mode.FLYING_TO_VIEWPOINT:
+			_process_flyto(delta)
 
 func _toggle_mode() -> void:
 	match _mode:
@@ -110,6 +129,9 @@ func _toggle_mode() -> void:
 			var euler := global_transform.basis.get_euler()
 			_fly_yaw = euler.y
 			_fly_pitch = euler.x
+		Mode.FLYING_TO_VIEWPOINT:
+			# During fly-to, Tab cancels and stays in fly mode
+			_cancel_flyto()
 
 func _process_orbit(delta: float) -> void:
 	_orbit_angle += deg_to_rad(orbit_speed) * delta
@@ -255,6 +277,69 @@ func _process_transition(delta: float) -> void:
 func _ease_in_out(t: float) -> float:
 	var clamped := clampf(t, 0.0, 1.0)
 	return clamped * clamped * (3.0 - 2.0 * clamped)
+
+func _process_flyto(delta: float) -> void:
+	_flyto_progress += delta / FLYTO_DURATION
+	var t := _ease_in_out(_flyto_progress)
+
+	global_position = _flyto_start_pos.lerp(_flyto_target_pos, t)
+
+	var target_transform := Transform3D(_flyto_start_basis, Vector3.ZERO).looking_at(
+		_flyto_target_look_at - _flyto_target_pos, Vector3.UP)
+	global_transform.basis = _flyto_start_basis.slerp(target_transform.basis, t)
+
+	if _flyto_progress >= 1.0:
+		# Land in fly mode at the target
+		global_position = _flyto_target_pos
+		look_at(_flyto_target_look_at, Vector3.UP)
+		_mode = Mode.FLY
+		var euler := global_transform.basis.get_euler()
+		_fly_yaw = euler.y
+		_fly_pitch = euler.x
+
+
+func _cancel_flyto() -> void:
+	_mode = Mode.FLY
+	var euler := global_transform.basis.get_euler()
+	_fly_yaw = euler.y
+	_fly_pitch = euler.x
+
+
+## Smoothly flies the camera to a target position, looking at a point on arrival.
+## Switches to fly mode when the animation completes.
+func fly_to_viewpoint(target_pos: Vector3, look_at_pos: Vector3) -> void:
+	# Reset orbit look overrides if coming from orbit
+	if _mode == Mode.ORBIT:
+		_orbit_look_yaw_offset = 0.0
+		_orbit_look_pitch_offset = 0.0
+		_orbit_look_easing_back = false
+
+	_flyto_start_pos = global_position
+	_flyto_start_basis = global_transform.basis
+	_flyto_target_pos = target_pos
+	_flyto_target_look_at = look_at_pos
+	_flyto_progress = 0.0
+	_focus_active = false
+	_mode = Mode.FLYING_TO_VIEWPOINT
+
+
+## Returns to orbit mode with a smooth transition. No-op if already orbiting.
+func return_to_orbit() -> void:
+	match _mode:
+		Mode.ORBIT:
+			return
+		Mode.FLYING_TO_VIEWPOINT:
+			# Cancel fly-to first, then transition to orbit
+			_cancel_flyto()
+		Mode.TRANSITIONING:
+			return  # Already heading back to orbit
+
+	# Reuse the existing fly→orbit transition
+	_mode = Mode.TRANSITIONING
+	_transition_start_pos = global_position
+	_transition_start_basis = global_transform.basis
+	_transition_progress = 0.0
+
 
 ## Smoothly pans the camera to look at the given world position.
 ## In orbit mode: changes orbit_center so the camera orbits the target.
