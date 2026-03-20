@@ -48,7 +48,7 @@ internal static class SharedZones
                 InstanceName: "15 minute"),
         ],
         InstanceMetricSource: null,
-        RotateYNinetyDeg: true,
+        YRotationDegrees: 90f,
         GroupName: "System");
 
     internal static ZoneDefinition DiskTotalsZone() => new(

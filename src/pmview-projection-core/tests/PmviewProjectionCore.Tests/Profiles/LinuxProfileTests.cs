@@ -235,15 +235,15 @@ public class LinuxProfileTests
     {
         var load = _zones.Single(z => z.Name == "Load");
         var memory = _zones.Single(z => z.Name == "Memory");
-        Assert.True(load.RotateYNinetyDeg);
-        Assert.True(memory.RotateYNinetyDeg);
+        Assert.True(load.YRotationDegrees != 0f);
+        Assert.True(memory.YRotationDegrees != 0f);
     }
 
     [Fact]
     public void SystemGroup_Cpu_IsNotRotated()
     {
         var cpu = _zones.Single(z => z.Name == "CPU");
-        Assert.False(cpu.RotateYNinetyDeg);
+        Assert.False(cpu.YRotationDegrees != 0f);
     }
 
     [Fact]

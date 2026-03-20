@@ -157,7 +157,7 @@ public class LayoutCalculatorForegroundTests
         {
             var left  = foreground[i];
             var right = foreground[i + 1];
-            var leftVisualWidth = left.RotateYNinetyDeg ? left.GroundDepth : left.GroundWidth;
+            var leftVisualWidth = left.YRotationDegrees != 0f ? left.GroundDepth : left.GroundWidth;
             var leftFootprintEnd = left.Position.X + leftVisualWidth;
             var gap = right.Position.X - leftFootprintEnd;
             Assert.True(gap <= 2.5f,
@@ -172,9 +172,9 @@ public class LayoutCalculatorForegroundTests
         var disk = layout.Zones.Single(z => z.Name == "Disk");
         var netIn = layout.Zones.Single(z => z.Name == "Net-In" && !z.HasGrid);
         var netOut = layout.Zones.Single(z => z.Name == "Net-Out" && !z.HasGrid);
-        Assert.False(disk.RotateYNinetyDeg);
-        Assert.False(netIn.RotateYNinetyDeg);
-        Assert.False(netOut.RotateYNinetyDeg);
+        Assert.False(disk.YRotationDegrees != 0f);
+        Assert.False(netIn.YRotationDegrees != 0f);
+        Assert.False(netOut.YRotationDegrees != 0f);
     }
 
     [Fact]
@@ -467,7 +467,7 @@ public class LayoutCalculatorAlignmentTests
 
     private static float ZoneXCenter(PlacedZone z)
     {
-        var width = z.RotateYNinetyDeg ? z.GroundDepth : z.GroundWidth;
+        var width = z.YRotationDegrees != 0f ? z.GroundDepth : z.GroundWidth;
         if (z.HasGrid) width += 2.0f; // RowHeaderReservation
         return z.Position.X + width / 2f;
     }
@@ -531,8 +531,8 @@ public class LayoutCalculatorAlignmentTests
         var layout = LayoutCalculator.Calculate(LinuxZones, MakeTopology());
         var load = layout.Zones.Single(z => z.Name == "Load");
         var memory = layout.Zones.Single(z => z.Name == "Memory");
-        Assert.True(load.RotateYNinetyDeg);
-        Assert.True(memory.RotateYNinetyDeg);
+        Assert.True(load.YRotationDegrees != 0f);
+        Assert.True(memory.YRotationDegrees != 0f);
     }
 
     [Fact]

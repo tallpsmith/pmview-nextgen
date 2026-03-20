@@ -145,13 +145,15 @@ public static class RuntimeSceneBuilder
         node.SetScript(GD.Load<Script>(MetricGroupScriptPath));
 
         var pos = zone.Position;
-        if (zone.RotateYNinetyDeg)
+        if (zone.YRotationDegrees != 0f)
         {
-            // 90° Y rotation: Basis columns are (0,0,-1), (0,1,0), (1,0,0)
+            var rad = zone.YRotationDegrees * Mathf.Pi / 180f;
+            var c = Mathf.Cos(rad);
+            var s = Mathf.Sin(rad);
             var basis = new Basis(
-                new Vector3(0, 0, 1),
+                new Vector3(c, 0, -s),
                 new Vector3(0, 1, 0),
-                new Vector3(-1, 0, 0));
+                new Vector3(s, 0, c));
             node.Transform = new Transform3D(basis, new Vector3(pos.X, pos.Y, pos.Z));
         }
         else if (pos.X != 0f || pos.Y != 0f || pos.Z != 0f)

@@ -53,7 +53,7 @@ public record ZoneDefinition(
     ZoneType Type,
     IReadOnlyList<MetricShapeMapping> Metrics,
     string? InstanceMetricSource = null,
-    bool RotateYNinetyDeg = false,
+    float YRotationDegrees = 0f,
     IReadOnlyList<MetricStackGroupDefinition>? StackGroups = null,
     string? GroupName = null,
     string? AlignWithForegroundZone = null);

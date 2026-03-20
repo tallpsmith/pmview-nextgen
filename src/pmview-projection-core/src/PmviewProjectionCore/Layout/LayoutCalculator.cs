@@ -52,7 +52,7 @@ public static class LayoutCalculator
             GroundDepth:      groundDepth,
             MetricLabels:     metricLabels,
             InstanceLabels:   instanceLabels,
-            RotateYNinetyDeg: zone.RotateYNinetyDeg);
+            YRotationDegrees: zone.YRotationDegrees);
     }
 
     private static (float Width, float Depth) ComputeGroundExtent(
@@ -332,11 +332,11 @@ public static class LayoutCalculator
 
     private static LayoutUnit BuildGroupUnit(List<(int Index, PlacedZone Zone, ZoneDefinition Def)> members)
     {
-        const float IntraGroupGap = 0.5f;
+        const float IntraGroupGap = 2.0f;
 
         // Anchor = the non-rotated zone in the group
-        var anchor = members.FirstOrDefault(m => !m.Def.RotateYNinetyDeg);
-        var wings = members.Where(m => m.Def.RotateYNinetyDeg).ToList();
+        var anchor = members.FirstOrDefault(m => m.Def.YRotationDegrees == 0f);
+        var wings = members.Where(m => m.Def.YRotationDegrees != 0f).ToList();
 
         // First wing goes left, second goes right (by declaration order within group)
         var leftWings = wings.Take(1).ToList();
@@ -469,7 +469,7 @@ public static class LayoutCalculator
             return zone.GroundWidth + RowHeaderReservation;
         if (zone.Items.Count == 0) return 0f;
         // Rotated zones (Ry 90°): local Z becomes world X, so visual width = GroundDepth.
-        if (zone.RotateYNinetyDeg) return zone.GroundDepth;
+        if (zone.YRotationDegrees != 0f) return zone.GroundDepth;
         // Use GroundWidth (visual footprint = shape origins + shape width + padding),
         // not just the rightmost shape X-origin, so centering reflects the actual extent.
         return zone.GroundWidth;

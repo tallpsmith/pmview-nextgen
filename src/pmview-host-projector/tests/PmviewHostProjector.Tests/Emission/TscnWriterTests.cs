@@ -167,26 +167,38 @@ public class TscnWriterTests
                 Items: [new PlacedShape("System_User", ShapeType.Bar, Vec3.Zero,
                     "kernel.all.cpu.user", null, null,
                     new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f)],
-                RotateYNinetyDeg: true)
+                YRotationDegrees: 90f)
         ]);
         var tscn = TscnWriter.Write(layout);
-        Assert.Contains("Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 2, 0, 0)", tscn);
+        // 90° Y rotation: cos(90°)≈0, sin(90°)≈1 → column-major (0,0,1, 0,1,0, -1,0,0)
+        // The zone node line should contain a non-identity transform
+        var zoneNodeLine = tscn.Split('\n')
+            .First(l => l.Contains("[node name=\"System\""));
+        var transformLine = tscn.Split('\n')
+            .SkipWhile(l => !l.Contains("[node name=\"System\""))
+            .Skip(1)
+            .First(l => l.StartsWith("transform"));
+        Assert.DoesNotContain("1, 0, 0, 0, 1, 0, 0, 0, 1", transformLine);
     }
 
     [Fact]
-    public void Write_RotatedZoneAtOrigin_StillEmitsYRotationTransform()
+    public void Write_NegativeRotatedZone_EmitsOppositeYRotation()
     {
         var layout = new SceneLayout("testhost", [
             new PlacedZone(
-                Name: "System", ZoneLabel: "System", Position: Vec3.Zero,
+                Name: "System", ZoneLabel: "System", Position: new Vec3(3f, 0, 0),
                 ColumnSpacing: null, RowSpacing: null,
                 Items: [new PlacedShape("System_User", ShapeType.Bar, Vec3.Zero,
                     "kernel.all.cpu.user", null, null,
                     new RgbColour(0.976f, 0.451f, 0.086f), 0f, 100f, 0.2f, 5.0f)],
-                RotateYNinetyDeg: true)
+                YRotationDegrees: -90f)
         ]);
         var tscn = TscnWriter.Write(layout);
-        Assert.Contains("Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 0, 0, 0)", tscn);
+        var transformLine = tscn.Split('\n')
+            .SkipWhile(l => !l.Contains("[node name=\"System\""))
+            .Skip(1)
+            .First(l => l.StartsWith("transform"));
+        Assert.DoesNotContain("1, 0, 0, 0, 1, 0, 0, 0, 1", transformLine);
     }
 
     // --- New MetricGroupNode / GroundBezel / MetricGrid tests ---

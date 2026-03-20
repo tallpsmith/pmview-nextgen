@@ -34,6 +34,6 @@ public static class MacOsProfile
             new("mem.util.compressed", ShapeType.Bar, "Compressed", SharedZones.Blue,  0f, 0f, 0.2f, 5.0f),
         ],
         InstanceMetricSource: null,
-        RotateYNinetyDeg: true,
+        YRotationDegrees: -90f,
         GroupName: "System");
 }

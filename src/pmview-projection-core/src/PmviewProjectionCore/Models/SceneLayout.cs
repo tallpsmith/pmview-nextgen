@@ -48,7 +48,7 @@ public record PlacedZone(
     float GroundDepth = 0f,
     IReadOnlyList<string>? MetricLabels = null,
     IReadOnlyList<string>? InstanceLabels = null,
-    bool RotateYNinetyDeg = false)
+    float YRotationDegrees = 0f)
 {
     private IReadOnlyList<PlacedShape>? _shapes;
 
