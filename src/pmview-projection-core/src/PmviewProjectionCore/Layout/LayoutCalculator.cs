@@ -318,8 +318,6 @@ public static class LayoutCalculator
 
         foreach (var unit in units)
         {
-            // Position each zone in the unit relative to cursor
-            var anchorX = cursor + unit.AnchorOffset;
             for (int i = 0; i < unit.Zones.Count; i++)
             {
                 var zone = unit.Zones[i];
@@ -344,12 +342,19 @@ public static class LayoutCalculator
         var leftWings = wings.Take(1).ToList();
         var rightWings = wings.Skip(1).ToList();
 
-        // If no anchor found, treat first zone as anchor
+        // If no anchor found, treat first zone as anchor and compute offsets
         if (anchor.Zone == null)
         {
             var zones = members.Select(m => m.Zone).ToList();
-            var width = zones.Sum(z => ZoneWidth(z)) + IntraGroupGap * (zones.Count - 1);
-            return new LayoutUnit(zones, width, 0, 0f);
+            var fallbackOffsets = new List<float>();
+            float fallbackCursor = 0f;
+            foreach (var z in zones)
+            {
+                fallbackOffsets.Add(fallbackCursor);
+                fallbackCursor += ZoneWidth(z) + IntraGroupGap;
+            }
+            var width = fallbackCursor - IntraGroupGap;
+            return new LayoutUnit(zones, width, 0, 0f, fallbackOffsets);
         }
 
         // Compute layout: left wings | anchor | right wings
