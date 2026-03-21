@@ -20,24 +20,32 @@ const PHASE_NAMES := [
 	"BUILDING SCENE",
 ]
 
-# Fly-by camera path constants
+# Fly-by timing
 const FLYBY_PAUSE := 0.3
-const FLYBY_APPROACH_DURATION := 0.8
-const FLYBY_SWEEP_DURATION := 1.2
-const FLYBY_HYPERSPACE_DURATION := 0.5
+const FLYBY_TOTAL_DURATION := 2.5
 
-# Camera positions for the fly-by phases
-const CAM_START := Vector3(0.0, 0.18, 6.11)
-const CAM_APPROACH_END := Vector3(-5.625, -0.12, 1.5)   # Alongside "P", dipped, forward of letters
-const CAM_SWEEP_END := Vector3(12.0, -0.12, 1.5)        # Well past "W"
-const CAM_HYPERSPACE_END := Vector3(20.0, -0.12, -5.0)  # Forward and right, into the distance
+# Spline waypoints: position, in-handle (relative), out-handle (relative), tilt (radians)
+# Handles control the curve shape — longer handles = wider/smoother curves
+const FLYBY_WAYPOINTS := [
+	# Start: front-on view of letters
+	{ "pos": Vector3(0.0, 0.18, 6.11),    "in": Vector3.ZERO,               "out": Vector3(0.0, 0.0, -2.0),    "tilt": 0.0 },
+	# Approach: diving toward the text centre, beginning to turn
+	{ "pos": Vector3(-2.0, -0.05, 2.0),   "in": Vector3(0.5, 0.1, 1.5),     "out": Vector3(-1.5, -0.1, -0.5),  "tilt": -0.26 },
+	# Alongside "P": banked, low, close to the letter face
+	{ "pos": Vector3(-5.625, -0.12, 1.5),  "in": Vector3(1.0, 0.0, 0.5),     "out": Vector3(-2.0, 0.0, 0.0),    "tilt": -0.15 },
+	# Mid-sweep: flying past letters, picking up speed
+	{ "pos": Vector3(3.0, -0.12, 1.5),     "in": Vector3(-3.0, 0.0, 0.0),    "out": Vector3(3.0, 0.0, 0.0),     "tilt": 0.0 },
+	# Past "W": letters behind, beginning hyperspace
+	{ "pos": Vector3(12.0, -0.12, 1.0),    "in": Vector3(-3.0, 0.0, 0.2),    "out": Vector3(3.0, 0.0, -1.0),    "tilt": 0.05 },
+	# Hyperspace exit: forward and away
+	{ "pos": Vector3(20.0, -0.12, -5.0),   "in": Vector3(-2.0, 0.0, 2.0),    "out": Vector3.ZERO,               "tilt": 0.0 },
+]
 
-# Camera rotations (Euler angles in radians)
-const ROT_START := Vector3(0.0, 0.0, 0.0)                        # Looking straight ahead
-const ROT_APPROACH_PEAK := Vector3(-0.05, -0.6, -0.26)           # Banked left, slight pitch down, rolled ~15°
-const ROT_APPROACH_END := Vector3(-0.05, -1.2, 0.0)              # Facing left along letter line, level
-const ROT_SWEEP := Vector3(-0.05, -1.4, 0.0)                     # Slightly more left-facing during sweep
-const ROT_HYPERSPACE := Vector3(-0.05, -1.0, 0.0)                # Straightening out forward
+# Progress ratios at which shader effects kick in (0.0 = start, 1.0 = end)
+const SHADER_SPEED_START := 0.35   # Start stretching dots during sweep
+const SHADER_SPEED_FULL := 0.85    # Full streak by hyperspace
+const WHITE_OUT_START := 0.75      # Begin white-out
+const STREAK_ANGLE_START := 0.70   # Begin rotating streak angle
 
 var _has_error := false
 
@@ -85,62 +93,70 @@ func _on_pipeline_completed() -> void:
 	await get_tree().create_timer(FLYBY_PAUSE).timeout
 	status_label.visible = false
 
-	# Lock camera to known starting position before fly-by
-	camera.position = CAM_START
-	camera.rotation = ROT_START
-
 	await _run_flyby_sequence()
 
 	# Transition to host view
 	SceneManager.go_to_host_view(pipeline.BuiltScene)
 
 
+func _build_flyby_curve() -> Curve3D:
+	var curve := Curve3D.new()
+	for wp: Dictionary in FLYBY_WAYPOINTS:
+		var idx := curve.add_point(wp["pos"], wp["in"], wp["out"])
+		curve.set_point_tilt(idx, wp["tilt"])
+	return curve
+
+
 func _run_flyby_sequence() -> void:
-	var t1 := FLYBY_APPROACH_DURATION
-	var t2 := FLYBY_SWEEP_DURATION
-	var t3 := FLYBY_HYPERSPACE_DURATION
+	# Build the spline path at runtime
+	var path := Path3D.new()
+	path.curve = _build_flyby_curve()
+	add_child(path)
 
-	# Single continuous position tween — no velocity discontinuities between phases
-	var pos_tween := create_tween()
-	pos_tween.tween_property(camera, "position", CAM_APPROACH_END, t1) \
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	pos_tween.tween_property(camera, "position", CAM_SWEEP_END, t2) \
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	pos_tween.tween_property(camera, "position", CAM_HYPERSPACE_END, t3) \
+	var follow := PathFollow3D.new()
+	follow.rotation_mode = PathFollow3D.ROTATION_ORIENTED
+	follow.use_model_front = true
+	follow.loop = false
+	path.add_child(follow)
+
+	# Reparent camera under the path follower so it rides the spline
+	var cam_local_xform := Transform3D.IDENTITY
+	camera.reparent(follow)
+	camera.transform = cam_local_xform
+
+	# Tween progress along the curve — EASE_IN for acceleration buildup
+	var progress_tween := create_tween()
+	progress_tween.tween_property(follow, "progress_ratio", 1.0, FLYBY_TOTAL_DURATION) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
-	# Single continuous rotation tween — smooth banking throughout
-	var rot_tween := create_tween()
-	rot_tween.tween_property(camera, "rotation", ROT_APPROACH_PEAK, t1 * 0.5) \
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	rot_tween.tween_property(camera, "rotation", ROT_APPROACH_END, t1 * 0.5) \
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	rot_tween.tween_property(camera, "rotation", ROT_SWEEP, t2) \
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	rot_tween.tween_property(camera, "rotation", ROT_HYPERSPACE, t3 * 0.3) \
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	# Use _process to drive shader effects based on progress
+	var shader_updater := func() -> void:
+		var p: float = follow.progress_ratio
 
-	# Ground shader: continuous speed ramp across sweep + hyperspace
-	var shader_tween := create_tween()
-	shader_tween.tween_interval(t1)  # Hold at 0.0 during approach
-	shader_tween.tween_property(ground_mat, "shader_parameter/speed", 0.6, t2) \
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	shader_tween.tween_property(ground_mat, "shader_parameter/speed", 1.0, t3) \
-		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		# Ground shader speed: ramp from 0 to 1 across the sweep/hyperspace portion
+		if p >= SHADER_SPEED_START:
+			var speed_t := clampf((p - SHADER_SPEED_START) / (SHADER_SPEED_FULL - SHADER_SPEED_START), 0.0, 1.0)
+			ground_mat.set_shader_parameter("speed", speed_t * speed_t)  # Quadratic ramp
 
-	# Streak angle: rotate toward forward during hyperspace
-	var angle_tween := create_tween()
-	angle_tween.tween_interval(t1 + t2)  # Hold at 0.0 during approach + sweep
-	angle_tween.tween_property(ground_mat, "shader_parameter/streak_angle", PI / 2.0, t3) \
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		# Streak angle: rotate toward forward (PI/2) during hyperspace
+		if p >= STREAK_ANGLE_START:
+			var angle_t := clampf((p - STREAK_ANGLE_START) / (1.0 - STREAK_ANGLE_START), 0.0, 1.0)
+			ground_mat.set_shader_parameter("streak_angle", angle_t * PI / 2.0)
 
-	# White-out: fade to white during hyperspace only
-	var white_tween := create_tween()
-	white_tween.tween_interval(t1 + t2)  # Hold transparent during approach + sweep
-	white_tween.tween_property(white_out, "modulate:a", 1.0, t3) \
-		.set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN)
+		# White-out: exponential ramp at the end
+		if p >= WHITE_OUT_START:
+			var white_t := clampf((p - WHITE_OUT_START) / (1.0 - WHITE_OUT_START), 0.0, 1.0)
+			white_out.modulate.a = white_t * white_t * white_t  # Cubic for late-hitting punch
 
-	await pos_tween.finished
+	# Connect to tree process to update effects each frame
+	get_tree().process_frame.connect(shader_updater)
+
+	await progress_tween.finished
+
+	# Cleanup: disconnect updater, free path nodes
+	get_tree().process_frame.disconnect(shader_updater)
+	camera.reparent(self)
+	path.queue_free()
 
 
 func _on_pipeline_error(index: int, error: String) -> void:
