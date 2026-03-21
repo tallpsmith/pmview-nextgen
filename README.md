@@ -268,7 +268,15 @@ This project uses the following third-party assets:
 
 ## License
 
-TBD - Exploring open source and potential dual licensing options
+**Business Source License 1.1** — free for internal and non-commercial use.
+Commercial repackaging or resale is not permitted under this license.
+
+After 3 years from each release, the code converts automatically to **Apache 2.0**
+(open source, no restrictions).
+
+See [LICENSE.md](LICENSE.md) for the full terms.
+
+Contributors must sign a CLA before their patches can be merged — see [CLA.md](CLA.md).
 
 ## Contact
 
