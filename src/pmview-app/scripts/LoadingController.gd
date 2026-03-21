@@ -25,21 +25,26 @@ const FLYBY_PAUSE := 0.3
 const FLYBY_TOTAL_DURATION := 2.5
 
 # Spline waypoints: position, in-handle (relative), out-handle (relative), tilt (radians)
-# Handles control the curve shape — longer handles = wider/smoother curves
+# IMPORTANT: in/out handles must be collinear (opposite directions) at each interior
+# point for C1 tangent continuity — otherwise the curve kinks and the camera jerks.
 # Path: straight at letter centre → bank right → sweep past I/E/W → hyperspace
 const FLYBY_WAYPOINTS := [
-	# Start: front-on view of letters
-	{ "pos": Vector3(0.0, 0.18, 6.11),    "in": Vector3.ZERO,              "out": Vector3(0.0, 0.0, -3.0),   "tilt": 0.0 },
-	# Dive toward letter centre, beginning to dip
-	{ "pos": Vector3(0.0, -0.05, 2.0),    "in": Vector3(0.0, 0.1, 2.0),    "out": Vector3(1.5, -0.05, -0.5), "tilt": 0.2 },
-	# Banking right past "V"/"I", close to the letter face
-	{ "pos": Vector3(3.0, -0.12, 1.5),    "in": Vector3(-1.5, 0.0, 0.3),   "out": Vector3(3.0, 0.0, 0.0),    "tilt": 0.15 },
-	# Past "E"/"W": picking up speed, letters whipping past left ear
-	{ "pos": Vector3(8.0, -0.12, 1.5),    "in": Vector3(-3.0, 0.0, 0.0),   "out": Vector3(3.0, 0.0, -0.5),   "tilt": 0.05 },
-	# Clear of letters, beginning hyperspace
-	{ "pos": Vector3(14.0, -0.12, 0.0),   "in": Vector3(-2.5, 0.0, 0.5),   "out": Vector3(3.0, 0.0, -2.0),   "tilt": 0.0 },
-	# Hyperspace exit: forward and away
-	{ "pos": Vector3(22.0, -0.12, -6.0),  "in": Vector3(-2.0, 0.0, 2.0),   "out": Vector3.ZERO,              "tilt": 0.0 },
+	# Start: front-on view — out handle points straight at the letters
+	{ "pos": Vector3(0.0, 0.18, 6.11),    "in": Vector3.ZERO,              "out": Vector3(0.0, -0.1, -3.0),  "tilt": 0.0 },
+	# Near letters: tangent transitions from forward (-Z) to rightward (+X)
+	# in/out are collinear: both along the (-Z → +X) diagonal
+	{ "pos": Vector3(0.5, -0.05, 1.8),    "in": Vector3(-0.4, 0.1, 1.5),   "out": Vector3(0.4, -0.1, -1.5),  "tilt": 0.15 },
+	# Banking right past "I", close to the face — tangent is pure +X
+	# in/out collinear along X axis
+	{ "pos": Vector3(3.5, -0.12, 1.5),    "in": Vector3(-2.5, 0.0, 0.0),   "out": Vector3(2.5, 0.0, 0.0),    "tilt": 0.15 },
+	# Past "W": still +X dominant, slight forward lean starting
+	# in/out collinear along (+X, 0, -0.15)
+	{ "pos": Vector3(9.0, -0.12, 1.2),    "in": Vector3(-3.0, 0.0, 0.15),  "out": Vector3(3.0, 0.0, -0.15),  "tilt": 0.05 },
+	# Transitioning to hyperspace: tangent bending from +X toward -Z
+	# in/out collinear along (+X, 0, -Z) diagonal
+	{ "pos": Vector3(15.0, -0.12, -0.5),  "in": Vector3(-2.5, 0.0, 0.8),   "out": Vector3(2.5, 0.0, -0.8),   "tilt": 0.0 },
+	# Hyperspace exit — in handle mirrors the approach direction
+	{ "pos": Vector3(22.0, -0.12, -6.0),  "in": Vector3(-2.0, 0.0, 1.5),   "out": Vector3.ZERO,              "tilt": 0.0 },
 ]
 
 # Progress ratios at which shader effects kick in (0.0 = start, 1.0 = end)
