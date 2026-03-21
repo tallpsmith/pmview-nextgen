@@ -4,6 +4,7 @@
 [ext_resource type="Script" uid="uid://dexdleq02k1b3" path="res://scripts/LoadingPipeline.cs" id="2"]
 [ext_resource type="FontFile" uid="uid://cuocu3qcqxof0" path="res://assets/fonts/PressStart2P-Regular.ttf" id="3"]
 [ext_resource type="Shader" uid="uid://u65rdxjtb4f6" path="res://shaders/materialise.gdshader" id="4"]
+[ext_resource type="Shader" path="res://shaders/retro_dot_grid.gdshader" id="5"]
 
 [sub_resource type="ProceduralSkyMaterial" id="loading_sky_mat"]
 sky_top_color = Color(0.02, 0.02, 0.06, 1)
@@ -110,6 +111,19 @@ shader_parameter/solid_color_top = Color(1, 0, 0.43, 1)
 shader_parameter/solid_color_bottom = Color(0.228, 0.525, 1, 1)
 shader_parameter/glow_pulse = 0.0
 
+[sub_resource type="ShaderMaterial" id="loading_ground_mat"]
+render_priority = -1
+shader = ExtResource("5")
+shader_parameter/dot_spacing = 2.0
+shader_parameter/dot_size = 0.08
+shader_parameter/dot_color = Color(0, 0.8, 0.3, 1)
+shader_parameter/fade_distance = 40.0
+shader_parameter/speed = 0.0
+shader_parameter/streak_angle = 0.0
+
+[sub_resource type="PlaneMesh" id="loading_ground_mesh"]
+size = Vector2(120, 120)
+
 [node name="Loading" type="Node3D" unique_id=1372877719]
 script = ExtResource("1")
 
@@ -119,9 +133,16 @@ environment = SubResource("loading_env")
 [node name="Camera3D" type="Camera3D" parent="." unique_id=1762205177]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.18243456, 6.1119094)
 
+[node name="GroundPlane" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1.2, 0)
+mesh = SubResource("loading_ground_mesh")
+surface_material_override/0 = SubResource("loading_ground_mat")
+cast_shadow = 0
+
 [node name="LoadingPipeline" type="Node" parent="." unique_id=1377308617]
 unique_name_in_owner = true
 script = ExtResource("2")
+MinPhaseDelayMs = 250
 
 [node name="LetterP" type="MeshInstance3D" parent="." unique_id=1237915246]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.625, 0, 0)
@@ -180,3 +201,15 @@ theme_override_font_sizes/font_size = 12
 text = ""
 horizontal_alignment = 1
 modulate = Color(0.228, 0.525, 1.0, 1)
+
+[node name="FadeOut" type="ColorRect" parent="CanvasLayer/Control"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 1)
+modulate = Color(1, 1, 1, 0)
+mouse_filter = 2
