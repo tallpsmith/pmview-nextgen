@@ -102,8 +102,8 @@ func _on_pipeline_completed() -> void:
 func _build_flyby_curve() -> Curve3D:
 	var curve := Curve3D.new()
 	for wp: Dictionary in FLYBY_WAYPOINTS:
-		var idx := curve.add_point(wp["pos"], wp["in"], wp["out"])
-		curve.set_point_tilt(idx, wp["tilt"])
+		curve.add_point(wp["pos"], wp["in"], wp["out"])
+		curve.set_point_tilt(curve.point_count - 1, wp["tilt"])
 	return curve
 
 
