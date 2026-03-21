@@ -433,8 +433,11 @@ func _dismiss_esc() -> void:
 func _handle_click_selection(event: InputEventMouseButton) -> void:
 	if not _camera:
 		return
-	var from := _camera.project_ray_origin(event.position)
-	var dir := _camera.project_ray_normal(event.position)
+	var cam: Camera3D = _camera as Camera3D
+	if cam == null:
+		return
+	var from: Vector3 = cam.project_ray_origin(event.position)
+	var dir: Vector3 = cam.project_ray_normal(event.position)
 	var to := from + dir * 1000.0
 
 	var space_state := get_world_3d().direct_space_state
