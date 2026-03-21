@@ -46,9 +46,29 @@ docker compose down -v
 
 ## Adding Profiles
 
-Drop YAML profile files into `profiles/`. The generator iterates all `*.yml` and `*.yaml` files. See [pmlogsynth](https://github.com/tallpsmith/pmlogsynth) for the profile format.
+Drop YAML profile files into `profiles/`. The generator iterates all `*.yml` and `*.yaml` files and detects profile type by filename convention. See [pmlogsynth](https://github.com/tallpsmith/pmlogsynth) for the profile format.
+
+### Single-Host Profiles
+
+Any profile file **without** a `fleet-` prefix is treated as a single-host profile and generated with:
+
+```bash
+pmlogsynth -o /archives/<stem>/<stem> <profile>
+```
 
 The included `saas-diurnal-week.yml` generates a 7-day SaaS workload with realistic diurnal patterns — overnight lows, morning ramps, peak hours, lunch lulls, afternoon spikes, and evening tail-offs.
+
+### Fleet Profiles
+
+Files with a `fleet-` prefix (e.g. `fleet-5-node-cpu-disk-smashed.yaml`) are treated as fleet profiles and generated with:
+
+```bash
+pmlogsynth fleet --seed 42 -o /archives/<stem> <profile>
+```
+
+Fleet profiles produce **multiple PCP archives** (one per simulated host) in a single directory, plus a `fleet.manifest` file describing the host assignments. The seeder automatically discovers and loads each host's archive individually.
+
+See the included `fleet-5-node-cpu-disk-smashed.yaml` for an example: 5 xlarge nodes with 1 bad actor being hammered on CPU and disk I/O.
 
 ## Verifying the Stack
 
