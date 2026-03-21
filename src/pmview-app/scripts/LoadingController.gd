@@ -26,19 +26,20 @@ const FLYBY_TOTAL_DURATION := 2.5
 
 # Spline waypoints: position, in-handle (relative), out-handle (relative), tilt (radians)
 # Handles control the curve shape — longer handles = wider/smoother curves
+# Path: straight at letter centre → bank right → sweep past I/E/W → hyperspace
 const FLYBY_WAYPOINTS := [
 	# Start: front-on view of letters
-	{ "pos": Vector3(0.0, 0.18, 6.11),    "in": Vector3.ZERO,               "out": Vector3(0.0, 0.0, -2.0),    "tilt": 0.0 },
-	# Approach: diving toward the text centre, beginning to turn
-	{ "pos": Vector3(-2.0, -0.05, 2.0),   "in": Vector3(0.5, 0.1, 1.5),     "out": Vector3(-1.5, -0.1, -0.5),  "tilt": -0.26 },
-	# Alongside "P": banked, low, close to the letter face
-	{ "pos": Vector3(-5.625, -0.12, 1.5),  "in": Vector3(1.0, 0.0, 0.5),     "out": Vector3(-2.0, 0.0, 0.0),    "tilt": -0.15 },
-	# Mid-sweep: flying past letters, picking up speed
-	{ "pos": Vector3(3.0, -0.12, 1.5),     "in": Vector3(-3.0, 0.0, 0.0),    "out": Vector3(3.0, 0.0, 0.0),     "tilt": 0.0 },
-	# Past "W": letters behind, beginning hyperspace
-	{ "pos": Vector3(12.0, -0.12, 1.0),    "in": Vector3(-3.0, 0.0, 0.2),    "out": Vector3(3.0, 0.0, -1.0),    "tilt": 0.05 },
+	{ "pos": Vector3(0.0, 0.18, 6.11),    "in": Vector3.ZERO,              "out": Vector3(0.0, 0.0, -3.0),   "tilt": 0.0 },
+	# Dive toward letter centre, beginning to dip
+	{ "pos": Vector3(0.0, -0.05, 2.0),    "in": Vector3(0.0, 0.1, 2.0),    "out": Vector3(1.5, -0.05, -0.5), "tilt": 0.2 },
+	# Banking right past "V"/"I", close to the letter face
+	{ "pos": Vector3(3.0, -0.12, 1.5),    "in": Vector3(-1.5, 0.0, 0.3),   "out": Vector3(3.0, 0.0, 0.0),    "tilt": 0.15 },
+	# Past "E"/"W": picking up speed, letters whipping past left ear
+	{ "pos": Vector3(8.0, -0.12, 1.5),    "in": Vector3(-3.0, 0.0, 0.0),   "out": Vector3(3.0, 0.0, -0.5),   "tilt": 0.05 },
+	# Clear of letters, beginning hyperspace
+	{ "pos": Vector3(14.0, -0.12, 0.0),   "in": Vector3(-2.5, 0.0, 0.5),   "out": Vector3(3.0, 0.0, -2.0),   "tilt": 0.0 },
 	# Hyperspace exit: forward and away
-	{ "pos": Vector3(20.0, -0.12, -5.0),   "in": Vector3(-2.0, 0.0, 2.0),    "out": Vector3.ZERO,               "tilt": 0.0 },
+	{ "pos": Vector3(22.0, -0.12, -6.0),  "in": Vector3(-2.0, 0.0, 2.0),   "out": Vector3.ZERO,              "tilt": 0.0 },
 ]
 
 # Progress ratios at which shader effects kick in (0.0 = start, 1.0 = end)
