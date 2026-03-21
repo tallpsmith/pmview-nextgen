@@ -85,6 +85,10 @@ func _on_pipeline_completed() -> void:
 	await get_tree().create_timer(FLYBY_PAUSE).timeout
 	status_label.visible = false
 
+	# Lock camera to known starting position before fly-by
+	camera.position = CAM_START
+	camera.rotation = ROT_START
+
 	# Phase 1: Banking approach — arc and dip toward "P"
 	await _flyby_banking_approach()
 
@@ -137,10 +141,12 @@ func _flyby_accelerating_sweep() -> void:
 	shader_tween.tween_property(ground_mat, "shader_parameter/speed", 0.6, t) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
-	# Wait for the longest tween
+	# Wait for all tweens to complete before next phase
 	await pos_tween.finished
 	if rot_tween.is_running():
 		await rot_tween.finished
+	if shader_tween.is_running():
+		await shader_tween.finished
 
 
 func _flyby_hyperspace_punch() -> void:
