@@ -52,3 +52,16 @@ func _layout_normalised(children: Array) -> void:
 		bar.scale.y = h
 		bar.position.y = offset
 		offset += h
+
+
+func highlight(enabled: bool) -> void:
+	for child in get_children():
+		if child.has_method("highlight"):
+			child.highlight(enabled)
+
+
+func is_highlighted() -> bool:
+	for child in get_children():
+		if child.has_method("is_highlighted"):
+			return child.is_highlighted()
+	return false
