@@ -37,6 +37,7 @@ public partial class SceneBinder : Node
 	private readonly List<ActiveBinding> _activeBindings = new();
 	private readonly Dictionary<Node3D, float> _rotationSpeeds = new();
 	private readonly Dictionary<ActiveBinding, (float Current, float Target)> _smoothValues = new();
+	private readonly Dictionary<ActiveBinding, double?> _lastRawValues = new();
 
 	/// <summary>
 	/// A validated, resolved binding with a cached node reference.
@@ -110,6 +111,7 @@ public partial class SceneBinder : Node
 		_activeBindings.Clear();
 		_rotationSpeeds.Clear();
 		_smoothValues.Clear();
+		_lastRawValues.Clear();
 		_currentScene = sceneRoot;
 
 		var metricNames = new HashSet<string>();
@@ -184,6 +186,8 @@ public partial class SceneBinder : Node
 				: new Godot.Collections.Dictionary();
 
 			double? rawValue = ExtractValue(binding, instances, nameToId);
+			if (rawValue != null)
+				_lastRawValues[active] = rawValue;
 			if (rawValue == null)
 			{
 				var instanceLabel = binding.InstanceName != null
@@ -238,6 +242,12 @@ public partial class SceneBinder : Node
 				_smoothValues[newActive] = smoothState;
 			}
 
+			if (_lastRawValues.TryGetValue(active, out var lastRaw))
+			{
+				_lastRawValues.Remove(active);
+				_lastRawValues[newActive] = lastRaw;
+			}
+
 			_activeBindings[i] = newActive;
 			updated++;
 			Log.LogInformation("{Metric}: SourceRangeMax {OldMax} -> {NewMax}",
@@ -274,6 +284,43 @@ public partial class SceneBinder : Node
 
 			result[binding.ZoneName] = binding.SourceRangeMax;
 		}
+		return result;
+	}
+
+	/// <summary>
+	/// Returns binding state for a node as a Dictionary shaped for GDScript consumers:
+	/// { "zone", "instance", "properties": { property: [{ "metric", "value" }] } }
+	/// Value is Nil variant when no metric has been applied yet.
+	/// </summary>
+	public Godot.Collections.Dictionary GetBindingsForNode(Node node)
+	{
+		var result = new Godot.Collections.Dictionary();
+		var matchingBindings = _activeBindings.Where(ab => ab.TargetNode == node).ToList();
+
+		if (matchingBindings.Count == 0)
+			return result;
+
+		var firstBinding = matchingBindings[0].Resolved.Binding;
+		result["zone"] = firstBinding.ZoneName ?? "";
+		result["instance"] = firstBinding.InstanceName ?? firstBinding.InstanceId?.ToString() ?? "";
+
+		var properties = new Godot.Collections.Dictionary();
+		foreach (var group in matchingBindings.GroupBy(ab => ab.Resolved.Binding.Property))
+		{
+			var entries = new Godot.Collections.Array();
+			foreach (var ab in group)
+			{
+				var entry = new Godot.Collections.Dictionary();
+				entry["metric"] = ab.Resolved.Binding.Metric;
+				entry["value"] = _lastRawValues.TryGetValue(ab, out var raw) && raw.HasValue
+					? Variant.From(raw.Value)
+					: default;
+				entries.Add(entry);
+			}
+			properties[group.Key] = entries;
+		}
+		result["properties"] = properties;
+
 		return result;
 	}
 
@@ -362,6 +409,7 @@ public partial class SceneBinder : Node
 		_activeBindings.Clear();
 		_rotationSpeeds.Clear();
 		_smoothValues.Clear();
+		_lastRawValues.Clear();
 
 		foreach (var nodes in _instanceNodes.Values)
 		{
