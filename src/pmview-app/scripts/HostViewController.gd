@@ -491,16 +491,16 @@ func _select_shape(shape: Node) -> void:
 		if count > 0:
 			target_pos = sum / float(count)
 
-	var orbit_height: float = _camera._orbit_height if _camera else 8.0
-	var cam_dir := (_camera.global_position - target_pos).normalized()
-	cam_dir.y = 0.0
-	if cam_dir.length_squared() < 0.01:
-		cam_dir = Vector3(0, 0, 1)
-	cam_dir = cam_dir.normalized()
-	var camera_pos := target_pos + cam_dir * 8.0
-	camera_pos.y = orbit_height
-
-	_camera.fly_to_viewpoint(camera_pos, target_pos)
+	if _camera:
+		var orbit_height: float = _camera._orbit_height
+		var cam_dir := (_camera.global_position - target_pos).normalized()
+		cam_dir.y = 0.0
+		if cam_dir.length_squared() < 0.01:
+			cam_dir = Vector3(0, 0, 1)
+		cam_dir = cam_dir.normalized()
+		var camera_pos := target_pos + cam_dir * 8.0
+		camera_pos.y = orbit_height
+		_camera.fly_to_viewpoint(camera_pos, target_pos)
 	_active_viewpoint_key = -1
 
 	if _detail_panel and _scene_binder:
@@ -515,7 +515,7 @@ func _select_shape(shape: Node) -> void:
 func _deselect_shape() -> void:
 	if _selected_shape == null:
 		return
-	if _selected_shape.has_method("highlight"):
+	if is_instance_valid(_selected_shape) and _selected_shape.has_method("highlight"):
 		_selected_shape.highlight(false)
 	_selected_shape = null
 	if _detail_panel and _detail_panel.visible:
@@ -523,7 +523,7 @@ func _deselect_shape() -> void:
 
 
 func _on_detail_panel_closed() -> void:
-	if _selected_shape and _selected_shape.has_method("highlight"):
+	if _selected_shape and is_instance_valid(_selected_shape) and _selected_shape.has_method("highlight"):
 		_selected_shape.highlight(false)
 	_selected_shape = null
 
