@@ -11,6 +11,7 @@ const HolographicBeamScript := preload("res://scripts/holographic_beam.gd")
 @onready var focus_camera: Camera3D = %FocusCamera
 @onready var master_timestamp: Label3D = %MasterTimestamp
 @onready var esc_hint: Label = %EscHint
+@onready var time_control: Control = %TimeControl
 
 ## Spacing between host grid cells (centre to centre)
 @export var host_spacing: float = 6.0
@@ -36,6 +37,7 @@ func _ready() -> void:
 	_position_master_timestamp()
 	patrol_camera.setup(_grid_bounds)
 	_update_esc_hint()
+	_setup_time_control(config)
 
 
 func _generate_mock_hostnames(count: int) -> PackedStringArray:
@@ -247,3 +249,25 @@ func _update_esc_hint() -> void:
 			esc_hint.text = "ESC \u2192 Return to Patrol"
 		_:
 			esc_hint.text = ""
+
+
+func _setup_time_control(config: Dictionary) -> void:
+	if not time_control:
+		return
+	var mode: String = config.get("mode", "live")
+	if mode != "archive":
+		return
+	# Set archive bounds so the TimeControl panel can render its timeline
+	var start_epoch: float = config.get("archive_start_epoch", 0.0)
+	var end_epoch: float = config.get("archive_end_epoch", 0.0)
+	if time_control.has_method("set_archive_bounds"):
+		time_control.set_archive_bounds(start_epoch, end_epoch)
+
+
+## Update the floating master timestamp billboard and TimeControl playhead.
+## Called by the fleet MetricPoller once polling is wired (Chunk 5).
+func update_master_timestamp(timestamp_iso: String) -> void:
+	if master_timestamp:
+		master_timestamp.text = timestamp_iso
+	if time_control and time_control.has_method("update_playhead"):
+		time_control.update_playhead(timestamp_iso, "archive")
