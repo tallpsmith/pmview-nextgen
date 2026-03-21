@@ -21,7 +21,7 @@ func _build_layout() -> void:
 	panel.anchor_right = 1.0
 	panel.anchor_top = 0.0
 	panel.anchor_bottom = 0.0
-	panel.offset_left = -290
+	panel.offset_left = -420
 	panel.offset_right = -10
 	panel.offset_top = 10
 	panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
@@ -31,14 +31,14 @@ func _build_layout() -> void:
 	style.border_color = Color(1, 1, 1, 0.15)
 	style.set_border_width_all(1)
 	style.set_corner_radius_all(6)
-	style.set_content_margin_all(12)
+	style.set_content_margin_all(16)
 	panel.add_theme_stylebox_override("panel", style)
 
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 4)
 
 	_header_label = Label.new()
-	_header_label.add_theme_font_size_override("font_size", 14)
+	_header_label.add_theme_font_size_override("font_size", 20)
 	_header_label.add_theme_color_override("font_color", Color.WHITE)
 	vbox.add_child(_header_label)
 
@@ -67,7 +67,7 @@ func show_for_shape(bindings_dict: Dictionary) -> void:
 		# Property group header
 		var prop_label := Label.new()
 		prop_label.text = prop_name
-		prop_label.add_theme_font_size_override("font_size", 11)
+		prop_label.add_theme_font_size_override("font_size", 15)
 		prop_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
 		_content_container.add_child(prop_label)
 
@@ -103,14 +103,14 @@ func _create_metric_row(metric_name: String, value) -> HBoxContainer:
 	var short_name := metric_name.rsplit(".", true, 1)[-1] if "." in metric_name else metric_name
 	var name_label := Label.new()
 	name_label.text = "  " + short_name
-	name_label.add_theme_font_size_override("font_size", 12)
+	name_label.add_theme_font_size_override("font_size", 16)
 	name_label.add_theme_color_override("font_color", Color(0.65, 0.65, 0.65))
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(name_label)
 
 	var value_label := Label.new()
 	value_label.text = _format_value(value)
-	value_label.add_theme_font_size_override("font_size", 12)
+	value_label.add_theme_font_size_override("font_size", 16)
 	value_label.add_theme_color_override("font_color", Color.WHITE)
 	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	row.add_child(value_label)

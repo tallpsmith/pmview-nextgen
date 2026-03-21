@@ -60,7 +60,7 @@ func highlight(enabled: bool) -> void:
 		if enabled:
 			mat.emission_enabled = true
 			mat.emission = mat.albedo_color
-			mat.emission_energy_multiplier = 2.0
+			mat.emission_energy_multiplier = 4.0
 			_show_outline(mesh_instance)
 		else:
 			mat.emission_enabled = false
@@ -77,7 +77,7 @@ func _show_outline(source_mesh: MeshInstance3D) -> void:
 		var mat := ShaderMaterial.new()
 		mat.shader = shader
 		_outline_mesh.set_surface_override_material(0, mat)
-		_outline_mesh.scale = Vector3(1.05, 1.05, 1.05)
+		_outline_mesh.scale = Vector3(1.15, 1.15, 1.15)
 		source_mesh.add_child(_outline_mesh)
 	_outline_mesh.visible = true
 
