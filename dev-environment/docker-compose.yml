@@ -42,27 +42,44 @@ services:
       - -c
       - |
         set -euo pipefail;
-        for archive_dir in /archives/*/; do
-            stem=$$(basename "$$archive_dir");
-            archive_path="/archives/$${stem}/$${stem}";
 
-            echo "INFO: --- $${stem} ---";
+        load_archive() {
+            local archive_path=$$1;
+            local label=$$2;
+
+            echo "INFO: --- $${label} ---";
             echo "INFO: archive contents:";
-            ls -lh "/archives/$${stem}/";
+            ls -lh "$$(dirname "$${archive_path}")/" | head -20;
 
             echo "INFO: archive bounds:";
             pmdumplog -l "$${archive_path}" 2>&1;
 
-            echo "INFO: loading $${stem} into pmseries";
+            echo "INFO: loading $${label} into pmseries";
             if ! pmseries --load "$${archive_path}"; then
-                echo "ERROR: pmseries --load failed for $${stem}";
-                exit 1;
+                echo "ERROR: pmseries --load failed for $${label}";
+                return 1;
             fi;
 
-            echo "INFO: $${stem} loaded — verifying index:";
             series_count=$$(pmseries 'kernel.all.cpu.user' 2>/dev/null | wc -l || echo 0);
-            echo "INFO: $${stem} — $${series_count} kernel.all.cpu.user series now in index";
+            echo "INFO: $${label} loaded — $${series_count} kernel.all.cpu.user series now in index";
+        };
+
+        for archive_dir in /archives/*/; do
+            stem=$$(basename "$$archive_dir");
+
+            if [[ "$${stem}" == fleet-* ]]; then
+                echo "INFO: === Fleet: $${stem} ===";
+                for data_file in "$${archive_dir}"*.0; do
+                    [[ -f "$${data_file}" ]] || continue;
+                    archive_path="$${data_file%.0}";
+                    host_name=$$(basename "$${archive_path}");
+                    load_archive "$${archive_path}" "$${stem}/$${host_name}" || exit 1;
+                done;
+            else
+                load_archive "/archives/$${stem}/$${stem}" "$${stem}" || exit 1;
+            fi;
         done;
+
         echo "INFO: all archives seeded";
     depends_on:
       pmlogsynth-generator:
