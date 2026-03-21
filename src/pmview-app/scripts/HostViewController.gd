@@ -494,16 +494,17 @@ func _select_shape(shape: Node) -> void:
 		if count > 0:
 			target_pos = sum / float(count)
 
-	if _camera:
-		var orbit_height: float = _camera._orbit_height
-		var cam_dir := (_camera.global_position - target_pos).normalized()
+	var cam3d: Camera3D = _camera as Camera3D if _camera else null
+	if cam3d:
+		var orbit_height: float = cam3d._orbit_height
+		var cam_dir: Vector3 = (cam3d.global_position - target_pos).normalized()
 		cam_dir.y = 0.0
 		if cam_dir.length_squared() < 0.01:
 			cam_dir = Vector3(0, 0, 1)
 		cam_dir = cam_dir.normalized()
-		var camera_pos := target_pos + cam_dir * 8.0
+		var camera_pos: Vector3 = target_pos + cam_dir * 8.0
 		camera_pos.y = orbit_height
-		_camera.fly_to_viewpoint(camera_pos, target_pos)
+		cam3d.fly_to_viewpoint(camera_pos, target_pos)
 	_active_viewpoint_key = -1
 
 	if _detail_panel and _scene_binder:
