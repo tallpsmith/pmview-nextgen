@@ -32,6 +32,7 @@ public static class RuntimeSceneBuilder
     private const string RangeTuningPanelScenePath = "res://addons/pmview-bridge/ui/range_tuning_panel.tscn";
     private const string HelpPanelScenePath = "res://addons/pmview-bridge/ui/help_panel.tscn";
     private const string HelpHintScenePath = "res://addons/pmview-bridge/ui/help_hint.tscn";
+    private const string DetailPanelScenePath = "res://addons/pmview-bridge/ui/detail_panel.tscn";
 
     // -- ambient label colours --
     private static readonly Color TimestampColour = new(0.976f, 0.451f, 0.086f, 1f);
@@ -401,6 +402,18 @@ public static class RuntimeSceneBuilder
         else
         {
             GD.PushWarning($"[RuntimeSceneBuilder] Failed to load HelpHint scene: {HelpHintScenePath}");
+        }
+
+        var detailPanelScene = GD.Load<PackedScene>(DetailPanelScenePath);
+        if (detailPanelScene != null)
+        {
+            var detailPanel = detailPanelScene.Instantiate();
+            detailPanel.Name = "DetailPanel";
+            canvas.AddChild(detailPanel);
+        }
+        else
+        {
+            GD.PushWarning($"[RuntimeSceneBuilder] Failed to load DetailPanel scene: {DetailPanelScenePath}");
         }
 
         sceneRoot.AddChild(canvas);

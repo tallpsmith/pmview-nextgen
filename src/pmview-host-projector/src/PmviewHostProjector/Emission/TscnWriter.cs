@@ -55,6 +55,8 @@ public static class TscnWriter
             "res://addons/pmview-bridge/ui/help_panel.tscn");
         registry.Require("help_hint_scene", "PackedScene",
             "res://addons/pmview-bridge/ui/help_hint.tscn");
+        registry.Require("detail_panel_scene", "PackedScene",
+            "res://addons/pmview-bridge/ui/detail_panel.tscn");
     }
 
     // --- resource collection ---
@@ -249,6 +251,9 @@ public static class TscnWriter
         sb.AppendLine();
 
         sb.AppendLine("[node name=\"HelpHint\" parent=\"UILayer\" instance=ExtResource(\"help_hint_scene\")]");
+        sb.AppendLine();
+
+        sb.AppendLine("[node name=\"DetailPanel\" parent=\"UILayer\" instance=ExtResource(\"detail_panel_scene\")]");
         sb.AppendLine();
     }
 
