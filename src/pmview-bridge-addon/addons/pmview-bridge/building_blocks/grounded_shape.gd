@@ -60,7 +60,7 @@ func highlight(enabled: bool) -> void:
 		if enabled:
 			mat.emission_enabled = true
 			mat.emission = mat.albedo_color
-			mat.emission_energy_multiplier = 4.0
+			mat.emission_energy_multiplier = 3.0
 			_show_outline(mesh_instance)
 		else:
 			mat.emission_enabled = false
