@@ -89,90 +89,58 @@ func _on_pipeline_completed() -> void:
 	camera.position = CAM_START
 	camera.rotation = ROT_START
 
-	# Phase 1: Banking approach — arc and dip toward "P"
-	await _flyby_banking_approach()
-
-	# Phase 2: Accelerating sweep — lateral fly-by past all letters
-	await _flyby_accelerating_sweep()
-
-	# Phase 3: Hyperspace punch — streaks + white-out
-	await _flyby_hyperspace_punch()
+	await _run_flyby_sequence()
 
 	# Transition to host view
 	SceneManager.go_to_host_view(pipeline.BuiltScene)
 
 
-func _flyby_banking_approach() -> void:
-	var t := FLYBY_APPROACH_DURATION
+func _run_flyby_sequence() -> void:
+	var t1 := FLYBY_APPROACH_DURATION
+	var t2 := FLYBY_SWEEP_DURATION
+	var t3 := FLYBY_HYPERSPACE_DURATION
 
-	# Position: arc from start to alongside "P" with a dip
+	# Single continuous position tween — no velocity discontinuities between phases
 	var pos_tween := create_tween()
-	pos_tween.tween_property(camera, "position", CAM_APPROACH_END, t) \
+	pos_tween.tween_property(camera, "position", CAM_APPROACH_END, t1) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	pos_tween.tween_property(camera, "position", CAM_SWEEP_END, t2) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	pos_tween.tween_property(camera, "position", CAM_HYPERSPACE_END, t3) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+
+	# Single continuous rotation tween — smooth banking throughout
+	var rot_tween := create_tween()
+	rot_tween.tween_property(camera, "rotation", ROT_APPROACH_PEAK, t1 * 0.5) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	rot_tween.tween_property(camera, "rotation", ROT_APPROACH_END, t1 * 0.5) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	rot_tween.tween_property(camera, "rotation", ROT_SWEEP, t2) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	rot_tween.tween_property(camera, "rotation", ROT_HYPERSPACE, t3 * 0.3) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
-	# Rotation: bank into the turn (roll peaks mid-way), then level out
-	var rot_tween := create_tween()
-	rot_tween.tween_property(camera, "rotation", ROT_APPROACH_PEAK, t * 0.5) \
-		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	rot_tween.tween_property(camera, "rotation", ROT_APPROACH_END, t * 0.5) \
+	# Ground shader: continuous speed ramp across sweep + hyperspace
+	var shader_tween := create_tween()
+	shader_tween.tween_interval(t1)  # Hold at 0.0 during approach
+	shader_tween.tween_property(ground_mat, "shader_parameter/speed", 0.6, t2) \
+		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	shader_tween.tween_property(ground_mat, "shader_parameter/speed", 1.0, t3) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+
+	# Streak angle: rotate toward forward during hyperspace
+	var angle_tween := create_tween()
+	angle_tween.tween_interval(t1 + t2)  # Hold at 0.0 during approach + sweep
+	angle_tween.tween_property(ground_mat, "shader_parameter/streak_angle", PI / 2.0, t3) \
 		.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 
-	# Wait for both tweens to complete before next phase
-	await pos_tween.finished
-	if rot_tween.is_running():
-		await rot_tween.finished
-
-
-func _flyby_accelerating_sweep() -> void:
-	var t := FLYBY_SWEEP_DURATION
-
-	# Position: lateral sweep with acceleration (ease-in = slow start, fast finish)
-	var pos_tween := create_tween()
-	pos_tween.tween_property(camera, "position", CAM_SWEEP_END, t) \
-		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-
-	# Rotation: slight adjustment during sweep
-	var rot_tween := create_tween()
-	rot_tween.tween_property(camera, "rotation", ROT_SWEEP, t) \
-		.set_trans(Tween.TRANS_LINEAR)
-
-	# Ground shader: ramp speed for lateral movement (streak_angle stays at 0.0 = X-axis)
-	var shader_tween := create_tween()
-	shader_tween.tween_property(ground_mat, "shader_parameter/speed", 0.6, t) \
-		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-
-	# Wait for all tweens to complete before next phase
-	await pos_tween.finished
-	if rot_tween.is_running():
-		await rot_tween.finished
-	if shader_tween.is_running():
-		await shader_tween.finished
-
-
-func _flyby_hyperspace_punch() -> void:
-	var t := FLYBY_HYPERSPACE_DURATION
-
-	# All effects run in parallel — position, shader, white-out
-	var tween := create_tween().set_parallel(true)
-
-	# Position: continue forward acceleration
-	tween.tween_property(camera, "position", CAM_HYPERSPACE_END, t) \
-		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-
-	# Rotation: straighten out (shorter duration, still parallel)
-	tween.tween_property(camera, "rotation", ROT_HYPERSPACE, t * 0.3) \
-		.set_trans(Tween.TRANS_LINEAR)
-
-	# Ground shader: full streak, rotate angle toward forward (Z axis = PI/2)
-	tween.tween_property(ground_mat, "shader_parameter/speed", 1.0, t) \
-		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tween.tween_property(ground_mat, "shader_parameter/streak_angle", PI / 2.0, t)
-
-	# White-out: fade to white
-	tween.tween_property(white_out, "modulate:a", 1.0, t) \
+	# White-out: fade to white during hyperspace only
+	var white_tween := create_tween()
+	white_tween.tween_interval(t1 + t2)  # Hold transparent during approach + sweep
+	white_tween.tween_property(white_out, "modulate:a", 1.0, t3) \
 		.set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN)
 
-	await tween.finished
+	await pos_tween.finished
 
 
 func _on_pipeline_error(index: int, error: String) -> void:
