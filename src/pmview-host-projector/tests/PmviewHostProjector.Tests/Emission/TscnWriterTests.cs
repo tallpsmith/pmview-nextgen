@@ -423,12 +423,13 @@ public class TscnWriterTests
         // ext_resources (12): controller_script, metric_poller_script, scene_binder_script,
         //                      metric_group_script, metric_grid_script, ground_bezel_script,
         //                      bar_scene, bindable_script, binding_res_script,
-        //                      range_tuning_panel_scene, help_panel_scene, help_hint_scene
+        //                      range_tuning_panel_scene, help_panel_scene, help_hint_scene,
+        //                      detail_panel_scene
         // sub_resources (1): binding for CPU_User
         // ambient labels (2): TimestampLabel, HostnameLabel
-        // = 12 + 1 + 2 = 15
+        // = 13 + 1 + 2 = 16
         var tscn = TscnWriter.Write(MinimalLayout());
-        Assert.Contains("load_steps=15 ", tscn);
+        Assert.Contains("load_steps=16 ", tscn);
     }
 
     // --- PlacedStack emission tests ---
@@ -525,12 +526,13 @@ public class TscnWriterTests
         // ext_resources (13): controller, metric_poller, scene_binder,
         //                      metric_group_script, metric_grid_script, ground_bezel_script,
         //                      bar_scene, bindable, binding_res, stack_group_script,
-        //                      range_tuning_panel_scene, help_panel_scene, help_hint_scene
+        //                      range_tuning_panel_scene, help_panel_scene, help_hint_scene,
+        //                      detail_panel_scene
         // sub_resources (3): one binding per member
         // ambient (2)
-        // = 13 + 3 + 2 = 18
+        // = 14 + 3 + 2 = 19
         var tscn = TscnWriter.Write(LayoutWithCpuStack());
-        Assert.Contains("load_steps=18 ", tscn);
+        Assert.Contains("load_steps=19 ", tscn);
     }
 
     // --- Placeholder / ghost shape tests ---
@@ -570,14 +572,15 @@ public class TscnWriterTests
         ]);
         var tscn = TscnWriter.Write(layout);
 
-        // ext_resources (12): controller, metric_poller, scene_binder,
+        // ext_resources (13): controller, metric_poller, scene_binder,
         //                      metric_group, metric_grid, ground_bezel,
         //                      bar_scene, bindable_script, binding_res_script,
-        //                      range_tuning_panel_scene, help_panel_scene, help_hint_scene
+        //                      range_tuning_panel_scene, help_panel_scene, help_hint_scene,
+        //                      detail_panel_scene
         // sub_resources (0): placeholder has no binding
         // ambient (2): TimestampLabel, HostnameLabel
-        // = 12 + 0 + 2 = 14
-        Assert.Contains("load_steps=14 ", tscn);
+        // = 13 + 0 + 2 = 15
+        Assert.Contains("load_steps=15 ", tscn);
     }
 
     [Fact]

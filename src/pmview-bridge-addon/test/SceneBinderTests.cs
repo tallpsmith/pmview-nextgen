@@ -603,6 +603,106 @@ public partial class SceneBinderTests
 		AssertThat(centroid).IsEqual(Godot.Vector3.Zero);
 	}
 
+	// ── GetBindingsForNode ───────────────────────────────────────────────
+
+	[TestCase]
+	[RequireGodotRuntime]
+	public async Task GetBindingsForNode_ReturnsBindingsGroupedByProperty()
+	{
+		var runner = ISceneRunner.Load("res://test/scenes/test_node3d.tscn");
+		var node3D = (Node3D)runner.Scene();
+		var binder = new SceneBinder();
+		runner.Scene().AddChild(binder);
+
+		var bindable = new PcpBindable();
+		var heightBinding = new PcpBindingResource
+		{
+			MetricName = "kernel.cpu.user",
+			TargetProperty = "height",
+			SourceRangeMin = 0f, SourceRangeMax = 100f,
+			TargetRangeMin = 0.2f, TargetRangeMax = 5.0f,
+			InitialValue = 0f,
+			ZoneName = "CPU",
+			InstanceName = "cpu0"
+		};
+		bindable.PcpBindings = new Godot.Collections.Array<PcpBindingResource> { heightBinding };
+		node3D.AddChild(bindable);
+		binder.BindFromSceneProperties(node3D);
+
+		var metrics = new Godot.Collections.Dictionary
+		{
+			["kernel.cpu.user"] = new Godot.Collections.Dictionary
+			{
+				["instances"] = new Godot.Collections.Dictionary { [7] = 42.3 },
+				["name_to_id"] = new Godot.Collections.Dictionary { ["cpu0"] = 7 }
+			}
+		};
+		binder.ApplyMetrics(metrics);
+
+		var result = binder.GetBindingsForNode(node3D);
+		AssertThat(result.ContainsKey("zone")).IsTrue();
+		AssertThat(result["zone"].AsString()).IsEqual("CPU");
+		AssertThat(result.ContainsKey("instance")).IsTrue();
+		AssertThat(result["instance"].AsString()).IsEqual("cpu0");
+		AssertThat(result.ContainsKey("properties")).IsTrue();
+
+		var properties = result["properties"].AsGodotDictionary();
+		AssertThat(properties.ContainsKey("height")).IsTrue();
+
+		var heightBindings = properties["height"].AsGodotArray();
+		AssertThat(heightBindings.Count).IsEqual(1);
+
+		var entry = heightBindings[0].AsGodotDictionary();
+		AssertThat(entry["metric"].AsString()).IsEqual("kernel.cpu.user");
+		AssertThat(entry["value"].AsDouble()).IsEqualApprox(42.3, 0.01);
+
+		await runner.AwaitIdleFrame();
+	}
+
+	[TestCase]
+	[RequireGodotRuntime]
+	public void GetBindingsForNode_NoBindings_ReturnsEmptyDict()
+	{
+		var binder = new SceneBinder();
+		var node = new Node3D();
+		var result = binder.GetBindingsForNode(node);
+		AssertThat(result.Count).IsEqual(0);
+	}
+
+	[TestCase]
+	[RequireGodotRuntime]
+	public async Task GetBindingsForNode_NoMetricsApplied_ReturnsNullValue()
+	{
+		var runner = ISceneRunner.Load("res://test/scenes/test_node3d.tscn");
+		var node3D = (Node3D)runner.Scene();
+		var binder = new SceneBinder();
+		runner.Scene().AddChild(binder);
+
+		var bindable = new PcpBindable();
+		var binding = new PcpBindingResource
+		{
+			MetricName = "kernel.cpu.user",
+			TargetProperty = "height",
+			SourceRangeMin = 0f, SourceRangeMax = 100f,
+			TargetRangeMin = 0.2f, TargetRangeMax = 5.0f,
+			InitialValue = 0f,
+			ZoneName = "CPU",
+			InstanceName = "cpu0"
+		};
+		bindable.PcpBindings = new Godot.Collections.Array<PcpBindingResource> { binding };
+		node3D.AddChild(bindable);
+		binder.BindFromSceneProperties(node3D);
+
+		var result = binder.GetBindingsForNode(node3D);
+		var properties = result["properties"].AsGodotDictionary();
+		var heightEntries = properties["height"].AsGodotArray();
+		var entry = heightEntries[0].AsGodotDictionary();
+
+		AssertThat(entry["value"].VariantType).IsEqual(Variant.Type.Nil);
+
+		await runner.AwaitIdleFrame();
+	}
+
 	// ── Helpers ──────────────────────────────────────────────────────────
 
 	private static Godot.Collections.Dictionary MakeSingularMetrics(

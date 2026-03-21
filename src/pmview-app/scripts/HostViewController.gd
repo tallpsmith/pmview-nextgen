@@ -26,6 +26,8 @@ var _timestamp_label_3d: Node = null
 var _is_archive_mode := false
 var _poll_interval_seconds := 60.0
 var _active_viewpoint_key: int = -1  ## Currently active viewpoint key, or -1 for none
+var _selected_shape: Node = null  ## Currently selected GroundedShape or StackGroupNode
+var _detail_panel: Control = null
 
 
 func _ready() -> void:
@@ -54,6 +56,16 @@ func _ready() -> void:
 	_scene_binder = scene.find_child("SceneBinder", true, false)
 	print("[HostView] HelpPanel found: %s, HelpHint found: %s, Camera found: %s, SceneBinder found: %s" % [
 		_help_panel != null, _help_hint != null, _camera != null, _scene_binder != null])
+
+	# Wire detail panel for shape selection
+	_detail_panel = scene.find_child("DetailPanel", true, false)
+	if _detail_panel:
+		_detail_panel.panel_closed.connect(_on_detail_panel_closed)
+
+	# Subscribe to metric updates for detail panel refresh
+	var metric_poller = scene.find_child("MetricPoller", true, false)
+	if metric_poller and metric_poller.has_signal("MetricsUpdated"):
+		metric_poller.MetricsUpdated.connect(_on_metrics_updated_for_detail)
 
 	# Connect panel signals for camera suppression
 	if _help_panel:
@@ -173,6 +185,15 @@ func _on_panel_closed() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Tab — deselect when switching camera mode (don't consume, camera handles toggle)
+	if event is InputEventKey and event.pressed and event.physical_keycode == KEY_TAB:
+		_deselect_shape()
+
+	# Left-click — shape selection via raycast
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_handle_click_selection(event)
+		return
+
 	# H or ? — toggle help panel
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.physical_keycode == KEY_H:
@@ -197,6 +218,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	# ESC — close help panel first if open
 	if event.is_action_pressed("ui_cancel") and _help_panel and _help_panel.visible:
 		_help_panel.hide_panel()
+		get_viewport().set_input_as_handled()
+		return
+
+	# ESC — deselect shape if selected (RangeTuningPanel handles its own ESC first)
+	if event.is_action_pressed("ui_cancel") and _selected_shape != null:
+		_deselect_shape()
 		get_viewport().set_input_as_handled()
 		return
 
@@ -267,6 +294,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _activate_viewpoint(vp: Array) -> void:
+	_deselect_shape()
 	var vp_key: int = vp[0]
 	if vp_key == _active_viewpoint_key:
 		return  # Already at this viewpoint
@@ -312,6 +340,7 @@ func _setup_help_content() -> void:
 		HelpGroup.HelpEntry.create("SHIFT", "Sprint (hold with movement)"),
 		HelpGroup.HelpEntry.create("Right-click", "Look around (hold + drag)"),
 		HelpGroup.HelpEntry.create("← → ↑ ↓", "Look around (arrow keys)"),
+		HelpGroup.HelpEntry.create("Click", "Select shape (inspect metrics)"),
 	])
 
 	var viewpoints_group := HelpGroup.create("Viewpoints", teal, [
@@ -356,6 +385,7 @@ func _setup_help_hints() -> void:
 
 
 func _on_help_opened() -> void:
+	_deselect_shape()
 	if _camera:
 		_camera.input_enabled = false
 	if _help_hint:
@@ -377,6 +407,7 @@ func _on_help_closed() -> void:
 
 
 func _on_tuner_opened() -> void:
+	_deselect_shape()
 	if _camera:
 		_camera.input_enabled = false
 	# Panel exclusivity — close help if open
@@ -397,6 +428,142 @@ func _toggle_playback() -> void:
 func _dismiss_esc() -> void:
 	_esc_pending = false
 	esc_label.visible = false
+
+
+func _handle_click_selection(event: InputEventMouseButton) -> void:
+	if not _camera:
+		return
+	var cam: Camera3D = _camera as Camera3D
+	if cam == null:
+		return
+	var from: Vector3 = cam.project_ray_origin(event.position)
+	var dir: Vector3 = cam.project_ray_normal(event.position)
+	var to := from + dir * 1000.0
+
+	var space_state := get_world_3d().direct_space_state
+	var query := PhysicsRayQueryParameters3D.create(from, to)
+	query.collision_mask = 2  # Layer 2 only
+	var result := space_state.intersect_ray(query)
+
+	if result.is_empty():
+		if _selected_shape != null:
+			_deselect_shape()
+			get_viewport().set_input_as_handled()
+		return
+	var hit_node: Node = result["collider"]
+	var shape := _find_selectable_ancestor(hit_node)
+	if shape and shape != _selected_shape:
+		_select_shape(shape)
+		get_viewport().set_input_as_handled()
+	elif shape == _selected_shape:
+		get_viewport().set_input_as_handled()
+	elif not shape:
+		if _selected_shape != null:
+			_deselect_shape()
+			get_viewport().set_input_as_handled()
+
+
+func _find_selectable_ancestor(node: Node) -> Node:
+	var current := node
+	while current != null:
+		if current is StackGroupNode:
+			return current
+		if current is GroundedShape:
+			if current.get_parent() is StackGroupNode:
+				return current.get_parent()
+			return current
+		current = current.get_parent()
+	return null
+
+
+func _select_shape(shape: Node) -> void:
+	if _selected_shape and _selected_shape.has_method("highlight"):
+		_selected_shape.highlight(false)
+
+	_selected_shape = shape
+	shape.highlight(true)
+
+	var target_pos: Vector3 = (shape as Node3D).global_position
+	if shape is StackGroupNode:
+		var sum := Vector3.ZERO
+		var count := 0
+		for child in shape.get_children():
+			if child is Node3D:
+				sum += child.global_position
+				count += 1
+		if count > 0:
+			target_pos = sum / float(count)
+
+	var cam3d: Camera3D = _camera as Camera3D if _camera else null
+	if cam3d:
+		var orbit_height: float = cam3d._orbit_height
+		var cam_dir: Vector3 = (cam3d.global_position - target_pos).normalized()
+		cam_dir.y = 0.0
+		if cam_dir.length_squared() < 0.01:
+			cam_dir = Vector3(0, 0, 1)
+		cam_dir = cam_dir.normalized()
+		var camera_pos: Vector3 = target_pos + cam_dir * 8.0
+		camera_pos.y = orbit_height
+		cam3d.fly_to_viewpoint(camera_pos, target_pos)
+	_active_viewpoint_key = -1
+
+	if _detail_panel and _scene_binder:
+		var bindings: Dictionary
+		if shape is StackGroupNode:
+			bindings = _get_stack_bindings(shape)
+		else:
+			bindings = _scene_binder.GetBindingsForNode(shape)
+		_detail_panel.show_for_shape(bindings)
+
+
+func _deselect_shape() -> void:
+	if _selected_shape == null:
+		return
+	if is_instance_valid(_selected_shape) and _selected_shape.has_method("highlight"):
+		_selected_shape.highlight(false)
+	_selected_shape = null
+	if _detail_panel and _detail_panel.visible:
+		_detail_panel.close_panel()
+
+
+func _on_detail_panel_closed() -> void:
+	if _selected_shape and is_instance_valid(_selected_shape) and _selected_shape.has_method("highlight"):
+		_selected_shape.highlight(false)
+	_selected_shape = null
+
+
+func _get_stack_bindings(stack: Node) -> Dictionary:
+	var zone := ""
+	var instance := ""
+	var all_properties := {}
+
+	for child in stack.get_children():
+		if not child is Node3D:
+			continue
+		var child_bindings: Dictionary = _scene_binder.GetBindingsForNode(child)
+		if child_bindings.is_empty():
+			continue
+		if zone.is_empty():
+			zone = child_bindings.get("zone", "")
+			instance = child_bindings.get("instance", "")
+		var props: Dictionary = child_bindings.get("properties", {})
+		for prop_name: String in props:
+			if not all_properties.has(prop_name):
+				all_properties[prop_name] = []
+			all_properties[prop_name].append_array(props[prop_name])
+
+	return {"zone": zone, "instance": instance, "properties": all_properties}
+
+
+func _on_metrics_updated_for_detail(_metrics: Dictionary) -> void:
+	if _selected_shape == null or _detail_panel == null or not _detail_panel.visible:
+		return
+	var bindings: Dictionary
+	if _selected_shape is StackGroupNode:
+		bindings = _get_stack_bindings(_selected_shape)
+	else:
+		bindings = _scene_binder.GetBindingsForNode(_selected_shape)
+	_detail_panel.update_values(bindings)
 
 
 func _notification(what: int) -> void:

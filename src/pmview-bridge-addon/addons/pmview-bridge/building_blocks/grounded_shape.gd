@@ -22,6 +22,9 @@ extends Node3D
 		ghost = value
 		_apply_colour()
 
+var _highlighted: bool = false
+var _outline_mesh: MeshInstance3D = null
+
 func _ready() -> void:
 	scale.y = height
 	_apply_colour()
@@ -41,6 +44,46 @@ func _apply_colour() -> void:
 		else:
 			mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
 			mat.albedo_color = colour
+		# Keep emission in sync if highlighted
+		if _highlighted and not ghost:
+			mat.emission = colour
+
+func highlight(enabled: bool) -> void:
+	if enabled == _highlighted:
+		return
+	_highlighted = enabled
+	var mesh_instance := _find_mesh_instance()
+	if mesh_instance == null:
+		return
+	var mat := mesh_instance.get_surface_override_material(0)
+	if mat is StandardMaterial3D:
+		if enabled:
+			mat.emission_enabled = true
+			mat.emission = mat.albedo_color
+			mat.emission_energy_multiplier = 3.0
+			_show_outline(mesh_instance)
+		else:
+			mat.emission_enabled = false
+			_hide_outline()
+
+func is_highlighted() -> bool:
+	return _highlighted
+
+func _show_outline(source_mesh: MeshInstance3D) -> void:
+	if _outline_mesh == null:
+		_outline_mesh = MeshInstance3D.new()
+		_outline_mesh.mesh = source_mesh.mesh
+		var shader := load("res://addons/pmview-bridge/building_blocks/highlight.gdshader")
+		var mat := ShaderMaterial.new()
+		mat.shader = shader
+		_outline_mesh.set_surface_override_material(0, mat)
+		_outline_mesh.scale = Vector3(1.15, 1.15, 1.15)
+		source_mesh.add_child(_outline_mesh)
+	_outline_mesh.visible = true
+
+func _hide_outline() -> void:
+	if _outline_mesh != null:
+		_outline_mesh.visible = false
 
 func _find_mesh_instance() -> MeshInstance3D:
 	for child in get_children():
