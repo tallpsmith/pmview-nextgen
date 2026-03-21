@@ -25,6 +25,7 @@ func _ready() -> void:
 		hostnames = _generate_mock_hostnames(12)
 	_build_grid(hostnames)
 	_position_master_timestamp()
+	patrol_camera.setup(_grid_bounds)
 
 
 func _generate_mock_hostnames(count: int) -> PackedStringArray:
