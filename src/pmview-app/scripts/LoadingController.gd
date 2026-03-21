@@ -115,7 +115,7 @@ func _run_flyby_sequence() -> void:
 
 	var follow := PathFollow3D.new()
 	follow.rotation_mode = PathFollow3D.ROTATION_ORIENTED
-	follow.use_model_front = true
+	follow.use_model_front = false
 	follow.loop = false
 	path.add_child(follow)
 
