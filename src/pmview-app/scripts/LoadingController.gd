@@ -9,7 +9,7 @@ extends Node3D
 @onready var letters := [$LetterP, $LetterM, $LetterV, $LetterI, $LetterE, $LetterW]
 @onready var camera: Camera3D = $Camera3D
 @onready var ground_mat: ShaderMaterial = $GroundPlane.get_surface_override_material(0)
-@onready var white_out: ColorRect = %WhiteOut
+@onready var fade_out: ColorRect = %FadeOut
 
 const PHASE_NAMES := [
 	"CONNECTING",
@@ -27,31 +27,28 @@ const FLYBY_TOTAL_DURATION := 2.5
 # Spline waypoints: position, in-handle (relative), out-handle (relative), tilt (radians)
 # IMPORTANT: in/out handles must be collinear (opposite directions) at each interior
 # point for C1 tangent continuity — otherwise the curve kinks and the camera jerks.
-# Path: straight at letter centre → bank right → sweep past I/E/W → hyperspace
+# Path: straight at letter centre → bank right → sweep along faces → climb → fade
 const FLYBY_WAYPOINTS := [
 	# Start: front-on view — out handle points straight at the letters
 	{ "pos": Vector3(0.0, 0.18, 6.11),    "in": Vector3.ZERO,              "out": Vector3(0.0, -0.1, -3.0),  "tilt": 0.0 },
 	# Near letters: tangent transitions from forward (-Z) to rightward (+X)
-	# in/out are collinear: both along the (-Z → +X) diagonal
+	# in/out collinear along the (-Z → +X) diagonal
 	{ "pos": Vector3(0.5, -0.05, 1.8),    "in": Vector3(-0.4, 0.1, 1.5),   "out": Vector3(0.4, -0.1, -1.5),  "tilt": 0.15 },
 	# Banking right past "I", close to the face — tangent is pure +X
 	# in/out collinear along X axis
 	{ "pos": Vector3(3.5, -0.12, 1.5),    "in": Vector3(-2.5, 0.0, 0.0),   "out": Vector3(2.5, 0.0, 0.0),    "tilt": 0.15 },
-	# Past "W": still +X dominant, slight forward lean starting
-	# in/out collinear along (+X, 0, -0.15)
-	{ "pos": Vector3(9.0, -0.12, 1.2),    "in": Vector3(-3.0, 0.0, 0.15),  "out": Vector3(3.0, 0.0, -0.15),  "tilt": 0.05 },
-	# Transitioning to hyperspace: tangent bending from +X toward -Z
-	# in/out collinear along (+X, 0, -Z) diagonal
-	{ "pos": Vector3(15.0, -0.12, -0.5),  "in": Vector3(-2.5, 0.0, 0.8),   "out": Vector3(2.5, 0.0, -0.8),   "tilt": 0.0 },
-	# Hyperspace exit — in handle mirrors the approach direction
-	{ "pos": Vector3(22.0, -0.12, -6.0),  "in": Vector3(-2.0, 0.0, 1.5),   "out": Vector3.ZERO,              "tilt": 0.0 },
+	# Past "W": staying alongside letter faces, pure +X, starting to climb
+	# in/out collinear along (+X, +Y slight)
+	{ "pos": Vector3(9.0, -0.05, 1.5),    "in": Vector3(-3.0, 0.0, 0.0),   "out": Vector3(3.0, 0.1, 0.0),    "tilt": 0.05 },
+	# Climbing away: still +X, gaining altitude, fading out
+	# in/out collinear along (+X, +Y)
+	{ "pos": Vector3(15.0, 0.8, 1.5),     "in": Vector3(-3.0, -0.4, 0.0),  "out": Vector3(3.0, 0.4, 0.0),    "tilt": 0.0 },
+	# Final: high and far right, same Z — no left turn
+	{ "pos": Vector3(22.0, 2.5, 1.5),     "in": Vector3(-3.0, -0.8, 0.0),  "out": Vector3.ZERO,              "tilt": 0.0 },
 ]
 
-# Progress ratios at which shader effects kick in (0.0 = start, 1.0 = end)
-const SHADER_SPEED_START := 0.35   # Start stretching dots during sweep
-const SHADER_SPEED_FULL := 0.85    # Full streak by hyperspace
-const WHITE_OUT_START := 0.75      # Begin white-out
-const STREAK_ANGLE_START := 0.70   # Begin rotating streak angle
+# Progress ratio at which fade-to-black begins
+const FADE_OUT_START := 0.70
 
 var _has_error := false
 
@@ -135,24 +132,14 @@ func _run_flyby_sequence() -> void:
 	progress_tween.tween_property(follow, "progress_ratio", 1.0, FLYBY_TOTAL_DURATION) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
-	# Use _process to drive shader effects based on progress
+	# Drive fade-to-black based on progress
 	var shader_updater := func() -> void:
 		var p: float = follow.progress_ratio
 
-		# Ground shader speed: ramp from 0 to 1 across the sweep/hyperspace portion
-		if p >= SHADER_SPEED_START:
-			var speed_t := clampf((p - SHADER_SPEED_START) / (SHADER_SPEED_FULL - SHADER_SPEED_START), 0.0, 1.0)
-			ground_mat.set_shader_parameter("speed", speed_t * speed_t)  # Quadratic ramp
-
-		# Streak angle: rotate toward forward (PI/2) during hyperspace
-		if p >= STREAK_ANGLE_START:
-			var angle_t := clampf((p - STREAK_ANGLE_START) / (1.0 - STREAK_ANGLE_START), 0.0, 1.0)
-			ground_mat.set_shader_parameter("streak_angle", angle_t * PI / 2.0)
-
-		# White-out: exponential ramp at the end
-		if p >= WHITE_OUT_START:
-			var white_t := clampf((p - WHITE_OUT_START) / (1.0 - WHITE_OUT_START), 0.0, 1.0)
-			white_out.modulate.a = white_t * white_t * white_t  # Cubic for late-hitting punch
+		# Fade to black as camera climbs away
+		if p >= FADE_OUT_START:
+			var fade_t := clampf((p - FADE_OUT_START) / (1.0 - FADE_OUT_START), 0.0, 1.0)
+			fade_out.modulate.a = fade_t * fade_t  # Quadratic for smooth late ramp
 
 	# Connect to tree process to update effects each frame
 	get_tree().process_frame.connect(shader_updater)

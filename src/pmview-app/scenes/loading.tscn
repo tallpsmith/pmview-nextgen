@@ -202,7 +202,7 @@ text = ""
 horizontal_alignment = 1
 modulate = Color(0.228, 0.525, 1.0, 1)
 
-[node name="WhiteOut" type="ColorRect" parent="CanvasLayer/Control"]
+[node name="FadeOut" type="ColorRect" parent="CanvasLayer/Control"]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
@@ -210,6 +210,6 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(1, 1, 1, 1)
+color = Color(0, 0, 0, 1)
 modulate = Color(1, 1, 1, 0)
 mouse_filter = 2
