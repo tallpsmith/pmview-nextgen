@@ -24,6 +24,10 @@ src/
 - **Godot**: NOT installed in Claude Code VM (no UI). Write `.tscn`, `.gd`, and `.cs` files directly. User tests scenes in their host Godot editor.
 - Always include `/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin` in PATH when running shell commands (VM quirk).
 
+## GDScript Gotchas
+
+- **Type inference on `find_child()` results**: Variables from `find_child()` are typed as `Node`. Using `:=` with methods like `.global_position` or `.project_ray_origin()` causes "Cannot infer type" parser errors. Always use explicit types: `var pos: Vector3 = (node as Node3D).global_position` or cast to the concrete type first: `var cam: Camera3D = _camera as Camera3D`.
+
 ## Addon Development Rules
 
 - **Explicit using directives**: All C# files under `addons/pmview-bridge/` MUST use explicit `using` directives (`System`, `System.Collections.Generic`, `System.Threading.Tasks`, `System.Linq`, etc.). Never rely on `ImplicitUsings` — the addon gets installed into external Godot projects that may not have it enabled.
