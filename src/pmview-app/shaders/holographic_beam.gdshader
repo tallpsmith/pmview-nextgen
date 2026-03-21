@@ -6,12 +6,13 @@ uniform float scan_line_count : hint_range(5.0, 50.0) = 20.0;
 uniform float scan_line_speed : hint_range(0.0, 5.0) = 1.5;
 uniform float scan_line_intensity : hint_range(0.0, 1.0) = 0.3;
 uniform float edge_fade : hint_range(0.0, 0.5) = 0.15;
+uniform float beam_height : hint_range(1.0, 100.0) = 15.0;
 
 varying float v_height_ratio;
 
 void vertex() {
 	// Pass normalised height (0 = floor, 1 = ceiling) to fragment
-	v_height_ratio = clamp(VERTEX.y / max(abs(VERTEX.y), 0.001), 0.0, 1.0);
+	v_height_ratio = clamp(VERTEX.y / beam_height, 0.0, 1.0);
 }
 
 void fragment() {

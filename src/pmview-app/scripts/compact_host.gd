@@ -33,7 +33,6 @@ const MOCK_HEIGHTS := {
 var _bars: Dictionary = {}
 var _bezel: GroundBezel
 var _label: Label3D
-var _selected: bool = false
 var _base_colours: Dictionary = {}  # original colours for opacity restore
 
 
@@ -108,8 +107,13 @@ func set_opacity(alpha: float) -> void:
 					mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 					mat.albedo_color = Color(base_col.r, base_col.g, base_col.b, alpha)
 		else:
-			# Restore full opacity — let GroundedShape handle it
-			bar.colour = base_col
+			# Restore full opacity — explicitly reset transparency mode
+			var mesh_instance := _find_mesh_in(bar)
+			if mesh_instance:
+				var mat := mesh_instance.get_surface_override_material(0)
+				if mat is StandardMaterial3D:
+					mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+					mat.albedo_color = base_col
 	if _bezel:
 		var mat := _bezel.get_surface_override_material(0)
 		if mat is StandardMaterial3D:

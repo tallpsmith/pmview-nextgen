@@ -5,6 +5,7 @@ extends Node3D
 
 const CompactHostScript := preload("res://scripts/compact_host.gd")
 const HolographicBeamScript := preload("res://scripts/holographic_beam.gd")
+const BAR_SCENE := preload("res://addons/pmview-bridge/building_blocks/grounded_bar.tscn")
 
 @onready var fleet_grid: Node3D = %FleetGrid
 @onready var patrol_camera: Camera3D = %PatrolCamera
@@ -216,9 +217,8 @@ func _spawn_mock_detail_view(host: Node3D) -> void:
 	_detail_view.name = "DetailView"
 	_detail_view.position = host.position + Vector3(0, DETAIL_VIEW_HEIGHT, 0)
 	# Placeholder bars to visualise the detail view space
-	var bar_scene := load("res://addons/pmview-bridge/building_blocks/grounded_bar.tscn")
 	for i in range(8):
-		var bar: Node3D = bar_scene.instantiate()
+		var bar: Node3D = BAR_SCENE.instantiate()
 		bar.position = Vector3((i - 3.5) * 2.0, 0, 0)
 		bar.height = randf_range(0.3, 1.0)
 		bar.colour = Color(randf(), randf(), randf())

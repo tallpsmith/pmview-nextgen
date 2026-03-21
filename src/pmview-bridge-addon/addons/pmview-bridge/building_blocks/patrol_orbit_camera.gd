@@ -180,12 +180,15 @@ func _process_flying_to_focus(delta: float) -> void:
 	global_transform.basis = _fly_start_basis.slerp(target_basis, smooth_t)
 
 	if t >= 1.0:
+		_mode = Mode.PATROL  # stop processing, await return_to_patrol() to resume
+		_input_enabled = false
 		fly_to_focus_completed.emit()
 
 
 ## Return to patrol from nearest racetrack point
 func return_to_patrol() -> void:
 	_mode = Mode.PATROL
+	_input_enabled = true
 	_speed_multiplier = 1.0
 	_look_offset = Vector2.ZERO
 	_look_override_time = 0.0

@@ -85,6 +85,7 @@ func rebuild() -> void:
 
 	var mat := ShaderMaterial.new()
 	mat.shader = BEAM_SHADER
+	mat.set_shader_parameter("beam_height", beam_height)
 	arr_mesh.surface_set_material(0, mat)
 
 	mesh = arr_mesh
