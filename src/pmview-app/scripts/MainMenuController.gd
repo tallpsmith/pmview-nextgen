@@ -28,6 +28,9 @@ extends Node3D
 @onready var start_time_input: LineEdit = %StartTimeInput
 @onready var verbose_check: CheckButton = %VerboseCheck
 
+@onready var all_hosts_button: Button = %AllHostsButton
+
+var _discovered_hostnames: Array[String] = []
 var _sweep_tween: Tween = null
 var _orbit_angle := 0.0
 var _elevation_angle := 0.0
@@ -45,8 +48,10 @@ func _ready() -> void:
 	live_button.pressed.connect(_on_live_pressed)
 	archive_button.pressed.connect(_on_archive_pressed)
 	host_dropdown.item_selected.connect(_on_host_selected)
+	all_hosts_button.pressed.connect(_on_all_hosts_pressed)
 
 	archive_panel.visible = false
+	all_hosts_button.visible = false
 
 
 func _process(delta: float) -> void:
@@ -116,8 +121,13 @@ func _on_hostnames_response(result: int, response_code: int,
 		return
 
 	host_dropdown.disabled = false
+	_discovered_hostnames.clear()
 	for hostname in hostnames:
 		host_dropdown.add_item(hostname)
+		_discovered_hostnames.append(hostname)
+
+	# Show ALL HOSTS button when multiple hosts are available
+	all_hosts_button.visible = _discovered_hostnames.size() > 1
 
 	_on_host_selected(0)
 
@@ -294,3 +304,28 @@ func _launch() -> void:
 			"mode": "live",
 			"verbose_logging": verbose_check.button_pressed,
 		})
+
+
+# --- Fleet view launch ---
+
+func _on_all_hosts_pressed() -> void:
+	if _discovered_hostnames.is_empty():
+		return
+	_launch_fleet(PackedStringArray(_discovered_hostnames))
+
+
+func _launch_fleet(hostnames: PackedStringArray) -> void:
+	var url: String = endpoint_input.text.strip_edges()
+	if url.is_empty():
+		url = "http://localhost:44322"
+	var config := {
+		"endpoint": url,
+		"mode": "archive" if archive_button.button_pressed else "live",
+		"hostnames": hostnames,
+		"verbose_logging": verbose_check.button_pressed,
+	}
+	if archive_button.button_pressed:
+		config["start_time"] = start_time_input.text
+		config["archive_start_epoch"] = _archive_start_epoch
+		config["archive_end_epoch"] = _archive_end_epoch
+	SceneManager.go_to_fleet_view(config)
