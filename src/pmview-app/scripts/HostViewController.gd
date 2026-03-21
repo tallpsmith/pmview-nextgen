@@ -483,7 +483,7 @@ func _select_shape(shape: Node) -> void:
 	_selected_shape = shape
 	shape.highlight(true)
 
-	var target_pos := shape.global_position
+	var target_pos: Vector3 = (shape as Node3D).global_position
 	if shape is StackGroupNode:
 		var sum := Vector3.ZERO
 		var count := 0
