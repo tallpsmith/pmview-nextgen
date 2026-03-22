@@ -826,10 +826,11 @@ public partial class MetricPoller : Node
 
 		var endpointUri = new Uri(Endpoint);
 
-		// Time window: live = near-now, playback = cursor position
-		var windowEnd = _timeCursor.Mode == CursorMode.Live
-			? DateTime.UtcNow
-			: _timeCursor.Position;
+		// Fleet series path: query the latest N values per series instead of
+		// a time window. This works for both live (near-now) and archive
+		// (historical) data — no need to know the time bounds.
+		// Counters need 2+ samples for rate conversion, so fetch 5 for headroom.
+		var sampleCount = 5;
 
 		// Collect values per hostname across all metrics
 		var hostMetrics = new Dictionary<string, Godot.Collections.Dictionary>();
@@ -838,19 +839,11 @@ public partial class MetricPoller : Node
 		{
 			try
 			{
-				// Counters need 2 samples for rate conversion — widen the window.
-				// When _archiveSamplingIntervalSeconds is 0 (not yet discovered),
-				// use a generous default (120s) to guarantee 2+ samples at any
-				// reasonable logging interval (typically 10-60s).
 				var isCounter = _rateConverter?.IsCounter(metricName) == true;
-				var windowSeconds = isCounter
-					? (_archiveSamplingIntervalSeconds > 0
-						? _archiveSamplingIntervalSeconds * 2.5 : 120.0)
-					: (_archiveSamplingIntervalSeconds > 0
-						? _archiveSamplingIntervalSeconds * 1.5 : 60.0);
 
-				var valuesUrl = PcpSeriesQuery.BuildValuesUrlWithTimeWindow(
-					endpointUri, seriesIds, windowEnd, windowSeconds: windowSeconds);
+				var baseValuesUrl = PcpSeriesQuery.BuildValuesUrl(
+					endpointUri, seriesIds);
+				var valuesUrl = new Uri($"{baseValuesUrl}&count={sampleCount}");
 
 				var response = await _sharedHttpClient.GetAsync(valuesUrl);
 				if (!response.IsSuccessStatusCode)
@@ -932,10 +925,11 @@ public partial class MetricPoller : Node
 						hostMetrics[hostname] = hostDict;
 					}
 
+					// Use the latest timestamp from the actual data
+					var dataTimestamp = resolvedValues.Max(v => v.Timestamp);
 					hostDict[metricName] = new Godot.Collections.Dictionary
 					{
-						["timestamp"] = windowEnd
-							.Subtract(DateTime.UnixEpoch).TotalSeconds,
+						["timestamp"] = dataTimestamp / 1000.0,
 						["instances"] = new Godot.Collections.Dictionary
 						{
 							[-1] = summedValue
