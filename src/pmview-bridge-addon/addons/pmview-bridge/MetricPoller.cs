@@ -461,7 +461,12 @@ public partial class MetricPoller : Node
 		var scrapeWatch = System.Diagnostics.Stopwatch.StartNew();
 		try
 		{
-			if (_timeCursor.Mode == CursorMode.Live)
+			if (HasCachedSeriesMap)
+			{
+				// Fleet mode — hostname-filtered series queries
+				await FetchSeriesMetricsForHosts();
+			}
+			else if (_timeCursor.Mode == CursorMode.Live)
 			{
 				// Live mode — fetch current values via /pmapi/fetch
 				await FetchLiveMetrics();
@@ -804,6 +809,135 @@ public partial class MetricPoller : Node
 	}
 
 	/// <summary>
+	/// Fetches metric values using the cached series map from centralised discovery.
+	/// Queries one /series/values call per metric with all cached series IDs,
+	/// partitions results by hostname, and fires MetricsUpdated per host.
+	/// Handles counter metrics via rate conversion (needs 2+ samples).
+	/// Used for both fleet live mode (near-now window) and fleet playback.
+	/// </summary>
+	private async Task FetchSeriesMetricsForHosts()
+	{
+		if (_cachedSeriesIdToHostname == null || _cachedSeriesIdsPerMetric == null)
+			return;
+
+		var endpointUri = new Uri(Endpoint);
+
+		// Time window: live = near-now, playback = cursor position
+		var windowEnd = _timeCursor.Mode == CursorMode.Live
+			? DateTime.UtcNow
+			: _timeCursor.Position;
+
+		// Collect values per hostname across all metrics
+		var hostMetrics = new Dictionary<string, Godot.Collections.Dictionary>();
+
+		foreach (var (metricName, seriesIds) in _cachedSeriesIdsPerMetric)
+		{
+			try
+			{
+				// Counters need 2 samples for rate conversion — widen the window
+				var isCounter = _rateConverter?.IsCounter(metricName) == true;
+				var windowSeconds = isCounter
+					? (_archiveSamplingIntervalSeconds > 0
+						? _archiveSamplingIntervalSeconds * 2.5 : 5.0)
+					: (_archiveSamplingIntervalSeconds > 0
+						? _archiveSamplingIntervalSeconds * 1.5 : 2.0);
+
+				var valuesUrl = PcpSeriesQuery.BuildValuesUrlWithTimeWindow(
+					endpointUri, seriesIds, windowEnd, windowSeconds: windowSeconds);
+
+				var response = await _sharedHttpClient.GetAsync(valuesUrl);
+				if (!response.IsSuccessStatusCode)
+				{
+					Log.LogError("Series values query failed for {Metric}: {StatusCode}",
+						metricName, response.StatusCode);
+					continue;
+				}
+
+				var json = await response.Content.ReadAsStringAsync();
+				var seriesValues = PcpSeriesQuery.ParseValuesResponse(json);
+
+				if (seriesValues.Count == 0)
+					continue;
+
+				// Counters: compute per-second rates from consecutive samples
+				// Instant/discrete: take latest timestamp's values directly
+				IReadOnlyList<SeriesValue> resolvedValues;
+				if (isCounter)
+				{
+					resolvedValues = PcpSeriesQuery.ComputeRatesFromSeriesValues(
+						seriesValues);
+					if (resolvedValues.Count == 0)
+						continue;
+				}
+				else
+				{
+					var latestTimestamp = seriesValues.Max(v => v.Timestamp);
+					resolvedValues = seriesValues
+						.Where(v => Math.Abs(v.Timestamp - latestTimestamp) < 1.0
+							&& !v.IsString)
+						.ToList();
+				}
+
+				// Partition by hostname using cached series_id → hostname map.
+				// Sum values per hostname/metric for multi-instance metrics
+				// (e.g. network.interface.in.bytes has one series per interface).
+				var hostSums = new Dictionary<string, double>();
+				foreach (var sv in resolvedValues)
+				{
+					var lookupKey = sv.InstanceId ?? sv.SeriesId;
+					// Try instance hash first, then series hash
+					if (!_cachedSeriesIdToHostname.TryGetValue(lookupKey, out var hostname)
+						&& !_cachedSeriesIdToHostname.TryGetValue(sv.SeriesId, out hostname))
+					{
+						continue; // Unknown series — skip
+					}
+
+					if (hostSums.TryGetValue(hostname, out var existing))
+						hostSums[hostname] = existing + sv.NumericValue;
+					else
+						hostSums[hostname] = sv.NumericValue;
+				}
+
+				// Build the metric dict entries per hostname
+				foreach (var (hostname, summedValue) in hostSums)
+				{
+					if (!hostMetrics.TryGetValue(hostname, out var hostDict))
+					{
+						hostDict = new Godot.Collections.Dictionary();
+						hostMetrics[hostname] = hostDict;
+					}
+
+					hostDict[metricName] = new Godot.Collections.Dictionary
+					{
+						["timestamp"] = windowEnd
+							.Subtract(DateTime.UnixEpoch).TotalSeconds,
+						["instances"] = new Godot.Collections.Dictionary
+						{
+							[-1] = summedValue
+						},
+						["name_to_id"] = new Godot.Collections.Dictionary()
+					};
+				}
+			}
+			catch (Exception ex)
+			{
+				Log.LogError("Series fetch error for {Metric}: {Message}",
+					metricName, ex.Message);
+			}
+		}
+
+		// Emit per-host signals
+		foreach (var (hostname, metrics) in hostMetrics)
+		{
+			InjectVirtualMetricsForHost(metrics, hostname);
+			_lastEmittedMetrics = metrics;
+			EmitSignal(SignalName.MetricsUpdated, hostname, metrics);
+		}
+
+		EmitSignal(SignalName.ShardPollCompleted);
+	}
+
+	/// <summary>
 	/// Fetches and caches the series-ID-to-PCP-instance-ID mapping for a metric.
 	/// Only makes the HTTP call on the first invocation per metric per playback session.
 	/// </summary>
@@ -916,6 +1050,37 @@ public partial class MetricPoller : Node
 			dict["pmview.meta.hostname"] = new Godot.Collections.Dictionary
 			{
 				["text_value"] = Hostname
+			};
+		}
+
+		dict["pmview.meta.endpoint"] = new Godot.Collections.Dictionary
+		{
+			["text_value"] = Endpoint
+		};
+	}
+
+	/// <summary>
+	/// Variant of InjectVirtualMetrics that takes an explicit hostname
+	/// parameter instead of reading the Hostname property. Used by the fleet
+	/// series path where each signal carries a different host's data.
+	/// </summary>
+	internal void InjectVirtualMetricsForHost(
+		Godot.Collections.Dictionary dict, string hostname)
+	{
+		var now = _timeCursor.Mode == CursorMode.Playback
+			? _timeCursor.Position
+			: DateTime.UtcNow;
+
+		dict["pmview.meta.timestamp"] = new Godot.Collections.Dictionary
+		{
+			["text_value"] = now.ToString("yyyy-MM-dd · HH:mm:ss")
+		};
+
+		if (!string.IsNullOrEmpty(hostname))
+		{
+			dict["pmview.meta.hostname"] = new Godot.Collections.Dictionary
+			{
+				["text_value"] = hostname
 			};
 		}
 

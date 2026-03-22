@@ -352,6 +352,28 @@ public partial class MetricPollerTests
 		await runner.AwaitIdleFrame();
 	}
 
+	// ── Fetch path routing ────────────────────────────────────────────────
+
+	[TestCase]
+	[RequireGodotRuntime]
+	public async Task HasCachedSeriesMap_True_AfterInitialise()
+	{
+		var runner = ISceneRunner.Load("res://test/scenes/test_node3d.tscn");
+		var mock = new MockPcpClient();
+		var poller = new TestableMetricPoller(mock);
+		runner.Scene().AddChild(poller);
+
+		poller.InitialiseWithCachedSeriesMap(
+			new Dictionary<string, string> { ["abc"] = "host-01" },
+			new Dictionary<string, IReadOnlyList<string>>
+			{
+				["cpu.idle"] = new List<string> { "abc" }
+			});
+
+		AssertThat(poller.HasCachedSeriesMap).IsTrue();
+		await runner.AwaitIdleFrame();
+	}
+
 	[TestCase]
 	[RequireGodotRuntime]
 	public async Task HasCachedSeriesMap_False_ByDefault()
