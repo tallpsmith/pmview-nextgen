@@ -819,7 +819,10 @@ public partial class MetricPoller : Node
 	private async Task FetchSeriesMetricsForHosts()
 	{
 		if (_cachedSeriesIdToHostname == null || _cachedSeriesIdsPerMetric == null)
+		{
+			GD.Print($"[MetricPoller] FetchSeriesMetricsForHosts: cached map is null — bailing");
 			return;
+		}
 
 		var endpointUri = new Uri(Endpoint);
 

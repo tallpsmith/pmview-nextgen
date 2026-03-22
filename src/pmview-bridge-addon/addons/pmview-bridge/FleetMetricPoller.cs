@@ -164,7 +164,9 @@ public partial class FleetMetricPoller : Node
     {
         GD.Print("[FleetMetricPoller] DeferredStartShards — starting discovery...");
         await DiscoverSeriesMapping();
-        GD.Print("[FleetMetricPoller] DeferredStartShards — discovery complete");
+        GD.Print($"[FleetMetricPoller] DeferredStartShards — discovery complete, {_shards.Count} shards");
+        foreach (var shard in _shards)
+            GD.Print($"[FleetMetricPoller]   Shard {shard.Name}: HasCachedSeriesMap={shard.HasCachedSeriesMap}");
     }
 
     private async Task DiscoverSeriesMapping()
@@ -223,15 +225,16 @@ public partial class FleetMetricPoller : Node
                 }
             }
 
-            Log.LogWarning("[Fleet] Discovery: {Metric} → {Count} series IDs",
-                metricName, metricSeriesIds.Count);
+            GD.Print($"[FleetMetricPoller] Discovery: {metricName} → {metricSeriesIds.Count} series IDs");
             if (metricSeriesIds.Count > 0)
                 seriesIdsPerMetric[metricName] = metricSeriesIds;
         }
 
+        GD.Print($"[FleetMetricPoller] Discovery phase 1 done: {allSeriesIds.Count} total series IDs across {seriesIdsPerMetric.Count} metrics");
+
         if (allSeriesIds.Count == 0)
         {
-            Log.LogWarning("Discovery found no series IDs — fleet polling will be idle");
+            GD.Print("[FleetMetricPoller] Discovery found NO series IDs — fleet polling will be idle");
             return;
         }
 
@@ -252,16 +255,22 @@ public partial class FleetMetricPoller : Node
 
             var labelsJson = await labelsResponse.Content.ReadAsStringAsync();
             seriesIdToHostname = PcpSeriesQuery.ParsePerSeriesHostnameLabels(labelsJson);
+            GD.Print($"[FleetMetricPoller] Labels phase: {seriesIdToHostname.Count} series mapped to hostnames");
+            if (seriesIdToHostname.Count > 0)
+            {
+                // Show first few mappings
+                var sample = seriesIdToHostname.Take(5);
+                foreach (var kv in sample)
+                    GD.Print($"[FleetMetricPoller]   {kv.Key[..Math.Min(12, kv.Key.Length)]}... → {kv.Value}");
+            }
         }
         catch (Exception ex)
         {
-            Log.LogWarning("Discovery labels error: {Message}", ex.Message);
+            GD.Print($"[FleetMetricPoller] Discovery labels error: {ex.Message}");
             return;
         }
 
-        Log.LogWarning(
-            "[Fleet] Discovery complete: {SeriesCount} series IDs mapped to {HostCount} hostnames across {MetricCount} metrics",
-            seriesIdToHostname.Count, allHostnames.Length, seriesIdsPerMetric.Count);
+        GD.Print($"[FleetMetricPoller] Discovery complete: {seriesIdToHostname.Count} series → {seriesIdsPerMetric.Count} metrics");
 
         // Phase 3: Partition by shard and distribute
         var partitioned = FleetMetricNormaliser.PartitionSeriesMapByShard(
