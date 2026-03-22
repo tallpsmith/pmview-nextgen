@@ -165,20 +165,29 @@ func _enter_focus(host_index: int) -> void:
 		if i != host_index:
 			_hosts[i].set_opacity(0.3)
 
-	# Calculate focus camera target position (above and in front of the host)
-	var target_pos := host.position + Vector3(0, DETAIL_VIEW_HEIGHT + 5.0, 15.0)
-	var look_pos := host.position + Vector3(0, DETAIL_VIEW_HEIGHT / 2.0, 0)
+	# Camera sits at detail view height, offset to the side so we see the
+	# detail view and beam from outside, not from inside the beam.
+	var detail_centre := host.position + Vector3(0, DETAIL_VIEW_HEIGHT, 0)
+	var target_pos := detail_centre + Vector3(0, 3.0, 18.0)
+	var look_pos := detail_centre
 
 	# Fly the patrol camera toward the focus position
 	patrol_camera.fly_to_focus(target_pos, look_pos)
 	await patrol_camera.fly_to_focus_completed
 
-	# Switch to focus camera at the destination
+	# Switch to focus camera at the destination.
+	# Must set position BEFORE make_current, then re-init orbit params
+	# because fly_orbit_camera._ready() only runs once at scene load.
 	focus_camera.global_transform = patrol_camera.global_transform
+	focus_camera.orbit_center = detail_centre
+	focus_camera._orbit_height = focus_camera.position.y
+	focus_camera._radius = Vector2(
+		focus_camera.position.x - detail_centre.x,
+		focus_camera.position.z - detail_centre.z).length()
+	focus_camera._orbit_angle = atan2(
+		focus_camera.position.z - detail_centre.z,
+		focus_camera.position.x - detail_centre.x)
 	focus_camera.make_current()
-	# Wait a frame for fly_orbit_camera.gd's _ready() state
-	await get_tree().process_frame
-	focus_camera.orbit_center = host.position + Vector3(0, DETAIL_VIEW_HEIGHT / 2.0, 0)
 
 	# Spawn mock detail view (placeholder — real HostView spawning comes later)
 	_spawn_mock_detail_view(host)
