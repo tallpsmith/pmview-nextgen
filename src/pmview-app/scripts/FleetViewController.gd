@@ -22,6 +22,7 @@ const BAR_SCENE := preload("res://addons/pmview-bridge/building_blocks/grounded_
 enum ViewMode { PATROL, TRANSITIONING_TO_FOCUS, FOCUS, TRANSITIONING_TO_PATROL }
 
 var _hosts: Array[Node3D] = []
+var _host_lookup: Dictionary = {}
 var _grid_columns: int = 0
 var _grid_bounds: Rect2 = Rect2()
 var _view_mode: ViewMode = ViewMode.PATROL
@@ -70,6 +71,7 @@ func _build_grid(hostnames: PackedStringArray) -> void:
 		host_node.name = "CompactHost_%d" % i
 		fleet_grid.add_child(host_node)
 		_hosts.append(host_node)
+		_host_lookup[hostnames[i]] = host_node
 
 	_grid_bounds = Rect2(
 		Vector2(offset.x, offset.z),
@@ -314,21 +316,16 @@ func _setup_fleet_poller(config: Dictionary) -> void:
 
 var _fleet_update_count: int = 0
 
-func _on_fleet_metrics_updated(metrics: Dictionary) -> void:
+func _on_fleet_metrics_updated(hostname: String, metrics: Dictionary) -> void:
 	_fleet_update_count += 1
 	if _fleet_update_count <= 3 or _fleet_update_count % 10 == 0:
-		# Log first 3 updates and then every 10th
-		var sample_host: String = ""
-		for key: String in metrics:
-			sample_host = key
-			break
-		if not sample_host.is_empty():
-			print("[FleetView] Update #%d — sample host '%s': %s" % [
-				_fleet_update_count, sample_host, metrics[sample_host]])
-	for host: Node3D in _hosts:
-		var data: Dictionary = metrics.get(host.hostname, {})
-		for metric_name: String in data:
-			host.set_metric_value(metric_name, data[metric_name])
+		print("[FleetView] Update #%d — host '%s': %s" % [
+			_fleet_update_count, hostname, metrics])
+	var host: Node3D = _host_lookup.get(hostname)
+	if not host:
+		return
+	for metric_name: String in metrics:
+		host.set_metric_value(metric_name, metrics[metric_name])
 
 
 func _on_scrape_lagging() -> void:
