@@ -926,11 +926,12 @@ public partial class MetricPoller : Node
 			}
 		}
 
-		// Emit per-host signals
+		// Emit per-host signals — do NOT set _lastEmittedMetrics here;
+		// it is a single-host concept and ReplayLastMetrics makes no
+		// sense for fleet shards (which serve multiple hosts).
 		foreach (var (hostname, metrics) in hostMetrics)
 		{
 			InjectVirtualMetricsForHost(metrics, hostname);
-			_lastEmittedMetrics = metrics;
 			EmitSignal(SignalName.MetricsUpdated, hostname, metrics);
 		}
 
@@ -1033,30 +1034,11 @@ public partial class MetricPoller : Node
 	/// <summary>
 	/// Adds synthetic pmview.meta.* keys to the outgoing metric dictionary.
 	/// These are derived from local poller state, not fetched from pmproxy.
+	/// Delegates to InjectVirtualMetricsForHost using the Hostname property.
 	/// </summary>
 	internal void InjectVirtualMetrics(Godot.Collections.Dictionary dict)
 	{
-		var now = _timeCursor.Mode == CursorMode.Playback
-			? _timeCursor.Position
-			: DateTime.UtcNow;
-
-		dict["pmview.meta.timestamp"] = new Godot.Collections.Dictionary
-		{
-			["text_value"] = now.ToString("yyyy-MM-dd · HH:mm:ss")
-		};
-
-		if (!string.IsNullOrEmpty(Hostname))
-		{
-			dict["pmview.meta.hostname"] = new Godot.Collections.Dictionary
-			{
-				["text_value"] = Hostname
-			};
-		}
-
-		dict["pmview.meta.endpoint"] = new Godot.Collections.Dictionary
-		{
-			["text_value"] = Endpoint
-		};
+		InjectVirtualMetricsForHost(dict, Hostname);
 	}
 
 	/// <summary>
