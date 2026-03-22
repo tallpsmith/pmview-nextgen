@@ -250,14 +250,14 @@ public partial class FleetMetricNormaliserTests
 
         AssertThat(partitioned).HasSize(2);
         var shard0 = partitioned[0];
-        AssertThat(shard0.SeriesIdToHostname).HasSize(3);
+        AssertThat(shard0.SeriesIdToHostname.Count).IsEqual(3);
         AssertThat(shard0.SeriesIdToHostname["aaa"]).IsEqual("host-01");
-        AssertThat(shard0.SeriesIdsPerMetric["cpu.idle"]).HasSize(3);
+        AssertThat(shard0.SeriesIdsPerMetric["cpu.idle"].Count).IsEqual(3);
 
         var shard1 = partitioned[1];
-        AssertThat(shard1.SeriesIdToHostname).HasSize(1);
+        AssertThat(shard1.SeriesIdToHostname.Count).IsEqual(1);
         AssertThat(shard1.SeriesIdToHostname["ddd"]).IsEqual("host-03");
-        AssertThat(shard1.SeriesIdsPerMetric["cpu.idle"]).HasSize(1);
+        AssertThat(shard1.SeriesIdsPerMetric["cpu.idle"].Count).IsEqual(1);
     }
 
     [TestCase]
@@ -272,6 +272,6 @@ public partial class FleetMetricNormaliserTests
             shardAssignment, seriesIdToHostname, seriesIdsPerMetric);
 
         AssertThat(partitioned).HasSize(1);
-        AssertThat(partitioned[0].SeriesIdToHostname).IsEmpty();
+        AssertThat(partitioned[0].SeriesIdToHostname.Count).IsEqual(0);
     }
 }
