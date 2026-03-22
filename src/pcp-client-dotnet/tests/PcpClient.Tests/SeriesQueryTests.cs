@@ -813,4 +813,63 @@ public class SeriesQueryTests
         var urlStr = url.AbsoluteUri;
         Assert.DoesNotContain(" ", urlStr);
     }
+
+    // ── Per-series labels URL and parsing ──
+
+    [Fact]
+    public void BuildPerSeriesLabelsUrl_FormatsCorrectly()
+    {
+        var baseUrl = new Uri("http://localhost:44322");
+        var url = PcpSeriesQuery.BuildPerSeriesLabelsUrl(
+            baseUrl, ["abc123", "def456"]);
+
+        var urlStr = url.AbsoluteUri;
+        Assert.Contains("/series/labels", urlStr);
+        Assert.Contains("series=", urlStr);
+        Assert.Contains("abc123", urlStr);
+        Assert.Contains("def456", urlStr);
+    }
+
+    [Fact]
+    public void ParsePerSeriesHostnameLabels_ExtractsHostnames()
+    {
+        var json = """
+        [
+            {"series": "abc123", "hostname": "host-01"},
+            {"series": "def456", "hostname": "host-02"},
+            {"series": "ghi789", "hostname": "host-01"}
+        ]
+        """;
+
+        var result = PcpSeriesQuery.ParsePerSeriesHostnameLabels(json);
+
+        Assert.Equal(3, result.Count);
+        Assert.Equal("host-01", result["abc123"]);
+        Assert.Equal("host-02", result["def456"]);
+        Assert.Equal("host-01", result["ghi789"]);
+    }
+
+    [Fact]
+    public void ParsePerSeriesHostnameLabels_MissingHostnameLabel_SkipsEntry()
+    {
+        var json = """
+        [
+            {"series": "abc123", "hostname": "host-01"},
+            {"series": "def456", "agent": "pmcd"}
+        ]
+        """;
+
+        var result = PcpSeriesQuery.ParsePerSeriesHostnameLabels(json);
+
+        Assert.Single(result);
+        Assert.Equal("host-01", result["abc123"]);
+    }
+
+    [Fact]
+    public void ParsePerSeriesHostnameLabels_EmptyArray_ReturnsEmpty()
+    {
+        var json = "[]";
+        var result = PcpSeriesQuery.ParsePerSeriesHostnameLabels(json);
+        Assert.Empty(result);
+    }
 }

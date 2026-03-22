@@ -258,6 +258,45 @@ public static class PcpSeriesQuery
         return new Uri(baseUrl, $"/series/labels?names={Uri.EscapeDataString(labelName)}");
     }
 
+    /// <summary>
+    /// Builds a /series/labels URL to look up labels for specific series IDs.
+    /// DISTINCT from BuildLabelsUrl which queries by label name (?names=).
+    /// This queries by series IDs (?series=) to get all labels for those series.
+    /// </summary>
+    public static Uri BuildPerSeriesLabelsUrl(
+        Uri baseUrl, IEnumerable<string> seriesIds)
+    {
+        var ids = string.Join(",", seriesIds);
+        return new Uri(baseUrl, $"/series/labels?series={Uri.EscapeDataString(ids)}");
+    }
+
+    /// <summary>
+    /// Parses a /series/labels?series=... response to extract hostname labels.
+    /// Returns series_id → hostname mapping. Skips entries without a hostname label.
+    /// DISTINCT from ParseLabelsResponse which returns a flat list of label values.
+    /// </summary>
+    public static Dictionary<string, string> ParsePerSeriesHostnameLabels(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var result = new Dictionary<string, string>();
+
+        foreach (var item in doc.RootElement.EnumerateArray())
+        {
+            var seriesId = item.GetProperty("series").GetString();
+            if (seriesId == null)
+                continue;
+
+            if (item.TryGetProperty("hostname", out var hostnameProp))
+            {
+                var hostname = hostnameProp.GetString();
+                if (hostname != null)
+                    result[seriesId] = hostname;
+            }
+        }
+
+        return result;
+    }
+
     private static double ToEpochSeconds(DateTime utcTime)
     {
         return ((DateTimeOffset)utcTime).ToUnixTimeMilliseconds() / 1000.0;
