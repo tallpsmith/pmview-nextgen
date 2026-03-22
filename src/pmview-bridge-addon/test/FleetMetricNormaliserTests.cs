@@ -222,4 +222,56 @@ public partial class FleetMetricNormaliserTests
         AssertThat(budget.IsLagging).IsFalse();
         AssertThat(budget.ShouldSkipNextTick).IsFalse();
     }
+
+    // ── Series map partitioning ───────────────────────────────────────────
+
+    [TestCase]
+    public void PartitionSeriesMapByShard_DistributesCorrectly()
+    {
+        var shardAssignment = new FleetMetricNormaliser.ShardAssignment(
+            [["host-01", "host-02"], ["host-03"]],
+            []);
+
+        var seriesIdToHostname = new Dictionary<string, string>
+        {
+            ["aaa"] = "host-01",
+            ["bbb"] = "host-02",
+            ["ccc"] = "host-01",
+            ["ddd"] = "host-03",
+        };
+
+        var seriesIdsPerMetric = new Dictionary<string, List<string>>
+        {
+            ["cpu.idle"] = ["aaa", "bbb", "ccc", "ddd"],
+        };
+
+        var partitioned = FleetMetricNormaliser.PartitionSeriesMapByShard(
+            shardAssignment, seriesIdToHostname, seriesIdsPerMetric);
+
+        AssertThat(partitioned).HasSize(2);
+        var shard0 = partitioned[0];
+        AssertThat(shard0.SeriesIdToHostname).HasSize(3);
+        AssertThat(shard0.SeriesIdToHostname["aaa"]).IsEqual("host-01");
+        AssertThat(shard0.SeriesIdsPerMetric["cpu.idle"]).HasSize(3);
+
+        var shard1 = partitioned[1];
+        AssertThat(shard1.SeriesIdToHostname).HasSize(1);
+        AssertThat(shard1.SeriesIdToHostname["ddd"]).IsEqual("host-03");
+        AssertThat(shard1.SeriesIdsPerMetric["cpu.idle"]).HasSize(1);
+    }
+
+    [TestCase]
+    public void PartitionSeriesMapByShard_EmptyMap_ReturnsEmptyPartitions()
+    {
+        var shardAssignment = new FleetMetricNormaliser.ShardAssignment(
+            [["host-01"]], []);
+        var seriesIdToHostname = new Dictionary<string, string>();
+        var seriesIdsPerMetric = new Dictionary<string, List<string>>();
+
+        var partitioned = FleetMetricNormaliser.PartitionSeriesMapByShard(
+            shardAssignment, seriesIdToHostname, seriesIdsPerMetric);
+
+        AssertThat(partitioned).HasSize(1);
+        AssertThat(partitioned[0].SeriesIdToHostname).IsEmpty();
+    }
 }

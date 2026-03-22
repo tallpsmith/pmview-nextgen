@@ -114,4 +114,49 @@ public static class FleetMetricNormaliser
             ShouldSkipNextTick = false;
         }
     }
+
+    /// <summary>
+    /// Result of partitioning the global series map for one shard.
+    /// Contains only the series IDs relevant to hosts assigned to that shard.
+    /// All collections are independent copies — no shared mutable state.
+    /// </summary>
+    public record ShardSeriesMap(
+        IReadOnlyDictionary<string, string> SeriesIdToHostname,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> SeriesIdsPerMetric);
+
+    /// <summary>
+    /// Partitions a global series_id → hostname map into per-shard subsets
+    /// based on the shard assignment. Each shard gets an independent immutable copy
+    /// containing only the series IDs for hosts assigned to that shard.
+    /// </summary>
+    public static IReadOnlyList<ShardSeriesMap> PartitionSeriesMapByShard(
+        ShardAssignment assignment,
+        Dictionary<string, string> seriesIdToHostname,
+        Dictionary<string, List<string>> seriesIdsPerMetric)
+    {
+        var result = new List<ShardSeriesMap>();
+
+        foreach (var shardHosts in assignment.Shards)
+        {
+            var hostSet = new HashSet<string>(shardHosts);
+
+            var filteredMap = seriesIdToHostname
+                .Where(kv => hostSet.Contains(kv.Value))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+            var filteredSeriesIds = new Dictionary<string, IReadOnlyList<string>>();
+            foreach (var (metric, allIds) in seriesIdsPerMetric)
+            {
+                var shardIds = allIds
+                    .Where(id => filteredMap.ContainsKey(id))
+                    .ToList();
+                if (shardIds.Count > 0)
+                    filteredSeriesIds[metric] = shardIds;
+            }
+
+            result.Add(new ShardSeriesMap(filteredMap, filteredSeriesIds));
+        }
+
+        return result;
+    }
 }
