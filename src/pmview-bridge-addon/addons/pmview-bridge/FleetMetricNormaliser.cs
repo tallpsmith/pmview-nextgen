@@ -65,4 +65,23 @@ public static class FleetMetricNormaliser
         var utilisation = 1.0 - (idleRate / maxIdle);
         return Math.Clamp(utilisation, 0.0, 1.0);
     }
+
+    /// <summary>
+    /// Normalise a combined rate against a configurable maximum.
+    /// Used for paging (pages/s), disk (bytes/s), network (bytes/s).
+    /// </summary>
+    public static double NormaliseRate(double combinedRate, double maxRate)
+    {
+        if (maxRate <= 0.0) return 0.0;
+        return Math.Clamp(combinedRate / maxRate, 0.0, 1.0);
+    }
+
+    /// <summary>
+    /// Convenience: sum two rates before normalising.
+    /// E.g. disk read + write, network in + out, pgpgin + pgpgout.
+    /// </summary>
+    public static double NormaliseRate(double rate1, double rate2, double maxRate)
+    {
+        return NormaliseRate(rate1 + rate2, maxRate);
+    }
 }

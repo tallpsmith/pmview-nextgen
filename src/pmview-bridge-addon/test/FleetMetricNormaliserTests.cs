@@ -131,4 +131,46 @@ public partial class FleetMetricNormaliserTests
         var result = FleetMetricNormaliser.NormaliseCpu(idleRate: -500.0, ncpu: 4);
         AssertThat(result).IsBetween(0.999, 1.001);
     }
+
+    // ── Rate normalisation (paging, disk, network) ──────────────────────
+
+    [TestCase]
+    public void NormaliseRate_HalfMax_ReturnsHalf()
+    {
+        var result = FleetMetricNormaliser.NormaliseRate(
+            combinedRate: 5000.0, maxRate: 10000.0);
+        AssertThat(result).IsBetween(0.499, 0.501);
+    }
+
+    [TestCase]
+    public void NormaliseRate_ExceedsMax_ClampedToOne()
+    {
+        var result = FleetMetricNormaliser.NormaliseRate(
+            combinedRate: 20000.0, maxRate: 10000.0);
+        AssertThat(result).IsBetween(0.999, 1.001);
+    }
+
+    [TestCase]
+    public void NormaliseRate_Zero_ReturnsZero()
+    {
+        var result = FleetMetricNormaliser.NormaliseRate(
+            combinedRate: 0.0, maxRate: 10000.0);
+        AssertThat(result).IsBetween(-0.001, 0.001);
+    }
+
+    [TestCase]
+    public void NormaliseRate_ZeroMax_ReturnsZero()
+    {
+        var result = FleetMetricNormaliser.NormaliseRate(
+            combinedRate: 5000.0, maxRate: 0.0);
+        AssertThat(result).IsBetween(-0.001, 0.001);
+    }
+
+    [TestCase]
+    public void NormaliseRate_CombinesTwoInputs()
+    {
+        var result = FleetMetricNormaliser.NormaliseRate(
+            rate1: 3000.0, rate2: 2000.0, maxRate: 10000.0);
+        AssertThat(result).IsBetween(0.499, 0.501);
+    }
 }
