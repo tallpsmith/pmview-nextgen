@@ -10,6 +10,6 @@ public class HostProfileProvider : IHostProfileProvider
         HostOs.MacOs => MacOsProfile.GetZones(),
         // Archives may lack kernel.uname.sysname — fall back to Linux
         // since PCP archives are overwhelmingly from Linux hosts.
-        HostOs.Unknown => LinuxProfile.GetZones(),
+        _ => LinuxProfile.GetZones(),
     };
 }
