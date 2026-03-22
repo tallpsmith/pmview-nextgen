@@ -35,6 +35,9 @@ public partial class MetricPoller : Node
 	[Signal]
 	public delegate void PlaybackPositionChangedEventHandler(string position, string mode);
 
+	[Signal]
+	public delegate void ShardPollCompletedEventHandler();
+
 	private ILogger? _log;
 	private ILogger Log => _log ??= PmviewLogger.GetLogger("MetricPoller");
 
