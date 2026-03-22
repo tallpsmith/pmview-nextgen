@@ -84,4 +84,34 @@ public static class FleetMetricNormaliser
     {
         return NormaliseRate(rate1 + rate2, maxRate);
     }
+
+    /// <summary>
+    /// Tracks whether poll scrapes are completing within their budget.
+    /// When a scrape overruns the poll interval, flags skip-next-tick
+    /// so the fleet poller can apply backpressure.
+    /// </summary>
+    public class ScrapeBudgetTracker
+    {
+        private readonly int _pollIntervalMs;
+
+        public bool ShouldSkipNextTick { get; private set; }
+        public bool IsLagging { get; private set; }
+
+        public ScrapeBudgetTracker(int pollIntervalMs)
+        {
+            _pollIntervalMs = pollIntervalMs;
+        }
+
+        public void RecordScrapeCompleted(long elapsedMs)
+        {
+            IsLagging = elapsedMs > _pollIntervalMs;
+            if (IsLagging)
+                ShouldSkipNextTick = true;
+        }
+
+        public void ConsumeSkip()
+        {
+            ShouldSkipNextTick = false;
+        }
+    }
 }

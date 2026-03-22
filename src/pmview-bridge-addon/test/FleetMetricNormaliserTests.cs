@@ -173,4 +173,53 @@ public partial class FleetMetricNormaliserTests
             rate1: 3000.0, rate2: 2000.0, maxRate: 10000.0);
         AssertThat(result).IsBetween(0.499, 0.501);
     }
+
+    // ── Scrape budget tracking ──────────────────────────────────────────
+
+    [TestCase]
+    public void ScrapeBudget_UnderBudget_NoSkip()
+    {
+        var budget = new FleetMetricNormaliser.ScrapeBudgetTracker(
+            pollIntervalMs: 2000);
+        budget.RecordScrapeCompleted(elapsedMs: 1500);
+
+        AssertThat(budget.ShouldSkipNextTick).IsFalse();
+        AssertThat(budget.IsLagging).IsFalse();
+    }
+
+    [TestCase]
+    public void ScrapeBudget_OverBudget_SkipsNextTick()
+    {
+        var budget = new FleetMetricNormaliser.ScrapeBudgetTracker(
+            pollIntervalMs: 2000);
+        budget.RecordScrapeCompleted(elapsedMs: 2500);
+
+        AssertThat(budget.ShouldSkipNextTick).IsTrue();
+        AssertThat(budget.IsLagging).IsTrue();
+    }
+
+    [TestCase]
+    public void ScrapeBudget_ConsumeSkip_ClearsFlag()
+    {
+        var budget = new FleetMetricNormaliser.ScrapeBudgetTracker(
+            pollIntervalMs: 2000);
+        budget.RecordScrapeCompleted(elapsedMs: 2500);
+
+        AssertThat(budget.ShouldSkipNextTick).IsTrue();
+        budget.ConsumeSkip();
+        AssertThat(budget.ShouldSkipNextTick).IsFalse();
+    }
+
+    [TestCase]
+    public void ScrapeBudget_SubsequentUnderBudget_ClearsLagging()
+    {
+        var budget = new FleetMetricNormaliser.ScrapeBudgetTracker(
+            pollIntervalMs: 2000);
+        budget.RecordScrapeCompleted(elapsedMs: 2500);
+        budget.ConsumeSkip();
+        budget.RecordScrapeCompleted(elapsedMs: 800);
+
+        AssertThat(budget.IsLagging).IsFalse();
+        AssertThat(budget.ShouldSkipNextTick).IsFalse();
+    }
 }
