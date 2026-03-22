@@ -856,7 +856,7 @@ public partial class MetricPoller : Node
 				var json = await response.Content.ReadAsStringAsync();
 				var seriesValues = PcpSeriesQuery.ParseValuesResponse(json);
 
-				Log.LogInformation(
+				Log.LogWarning(
 					"[Fleet] {Metric}: {Count} raw series values from API (isCounter={IsCounter}, window={Window:F1}s)",
 					metricName, seriesValues.Count, isCounter, windowSeconds);
 
@@ -870,7 +870,7 @@ public partial class MetricPoller : Node
 				{
 					resolvedValues = PcpSeriesQuery.ComputeRatesFromSeriesValues(
 						seriesValues);
-					Log.LogInformation(
+					Log.LogWarning(
 						"[Fleet] {Metric}: {RawCount} raw → {RateCount} rate values after ComputeRates",
 						metricName, seriesValues.Count, resolvedValues.Count);
 					if (resolvedValues.Count == 0)
@@ -914,7 +914,7 @@ public partial class MetricPoller : Node
 
 				// Log per-host sums for this metric
 				foreach (var (h, v) in hostSums)
-					Log.LogInformation("[Fleet] {Metric}: {Host} = {Value:F4}", metricName, h, v);
+					Log.LogWarning("[Fleet] {Metric}: {Host} = {Value:F4}", metricName, h, v);
 
 				// Build the metric dict entries per hostname
 				foreach (var (hostname, summedValue) in hostSums)

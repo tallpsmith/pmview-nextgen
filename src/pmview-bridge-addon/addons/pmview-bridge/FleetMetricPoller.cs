@@ -276,7 +276,7 @@ public partial class FleetMetricPoller : Node
     {
         StartScrapeTimerIfNeeded();
         var normalised = NormaliseHostMetrics(hostname, metrics);
-        Log.LogInformation(
+        Log.LogWarning(
             "[Fleet] Normalised {Host}: cpu={Cpu:F3} mem={Mem:F3} disk={Disk:F3} net={Net:F3}",
             hostname,
             normalised.ContainsKey("cpu") ? normalised["cpu"].AsDouble() : -1,
@@ -307,7 +307,7 @@ public partial class FleetMetricPoller : Node
         var elapsed = _scrapeStopwatch?.ElapsedMilliseconds ?? 0;
         _budgetTracker?.RecordScrapeCompleted(elapsed);
 
-        Log.LogInformation(
+        Log.LogWarning(
             "[Fleet] All shards complete: scrape={Elapsed}ms, budget={Interval}ms, lagging={Lagging}",
             elapsed, PollIntervalMs, _budgetTracker?.IsLagging ?? false);
 
