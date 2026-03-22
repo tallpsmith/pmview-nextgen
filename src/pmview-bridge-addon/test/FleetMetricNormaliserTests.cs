@@ -92,4 +92,43 @@ public partial class FleetMetricNormaliserTests
         AssertThat(result.Shards[0]).HasSize(25);
         AssertThat(result.Shards[1]).HasSize(5);
     }
+
+    // ── CPU normalisation ───────────────────────────────────────────────
+
+    [TestCase]
+    public void NormaliseCpu_HalfIdle_ReturnsHalfUtilisation()
+    {
+        // 4 cores, idle rate = 2000ms/s (half of 4*1000)
+        var result = FleetMetricNormaliser.NormaliseCpu(idleRate: 2000.0, ncpu: 4);
+        AssertThat(result).IsBetween(0.499, 0.501);
+    }
+
+    [TestCase]
+    public void NormaliseCpu_FullyBusy_ReturnsOne()
+    {
+        var result = FleetMetricNormaliser.NormaliseCpu(idleRate: 0.0, ncpu: 8);
+        AssertThat(result).IsBetween(0.999, 1.001);
+    }
+
+    [TestCase]
+    public void NormaliseCpu_FullyIdle_ReturnsZero()
+    {
+        var result = FleetMetricNormaliser.NormaliseCpu(idleRate: 4000.0, ncpu: 4);
+        AssertThat(result).IsBetween(-0.001, 0.001);
+    }
+
+    [TestCase]
+    public void NormaliseCpu_ZeroCores_ReturnsZero()
+    {
+        var result = FleetMetricNormaliser.NormaliseCpu(idleRate: 1000.0, ncpu: 0);
+        AssertThat(result).IsBetween(-0.001, 0.001);
+    }
+
+    [TestCase]
+    public void NormaliseCpu_NegativeIdle_ClampsToOne()
+    {
+        // Shouldn't happen, but guard against it
+        var result = FleetMetricNormaliser.NormaliseCpu(idleRate: -500.0, ncpu: 4);
+        AssertThat(result).IsBetween(0.999, 1.001);
+    }
 }

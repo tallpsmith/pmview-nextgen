@@ -51,4 +51,18 @@ public static class FleetMetricNormaliser
 
         return new ShardAssignment(shards, dropped);
     }
+
+    /// <summary>
+    /// Normalise CPU utilisation from idle counter rate.
+    /// kernel.all.cpu.idle is a counter in milliseconds — its rate gives
+    /// idle-ms/s. Dividing by (ncpu * 1000) gives idle fraction.
+    /// Result: 1.0 - idle_fraction, clamped to [0, 1].
+    /// </summary>
+    public static double NormaliseCpu(double idleRate, int ncpu)
+    {
+        if (ncpu <= 0) return 0.0;
+        var maxIdle = ncpu * 1000.0;
+        var utilisation = 1.0 - (idleRate / maxIdle);
+        return Math.Clamp(utilisation, 0.0, 1.0);
+    }
 }
