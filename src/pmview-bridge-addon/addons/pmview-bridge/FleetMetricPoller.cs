@@ -181,7 +181,7 @@ public partial class FleetMetricPoller : Node
     private Stopwatch? _scrapeStopwatch;
     private int _shardsCompletedThisTick;
 
-    private void OnShardMetricsUpdated(Godot.Collections.Dictionary metrics)
+    private void OnShardMetricsUpdated(string hostname, Godot.Collections.Dictionary metrics)
     {
         Log.LogWarning("Shard metrics received: {Count} metrics, shard {Idx}/{Total}",
             metrics.Count, _shardsCompletedThisTick + 1, _shards.Count);

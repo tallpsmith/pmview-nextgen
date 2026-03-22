@@ -59,7 +59,7 @@ public partial class BindingPipelineTests
 
 		// Wire MetricPoller → SceneBinder (mirroring what the controller does)
 		bool metricsReceived = false;
-		poller.MetricsUpdated += metrics =>
+		poller.MetricsUpdated += (_, metrics) =>
 		{
 			binder.ApplyMetrics(metrics);
 			metricsReceived = true;

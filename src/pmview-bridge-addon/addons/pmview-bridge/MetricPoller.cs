@@ -19,7 +19,7 @@ public partial class MetricPoller : Node
 {
 	[Signal]
 	public delegate void MetricsUpdatedEventHandler(
-		Godot.Collections.Dictionary metrics);
+		string hostname, Godot.Collections.Dictionary metrics);
 
 	[Signal]
 	public delegate void ConnectionStateChangedEventHandler(string state);
@@ -485,7 +485,7 @@ public partial class MetricPoller : Node
 			Log.LogInformation("Replaying {Count} cached metrics for new scene", _lastEmittedMetrics.Count);
 			var dict = _lastEmittedMetrics.Duplicate(true);   // deep copy — inner dicts are independent
 			InjectVirtualMetrics(dict);
-			EmitSignal(SignalName.MetricsUpdated, dict);
+			EmitSignal(SignalName.MetricsUpdated, Hostname ?? "", dict);
 		}
 	}
 
@@ -530,7 +530,7 @@ public partial class MetricPoller : Node
 			var dict = MarshalMetricValues(converted);
 			InjectVirtualMetrics(dict);
 			_lastEmittedMetrics = dict;
-			EmitSignal(SignalName.MetricsUpdated, dict);
+			EmitSignal(SignalName.MetricsUpdated, Hostname ?? "", dict);
 		}
 	}
 
@@ -773,7 +773,7 @@ public partial class MetricPoller : Node
 		{
 			Log.LogInformation("Historical update: {Count} metrics with new data", dict.Count);
 			_lastEmittedMetrics = dict;
-			EmitSignal(SignalName.MetricsUpdated, dict);
+			EmitSignal(SignalName.MetricsUpdated, Hostname ?? "", dict);
 		}
 	}
 

@@ -317,7 +317,7 @@ public partial class MetricPollerTests
 		runner.Scene().AddChild(poller);
 
 		var emitted = false;
-		poller.MetricsUpdated += _ => emitted = true;
+		poller.MetricsUpdated += (_, _) => emitted = true;
 
 		poller.ReplayLastMetrics();
 		await Task.Delay(100);
