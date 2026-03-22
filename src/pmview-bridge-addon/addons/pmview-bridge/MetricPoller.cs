@@ -838,13 +838,16 @@ public partial class MetricPoller : Node
 		{
 			try
 			{
-				// Counters need 2 samples for rate conversion — widen the window
+				// Counters need 2 samples for rate conversion — widen the window.
+				// When _archiveSamplingIntervalSeconds is 0 (not yet discovered),
+				// use a generous default (120s) to guarantee 2+ samples at any
+				// reasonable logging interval (typically 10-60s).
 				var isCounter = _rateConverter?.IsCounter(metricName) == true;
 				var windowSeconds = isCounter
 					? (_archiveSamplingIntervalSeconds > 0
-						? _archiveSamplingIntervalSeconds * 2.5 : 5.0)
+						? _archiveSamplingIntervalSeconds * 2.5 : 120.0)
 					: (_archiveSamplingIntervalSeconds > 0
-						? _archiveSamplingIntervalSeconds * 1.5 : 2.0);
+						? _archiveSamplingIntervalSeconds * 1.5 : 60.0);
 
 				var valuesUrl = PcpSeriesQuery.BuildValuesUrlWithTimeWindow(
 					endpointUri, seriesIds, windowEnd, windowSeconds: windowSeconds);
