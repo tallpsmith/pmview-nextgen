@@ -165,9 +165,15 @@ public partial class FleetMetricPoller : Node
 
     private async Task DiscoverSeriesMapping()
     {
-        if (_assignment == null) return;
+        if (_assignment == null)
+        {
+            Log.LogWarning("[Fleet] DiscoverSeriesMapping: _assignment is null — bailing");
+            return;
+        }
 
         var allHostnames = _assignment.Shards.SelectMany(s => s).ToArray();
+        Log.LogWarning("[Fleet] DiscoverSeriesMapping: starting for {Count} hosts at {Endpoint}",
+            allHostnames.Length, Endpoint);
         var endpointUri = new Uri(Endpoint);
         var allSeriesIds = new HashSet<string>();
         var seriesIdsPerMetric = new Dictionary<string, List<string>>();
@@ -213,6 +219,8 @@ public partial class FleetMetricPoller : Node
                 }
             }
 
+            Log.LogWarning("[Fleet] Discovery: {Metric} → {Count} series IDs",
+                metricName, metricSeriesIds.Count);
             if (metricSeriesIds.Count > 0)
                 seriesIdsPerMetric[metricName] = metricSeriesIds;
         }
@@ -247,8 +255,8 @@ public partial class FleetMetricPoller : Node
             return;
         }
 
-        Log.LogInformation(
-            "Discovery complete: {SeriesCount} series IDs mapped to {HostCount} hostnames across {MetricCount} metrics",
+        Log.LogWarning(
+            "[Fleet] Discovery complete: {SeriesCount} series IDs mapped to {HostCount} hostnames across {MetricCount} metrics",
             seriesIdToHostname.Count, allHostnames.Length, seriesIdsPerMetric.Count);
 
         // Phase 3: Partition by shard and distribute
@@ -260,8 +268,8 @@ public partial class FleetMetricPoller : Node
             _shards[i].InitialiseWithCachedSeriesMap(
                 partitioned[i].SeriesIdToHostname,
                 partitioned[i].SeriesIdsPerMetric);
-            Log.LogInformation(
-                "Shard {Index}: {SeriesCount} series IDs for {HostCount} hosts",
+            Log.LogWarning(
+                "[Fleet] Shard {Index}: {SeriesCount} series IDs for {HostCount} hosts",
                 i, partitioned[i].SeriesIdToHostname.Count,
                 _assignment.Shards[i].Length);
         }

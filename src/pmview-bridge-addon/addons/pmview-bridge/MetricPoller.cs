@@ -463,12 +463,13 @@ public partial class MetricPoller : Node
 		{
 			if (HasCachedSeriesMap)
 			{
-				// Fleet mode — hostname-filtered series queries
+				Log.LogWarning("[Fleet] Shard {Name}: using FetchSeriesMetricsForHosts ({MetricCount} metrics, {SeriesCount} series IDs)",
+					Name, _cachedSeriesIdsPerMetric?.Count ?? 0, _cachedSeriesIdToHostname?.Count ?? 0);
 				await FetchSeriesMetricsForHosts();
 			}
 			else if (_timeCursor.Mode == CursorMode.Live)
 			{
-				// Live mode — fetch current values via /pmapi/fetch
+				Log.LogWarning("[Fleet] Shard {Name}: NO cached series map — falling back to FetchLiveMetrics", Name);
 				await FetchLiveMetrics();
 			}
 			else
