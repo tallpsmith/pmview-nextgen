@@ -5,6 +5,7 @@
 [ext_resource type="Script" path="res://addons/pmview-bridge/building_blocks/patrol_orbit_camera.gd" id="3"]
 [ext_resource type="Script" path="res://addons/pmview-bridge/building_blocks/fly_orbit_camera.gd" id="4"]
 [ext_resource type="PackedScene" path="res://scenes/time_control.tscn" id="5"]
+[ext_resource type="PackedScene" path="res://addons/pmview-bridge/ui/warning_toast.tscn" id="6"]
 
 [sub_resource type="ProceduralSkyMaterial" id="sky_mat"]
 sky_top_color = Color(0.02, 0.02, 0.06, 1)
@@ -84,4 +85,7 @@ horizontal_alignment = 1
 modulate = Color(1, 1, 1, 0.8)
 
 [node name="TimeControl" parent="HUD/Control" instance=ExtResource("5")]
+unique_name_in_owner = true
+
+[node name="WarningToast" parent="HUD/Control" instance=ExtResource("6")]
 unique_name_in_owner = true

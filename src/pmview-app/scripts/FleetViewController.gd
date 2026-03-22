@@ -13,6 +13,7 @@ const BAR_SCENE := preload("res://addons/pmview-bridge/building_blocks/grounded_
 @onready var master_timestamp: Label3D = %MasterTimestamp
 @onready var esc_hint: Label = %EscHint
 @onready var time_control: Control = %TimeControl
+@onready var warning_toast: Control = %WarningToast
 
 ## Spacing between host grid cells (centre to centre)
 @export var host_spacing: float = 6.0
@@ -39,6 +40,7 @@ func _ready() -> void:
 	patrol_camera.setup(_grid_bounds)
 	_update_esc_hint()
 	_setup_time_control(config)
+	_setup_fleet_poller(config)
 
 
 func _generate_mock_hostnames(count: int) -> PackedStringArray:
@@ -274,9 +276,49 @@ func _setup_time_control(config: Dictionary) -> void:
 
 
 ## Update the floating master timestamp billboard and TimeControl playhead.
-## Called by the fleet MetricPoller once polling is wired (Chunk 5).
 func update_master_timestamp(timestamp_iso: String) -> void:
 	if master_timestamp:
 		master_timestamp.text = timestamp_iso
 	if time_control and time_control.has_method("update_playhead"):
 		time_control.update_playhead(timestamp_iso, "archive")
+
+
+# --- Fleet metric poller ---
+
+func _setup_fleet_poller(config: Dictionary) -> void:
+	var hostnames: PackedStringArray = config.get("hostnames", PackedStringArray())
+	if hostnames.is_empty():
+		return  # Mock mode — no polling
+
+	var endpoint: String = config.get("endpoint", "http://localhost:44322")
+	var fleet_poller := Node.new()
+	fleet_poller.name = "FleetMetricPoller"
+	fleet_poller.set_script(load("res://addons/pmview-bridge/FleetMetricPoller.cs"))
+	fleet_poller.set("Endpoint", endpoint)
+	add_child(fleet_poller)
+
+	fleet_poller.FleetMetricsUpdated.connect(_on_fleet_metrics_updated)
+	fleet_poller.ScrapeBudgetExceeded.connect(_on_scrape_lagging)
+	fleet_poller.HostsDropped.connect(_on_hosts_dropped)
+	fleet_poller.StartPolling(hostnames)
+
+
+func _on_fleet_metrics_updated(metrics: Dictionary) -> void:
+	for host: Node3D in _hosts:
+		var data: Dictionary = metrics.get(host.hostname, {})
+		for metric_name: String in data:
+			host.set_metric_value(metric_name, data[metric_name])
+
+
+func _on_scrape_lagging() -> void:
+	if warning_toast and warning_toast.has_method("show_toast"):
+		warning_toast.show_toast(
+			"METRIC POLLING LAGGING", WarningToast.Severity.WARNING,
+			5.0, "scrape_lag")
+
+
+func _on_hosts_dropped(count: int, hostnames: Array) -> void:
+	if warning_toast and warning_toast.has_method("show_toast"):
+		warning_toast.show_toast(
+			"250 HOST LIMIT - %d HOSTS DROPPED (SEE LOGS)" % count,
+			WarningToast.Severity.WARNING, 10.0)
