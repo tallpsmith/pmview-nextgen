@@ -287,19 +287,29 @@ func update_master_timestamp(timestamp_iso: String) -> void:
 # --- Fleet metric poller ---
 
 func _setup_fleet_poller(config: Dictionary) -> void:
+	print("[FleetView] _setup_fleet_poller called")
+	print("[FleetView]   fleet_poller node: ", fleet_poller)
+	print("[FleetView]   config keys: ", config.keys())
 	if not fleet_poller:
+		print("[FleetView]   BAIL: fleet_poller is null")
 		return
 	var hostnames: PackedStringArray = config.get("hostnames", PackedStringArray())
+	print("[FleetView]   hostnames count: ", hostnames.size())
 	if hostnames.is_empty():
+		print("[FleetView]   BAIL: no hostnames in config")
 		return  # Mock mode — no polling
 
 	var endpoint: String = config.get("endpoint", "http://localhost:44322")
+	print("[FleetView]   endpoint: ", endpoint)
+	print("[FleetView]   fleet_poller script: ", fleet_poller.get_script())
 	fleet_poller.set("Endpoint", endpoint)
 
 	fleet_poller.FleetMetricsUpdated.connect(_on_fleet_metrics_updated)
 	fleet_poller.ScrapeBudgetExceeded.connect(_on_scrape_lagging)
 	fleet_poller.HostsDropped.connect(_on_hosts_dropped)
+	print("[FleetView]   calling StartPolling...")
 	fleet_poller.StartPolling(hostnames)
+	print("[FleetView]   StartPolling called successfully")
 
 
 func _on_fleet_metrics_updated(metrics: Dictionary) -> void:
