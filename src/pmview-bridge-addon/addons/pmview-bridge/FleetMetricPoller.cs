@@ -114,9 +114,12 @@ public partial class FleetMetricPoller : Node
     /// </summary>
     public void StartPolling(string[] hostnames)
     {
+        Log.LogWarning("FleetMetricPoller.StartPolling called with {Count} hostnames, endpoint={Endpoint}",
+            hostnames.Length, Endpoint);
         ConfigureShards(hostnames, Endpoint, PollIntervalMs);
         CreateShardPollers();
-        // Discovery and shard start are deferred so the scene tree is ready
+        // Shards auto-start via MetricPoller._Ready() since MetricNames is pre-set.
+        // Discovery runs deferred to populate ncpu cache.
         CallDeferred(nameof(DeferredStartShards));
     }
 
@@ -154,11 +157,8 @@ public partial class FleetMetricPoller : Node
     {
         // One-time discovery: fetch hinv.ncpu per host
         await DiscoverHostCapacities();
-
-        // Start each shard's polling
+        // Shards already auto-started via MetricPoller._Ready()
         _scrapeStopwatch = Stopwatch.StartNew();
-        foreach (var shard in _shards)
-            shard.CallDeferred("StartPolling");
     }
 
     private async Task DiscoverHostCapacities()
@@ -183,6 +183,8 @@ public partial class FleetMetricPoller : Node
 
     private void OnShardMetricsUpdated(Godot.Collections.Dictionary metrics)
     {
+        Log.LogWarning("Shard metrics received: {Count} metrics, shard {Idx}/{Total}",
+            metrics.Count, _shardsCompletedThisTick + 1, _shards.Count);
         _shardsCompletedThisTick++;
 
         // Store this shard's raw results
@@ -206,6 +208,7 @@ public partial class FleetMetricPoller : Node
 
         // Normalise and emit
         var normalised = NormaliseAllHosts(metrics);
+        Log.LogWarning("Emitting FleetMetricsUpdated for {Count} hosts", normalised.Count);
         EmitSignal(SignalName.FleetMetricsUpdated, normalised);
 
         // Reset for next tick
