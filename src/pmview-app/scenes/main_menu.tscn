@@ -297,12 +297,26 @@ theme_override_font_sizes/font_size = 12
 text = "SOURCE HOST"
 horizontal_alignment = 1
 
-[node name="HostDropdown" type="OptionButton" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer/ArchivePanel"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(400, 32)
+[node name="HostRow" type="HBoxContainer" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer/ArchivePanel"]
 layout_mode = 2
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="HostDropdown" type="OptionButton" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer/ArchivePanel/HostRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(320, 32)
+layout_mode = 2
+size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 12
 alignment = 1
+
+[node name="AllHostsButton" type="Button" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer/ArchivePanel/HostRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(100, 32)
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "ALL HOSTS"
+visible = false
 
 [node name="RangeLabel" type="Label" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer/ArchivePanel"]
 unique_name_in_owner = true

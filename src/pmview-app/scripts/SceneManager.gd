@@ -17,6 +17,10 @@ func go_to_host_view(scene: Node3D) -> void:
 	built_scene = scene
 	get_tree().change_scene_to_file("res://scenes/host_view.tscn")
 
+func go_to_fleet_view(config: Dictionary) -> void:
+	connection_config = config
+	get_tree().change_scene_to_file("res://scenes/fleet_view.tscn")
+
 func go_to_main_menu() -> void:
 	connection_config = {}
 	if built_scene:
