@@ -14,6 +14,7 @@ const BAR_SCENE := preload("res://addons/pmview-bridge/building_blocks/grounded_
 @onready var esc_hint: Label = %EscHint
 @onready var time_control: Control = %TimeControl
 @onready var warning_toast: Control = %WarningToast
+@onready var fleet_poller: Node = %FleetMetricPoller
 
 ## Spacing between host grid cells (centre to centre)
 @export var host_spacing: float = 6.0
@@ -286,16 +287,14 @@ func update_master_timestamp(timestamp_iso: String) -> void:
 # --- Fleet metric poller ---
 
 func _setup_fleet_poller(config: Dictionary) -> void:
+	if not fleet_poller:
+		return
 	var hostnames: PackedStringArray = config.get("hostnames", PackedStringArray())
 	if hostnames.is_empty():
 		return  # Mock mode — no polling
 
 	var endpoint: String = config.get("endpoint", "http://localhost:44322")
-	var fleet_poller := Node.new()
-	fleet_poller.name = "FleetMetricPoller"
-	fleet_poller.set_script(load("res://addons/pmview-bridge/FleetMetricPoller.cs"))
 	fleet_poller.set("Endpoint", endpoint)
-	add_child(fleet_poller)
 
 	fleet_poller.FleetMetricsUpdated.connect(_on_fleet_metrics_updated)
 	fleet_poller.ScrapeBudgetExceeded.connect(_on_scrape_lagging)
