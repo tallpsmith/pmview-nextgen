@@ -105,6 +105,29 @@ public partial class MetricPoller : Node
 		MetricNames = metricNames;
 	}
 
+	private IReadOnlyDictionary<string, string>? _cachedSeriesIdToHostname;
+	private IReadOnlyDictionary<string, IReadOnlyList<string>>? _cachedSeriesIdsPerMetric;
+
+	/// <summary>
+	/// Whether this poller has a pre-cached series map from FleetMetricPoller
+	/// discovery. When true, uses FetchSeriesMetricsForHosts instead of the
+	/// standard live/historical fetch paths.
+	/// </summary>
+	public bool HasCachedSeriesMap => _cachedSeriesIdToHostname != null;
+
+	/// <summary>
+	/// Initialise with a pre-resolved series map from centralised discovery.
+	/// Caller must pass independent immutable copies — no shared state between shards.
+	/// Skips per-shard discovery; shard goes straight to polling with cached data.
+	/// </summary>
+	public void InitialiseWithCachedSeriesMap(
+		IReadOnlyDictionary<string, string> seriesIdToHostname,
+		IReadOnlyDictionary<string, IReadOnlyList<string>> seriesIdsPerMetric)
+	{
+		_cachedSeriesIdToHostname = seriesIdToHostname;
+		_cachedSeriesIdsPerMetric = seriesIdsPerMetric;
+	}
+
 	public TimeCursor TimeCursor => _timeCursor;
 
 	public async void StartPlayback(string startTimeIso)

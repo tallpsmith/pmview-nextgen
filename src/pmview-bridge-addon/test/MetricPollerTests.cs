@@ -324,4 +324,44 @@ public partial class MetricPollerTests
 
 		AssertThat(emitted).IsFalse();
 	}
+
+	// ── Cached series map initialisation ──────────────────────────────────
+
+	[TestCase]
+	[RequireGodotRuntime]
+	public async Task InitialiseWithCachedSeriesMap_StoresMap()
+	{
+		var runner = ISceneRunner.Load("res://test/scenes/test_node3d.tscn");
+		var mock = new MockPcpClient();
+		var poller = new TestableMetricPoller(mock);
+		runner.Scene().AddChild(poller);
+
+		var seriesIdToHostname = new Dictionary<string, string>
+		{
+			["abc123"] = "host-01",
+			["def456"] = "host-02",
+		};
+		var seriesIdsPerMetric = new Dictionary<string, IReadOnlyList<string>>
+		{
+			["kernel.all.cpu.idle"] = new List<string> { "abc123", "def456" },
+		};
+
+		poller.InitialiseWithCachedSeriesMap(seriesIdToHostname, seriesIdsPerMetric);
+
+		AssertThat(poller.HasCachedSeriesMap).IsTrue();
+		await runner.AwaitIdleFrame();
+	}
+
+	[TestCase]
+	[RequireGodotRuntime]
+	public async Task HasCachedSeriesMap_False_ByDefault()
+	{
+		var runner = ISceneRunner.Load("res://test/scenes/test_node3d.tscn");
+		var mock = new MockPcpClient();
+		var poller = new TestableMetricPoller(mock);
+		runner.Scene().AddChild(poller);
+
+		AssertThat(poller.HasCachedSeriesMap).IsFalse();
+		await runner.AwaitIdleFrame();
+	}
 }
