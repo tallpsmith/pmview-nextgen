@@ -761,4 +761,56 @@ public class SeriesQueryTests
         Assert.DoesNotContain(" ", urlStr);
         Assert.Contains("web%20server.local", urlStr);
     }
+
+    // ── Multi-host filtered query URL building ──
+
+    [Fact]
+    public void BuildMultiHostFilteredQueryUrl_TwoHosts_BuildsOrChainedFilter()
+    {
+        var baseUrl = new Uri("http://localhost:44322");
+        var url = PcpSeriesQuery.BuildMultiHostFilteredQueryUrl(
+            baseUrl, "kernel.all.cpu.idle", ["host-01", "host-02"]);
+
+        var urlStr = url.AbsoluteUri;
+        Assert.Contains("/series/query", urlStr);
+        var decoded = Uri.UnescapeDataString(urlStr);
+        Assert.Contains("hostname==\"host-01\"", decoded);
+        Assert.Contains("hostname==\"host-02\"", decoded);
+        Assert.Contains("||", decoded);
+    }
+
+    [Fact]
+    public void BuildMultiHostFilteredQueryUrl_SingleHost_NoOrOperator()
+    {
+        var baseUrl = new Uri("http://localhost:44322");
+        var url = PcpSeriesQuery.BuildMultiHostFilteredQueryUrl(
+            baseUrl, "kernel.all.load", ["app-server-1"]);
+
+        var decoded = Uri.UnescapeDataString(url.AbsoluteUri);
+        Assert.Contains("hostname==\"app-server-1\"", decoded);
+        Assert.DoesNotContain("||", decoded);
+    }
+
+    [Fact]
+    public void BuildMultiHostFilteredQueryUrl_EmptyArray_ReturnsUnfilteredQuery()
+    {
+        var baseUrl = new Uri("http://localhost:44322");
+        var url = PcpSeriesQuery.BuildMultiHostFilteredQueryUrl(
+            baseUrl, "kernel.all.load", []);
+
+        var decoded = Uri.UnescapeDataString(url.AbsoluteUri);
+        Assert.Contains("kernel.all.load", decoded);
+        Assert.DoesNotContain("hostname", decoded);
+    }
+
+    [Fact]
+    public void BuildMultiHostFilteredQueryUrl_SpecialCharsInHostname_EncodesCorrectly()
+    {
+        var baseUrl = new Uri("http://localhost:44322");
+        var url = PcpSeriesQuery.BuildMultiHostFilteredQueryUrl(
+            baseUrl, "kernel.all.load", ["web server.local", "app-01"]);
+
+        var urlStr = url.AbsoluteUri;
+        Assert.DoesNotContain(" ", urlStr);
+    }
 }

@@ -75,6 +75,23 @@ public static class PcpSeriesQuery
         return new Uri(baseUrl, $"/series/query?expr={Uri.EscapeDataString(filter)}");
     }
 
+    /// <summary>
+    /// Builds a /series/query URL with an OR-chained hostname label filter for
+    /// multiple hosts. Used during fleet discovery to batch hostname queries.
+    /// Empty hostnames array returns an unfiltered query.
+    /// </summary>
+    public static Uri BuildMultiHostFilteredQueryUrl(
+        Uri baseUrl, string metricName, string[] hostnames)
+    {
+        if (hostnames.Length == 0)
+            return BuildQueryUrl(baseUrl, metricName);
+
+        var clauses = hostnames
+            .Select(h => $"hostname==\"{h}\"");
+        var filter = $"{metricName}{{{string.Join(" || ", clauses)}}}";
+        return new Uri(baseUrl, $"/series/query?expr={Uri.EscapeDataString(filter)}");
+    }
+
     public static Uri BuildValuesUrl(Uri baseUrl, IEnumerable<string> seriesIds)
     {
         var ids = string.Join(",", seriesIds);
