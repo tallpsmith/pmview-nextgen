@@ -833,11 +833,12 @@ public class SeriesQueryTests
     [Fact]
     public void ParsePerSeriesHostnameLabels_ExtractsHostnames()
     {
+        // Actual pmproxy response nests labels under a "labels" key
         var json = """
         [
-            {"series": "abc123", "hostname": "host-01"},
-            {"series": "def456", "hostname": "host-02"},
-            {"series": "ghi789", "hostname": "host-01"}
+            {"series": "abc123", "labels": {"hostname": "host-01", "agent": "linux"}},
+            {"series": "def456", "labels": {"hostname": "host-02", "agent": "linux"}},
+            {"series": "ghi789", "labels": {"hostname": "host-01", "agent": "linux"}}
         ]
         """;
 
@@ -854,8 +855,8 @@ public class SeriesQueryTests
     {
         var json = """
         [
-            {"series": "abc123", "hostname": "host-01"},
-            {"series": "def456", "agent": "pmcd"}
+            {"series": "abc123", "labels": {"hostname": "host-01"}},
+            {"series": "def456", "labels": {"agent": "pmcd"}}
         ]
         """;
 

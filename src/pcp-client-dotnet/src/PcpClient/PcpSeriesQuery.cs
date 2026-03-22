@@ -266,14 +266,19 @@ public static class PcpSeriesQuery
     public static Uri BuildPerSeriesLabelsUrl(
         Uri baseUrl, IEnumerable<string> seriesIds)
     {
+        // pmproxy expects literal commas in the series parameter — do NOT
+        // percent-encode them or you get 400 Bad Request.
         var ids = string.Join(",", seriesIds);
-        return new Uri(baseUrl, $"/series/labels?series={Uri.EscapeDataString(ids)}");
+        return new Uri(baseUrl, $"/series/labels?series={ids}");
     }
 
     /// <summary>
     /// Parses a /series/labels?series=... response to extract hostname labels.
     /// Returns series_id → hostname mapping. Skips entries without a hostname label.
     /// DISTINCT from ParseLabelsResponse which returns a flat list of label values.
+    ///
+    /// Response format (from pmwebapi docs):
+    /// [{"series": "abc123", "labels": {"hostname": "host-01", ...}}, ...]
     /// </summary>
     public static Dictionary<string, string> ParsePerSeriesHostnameLabels(string json)
     {
@@ -286,7 +291,9 @@ public static class PcpSeriesQuery
             if (seriesId == null)
                 continue;
 
-            if (item.TryGetProperty("hostname", out var hostnameProp))
+            // Labels are nested under a "labels" object
+            if (item.TryGetProperty("labels", out var labelsProp)
+                && labelsProp.TryGetProperty("hostname", out var hostnameProp))
             {
                 var hostname = hostnameProp.GetString();
                 if (hostname != null)

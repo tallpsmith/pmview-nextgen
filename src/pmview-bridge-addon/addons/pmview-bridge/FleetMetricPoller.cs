@@ -244,12 +244,14 @@ public partial class FleetMetricPoller : Node
         {
             var labelsUrl = PcpSeriesQuery.BuildPerSeriesLabelsUrl(
                 endpointUri, allSeriesIds);
+            Log.LogWarning("Discovery labels URL: {Url}", labelsUrl.AbsoluteUri);
             var labelsResponse = await _sharedHttpClient.GetAsync(labelsUrl);
             if (!labelsResponse.IsSuccessStatusCode)
             {
+                var errorBody = await labelsResponse.Content.ReadAsStringAsync();
                 Log.LogWarning(
-                    "Discovery labels query failed: {Status}",
-                    labelsResponse.StatusCode);
+                    "Discovery labels query failed: {Status} — {Body}",
+                    labelsResponse.StatusCode, errorBody);
                 return;
             }
 

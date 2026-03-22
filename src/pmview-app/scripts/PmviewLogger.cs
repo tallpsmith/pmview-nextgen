@@ -34,7 +34,7 @@ public partial class PmviewLogger : Node
     {
         _provider = new PmviewLoggerProvider
         {
-            LogFilePath = ProjectSettings.GlobalizePath("user://pmview.log")
+            LogFilePath = ProjectSettings.GlobalizePath("res://pmview.log")
         };
 
         _factory = LoggerFactory.Create(builder =>
