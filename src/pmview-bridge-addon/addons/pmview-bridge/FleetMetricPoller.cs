@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Godot;
 using Microsoft.Extensions.Logging;
+using PcpClient;
 using PmviewApp;
 
 namespace PmviewNextgen.Bridge;
@@ -18,7 +19,7 @@ public partial class FleetMetricPoller : Node
 {
     [Signal]
     public delegate void FleetMetricsUpdatedEventHandler(
-        Godot.Collections.Dictionary metrics);
+        string hostname, Godot.Collections.Dictionary metrics);
 
     [Signal]
     public delegate void HostsDroppedEventHandler(int count, string[] hostnames);
@@ -39,6 +40,9 @@ public partial class FleetMetricPoller : Node
 
     private ILogger? _log;
     private ILogger Log => _log ??= PmviewLogger.GetLogger("FleetMetricPoller");
+
+    private const int MaxHostsPerQueryBatch = 20;
+    private readonly System.Net.Http.HttpClient _sharedHttpClient = new();
 
     private readonly List<MetricPoller> _shards = new();
     private FleetMetricNormaliser.ScrapeBudgetTracker? _budgetTracker;
@@ -110,7 +114,7 @@ public partial class FleetMetricPoller : Node
 
     /// <summary>
     /// Start polling: create MetricPoller child nodes for each shard,
-    /// discover host capacities (hinv.ncpu), then start all shards.
+    /// discover series mapping, then distribute to shards.
     /// </summary>
     public void StartPolling(string[] hostnames)
     {
@@ -120,7 +124,7 @@ public partial class FleetMetricPoller : Node
         _scrapeStopwatch = Stopwatch.StartNew();
         CreateShardPollers();
         // Shards auto-start via MetricPoller._Ready() since MetricNames is pre-set.
-        // Discovery runs deferred to populate ncpu cache.
+        // Discovery runs deferred to populate series mapping cache.
         CallDeferred(nameof(DeferredStartShards));
     }
 
@@ -146,6 +150,7 @@ public partial class FleetMetricPoller : Node
                     ? _assignment.Shards[i][0] : "",
             };
             shard.MetricsUpdated += OnShardMetricsUpdated;
+            shard.ShardPollCompleted += OnShardPollCompleted;
             if (i == 0)
                 shard.ConnectionStateChanged += state =>
                     EmitSignal(SignalName.ConnectionStateChanged, state);
@@ -156,45 +161,131 @@ public partial class FleetMetricPoller : Node
 
     private async void DeferredStartShards()
     {
-        // One-time discovery: fetch hinv.ncpu per host
-        await DiscoverHostCapacities();
-        // Shards already auto-started via MetricPoller._Ready()
+        await DiscoverSeriesMapping();
     }
 
-    private async Task DiscoverHostCapacities()
+    private async Task DiscoverSeriesMapping()
     {
-        // TODO: Query hinv.ncpu via series API for each host.
-        // For now default to 1 — refined when wired to real data.
-        Log.LogInformation(
-            "Discovering host capacities for {Count} hosts (defaulting ncpu=1)",
-            AssignedHostCount);
         if (_assignment == null) return;
-        foreach (var shard in _assignment.Shards)
-            foreach (var host in shard)
-                _hostNcpu[host] = 1;
-        await Task.CompletedTask;
+
+        var allHostnames = _assignment.Shards.SelectMany(s => s).ToArray();
+        var endpointUri = new Uri(Endpoint);
+        var allSeriesIds = new HashSet<string>();
+        var seriesIdsPerMetric = new Dictionary<string, List<string>>();
+
+        // Default ncpu to 1 for all hosts (refined when hinv.ncpu wired)
+        foreach (var host in allHostnames)
+            _hostNcpu[host] = 1;
+
+        // Phase 1: Query series IDs per metric, batched by hostname
+        foreach (var metricName in FleetMetricNames)
+        {
+            var metricSeriesIds = new List<string>();
+            for (var i = 0; i < allHostnames.Length; i += MaxHostsPerQueryBatch)
+            {
+                var batch = allHostnames
+                    .Skip(i)
+                    .Take(MaxHostsPerQueryBatch)
+                    .ToArray();
+                try
+                {
+                    var queryUrl = PcpSeriesQuery.BuildMultiHostFilteredQueryUrl(
+                        endpointUri, metricName, batch);
+                    var response = await _sharedHttpClient.GetAsync(queryUrl);
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        Log.LogWarning(
+                            "Discovery query failed for {Metric} batch {Batch}: {Status}",
+                            metricName, i / MaxHostsPerQueryBatch, response.StatusCode);
+                        continue;
+                    }
+
+                    var json = await response.Content.ReadAsStringAsync();
+                    var ids = PcpSeriesQuery.ParseQueryResponse(json);
+                    metricSeriesIds.AddRange(ids);
+                    foreach (var id in ids)
+                        allSeriesIds.Add(id);
+                }
+                catch (Exception ex)
+                {
+                    Log.LogWarning(
+                        "Discovery query error for {Metric}: {Message}",
+                        metricName, ex.Message);
+                }
+            }
+
+            if (metricSeriesIds.Count > 0)
+                seriesIdsPerMetric[metricName] = metricSeriesIds;
+        }
+
+        if (allSeriesIds.Count == 0)
+        {
+            Log.LogWarning("Discovery found no series IDs — fleet polling will be idle");
+            return;
+        }
+
+        // Phase 2: Map series_id -> hostname via /series/labels
+        Dictionary<string, string> seriesIdToHostname;
+        try
+        {
+            var labelsUrl = PcpSeriesQuery.BuildPerSeriesLabelsUrl(
+                endpointUri, allSeriesIds);
+            var labelsResponse = await _sharedHttpClient.GetAsync(labelsUrl);
+            if (!labelsResponse.IsSuccessStatusCode)
+            {
+                Log.LogWarning(
+                    "Discovery labels query failed: {Status}",
+                    labelsResponse.StatusCode);
+                return;
+            }
+
+            var labelsJson = await labelsResponse.Content.ReadAsStringAsync();
+            seriesIdToHostname = PcpSeriesQuery.ParsePerSeriesHostnameLabels(labelsJson);
+        }
+        catch (Exception ex)
+        {
+            Log.LogWarning("Discovery labels error: {Message}", ex.Message);
+            return;
+        }
+
+        Log.LogInformation(
+            "Discovery complete: {SeriesCount} series IDs mapped to {HostCount} hostnames across {MetricCount} metrics",
+            seriesIdToHostname.Count, allHostnames.Length, seriesIdsPerMetric.Count);
+
+        // Phase 3: Partition by shard and distribute
+        var partitioned = FleetMetricNormaliser.PartitionSeriesMapByShard(
+            _assignment, seriesIdToHostname, seriesIdsPerMetric);
+
+        for (var i = 0; i < _shards.Count && i < partitioned.Count; i++)
+        {
+            _shards[i].InitialiseWithCachedSeriesMap(
+                partitioned[i].SeriesIdToHostname,
+                partitioned[i].SeriesIdsPerMetric);
+            Log.LogInformation(
+                "Shard {Index}: {SeriesCount} series IDs for {HostCount} hosts",
+                i, partitioned[i].SeriesIdToHostname.Count,
+                _assignment.Shards[i].Length);
+        }
     }
 
-    // ── Signal aggregation ──────────────────────────────────────────────
+    // -- Signal aggregation -----------------------------------------------
 
-    private readonly Dictionary<string, Godot.Collections.Dictionary> _shardResults = new();
     private Stopwatch? _scrapeStopwatch;
     private int _shardsCompletedThisTick;
 
     private void OnShardMetricsUpdated(string hostname, Godot.Collections.Dictionary metrics)
     {
-        Log.LogWarning("Shard metrics received: {Count} metrics, shard {Idx}/{Total}",
-            metrics.Count, _shardsCompletedThisTick + 1, _shards.Count);
+        var normalised = NormaliseHostMetrics(hostname, metrics);
+        EmitSignal(SignalName.FleetMetricsUpdated, hostname, normalised);
+    }
+
+    private void OnShardPollCompleted()
+    {
         _shardsCompletedThisTick++;
 
-        // Store this shard's raw results
-        var shardIndex = _shardsCompletedThisTick - 1;
-        _shardResults[$"shard_{shardIndex}"] = metrics;
-
         if (_shardsCompletedThisTick < _shards.Count)
-            return; // wait for all shards
+            return;
 
-        // All shards reported — check budget
         var elapsed = _scrapeStopwatch?.ElapsedMilliseconds ?? 0;
         _budgetTracker?.RecordScrapeCompleted(elapsed);
 
@@ -206,59 +297,35 @@ public partial class FleetMetricPoller : Node
             EmitSignal(SignalName.ScrapeBudgetExceeded);
         }
 
-        // Normalise and emit
-        var normalised = NormaliseAllHosts(metrics);
-        Log.LogWarning("Emitting FleetMetricsUpdated for {Count} hosts", normalised.Count);
-        EmitSignal(SignalName.FleetMetricsUpdated, normalised);
-
-        // Reset for next tick
-        _shardResults.Clear();
         _shardsCompletedThisTick = 0;
         _scrapeStopwatch = Stopwatch.StartNew();
     }
 
-    /// <summary>
-    /// Normalise raw metric values into 0-1 range for each host.
-    /// For now, uses the last shard's metrics for all hosts (all shards
-    /// query the same pmproxy and get all hosts' data). Per-host partitioning
-    /// from series instance metadata will be refined when wired to real data.
-    /// </summary>
-    private Godot.Collections.Dictionary NormaliseAllHosts(
-        Godot.Collections.Dictionary rawMetrics)
+    private Godot.Collections.Dictionary NormaliseHostMetrics(
+        string hostname, Godot.Collections.Dictionary rawMetrics)
     {
-        var result = new Godot.Collections.Dictionary();
-        if (_assignment == null) return result;
+        var ncpu = _hostNcpu.GetValueOrDefault(hostname, 1);
+        var hostDict = new Godot.Collections.Dictionary();
 
-        foreach (var shard in _assignment.Shards)
-        {
-            foreach (var hostname in shard)
-            {
-                var ncpu = _hostNcpu.GetValueOrDefault(hostname, 1);
-                var hostDict = new Godot.Collections.Dictionary();
+        var idleRate = ExtractRate(rawMetrics, "kernel.all.cpu.idle");
+        hostDict["cpu"] = FleetMetricNormaliser.NormaliseCpu(idleRate, ncpu);
 
-                var idleRate = ExtractRate(rawMetrics, "kernel.all.cpu.idle");
-                hostDict["cpu"] = FleetMetricNormaliser.NormaliseCpu(idleRate, ncpu);
+        var pgIn = ExtractRate(rawMetrics, "mem.vmstat.pgpgin");
+        var pgOut = ExtractRate(rawMetrics, "mem.vmstat.pgpgout");
+        hostDict["memory"] = FleetMetricNormaliser.NormaliseRate(
+            pgIn, pgOut, PagingMaxPagesPerSec);
 
-                var pgIn = ExtractRate(rawMetrics, "mem.vmstat.pgpgin");
-                var pgOut = ExtractRate(rawMetrics, "mem.vmstat.pgpgout");
-                hostDict["memory"] = FleetMetricNormaliser.NormaliseRate(
-                    pgIn, pgOut, PagingMaxPagesPerSec);
+        var diskRead = ExtractRate(rawMetrics, "disk.all.read_bytes");
+        var diskWrite = ExtractRate(rawMetrics, "disk.all.write_bytes");
+        hostDict["disk"] = FleetMetricNormaliser.NormaliseRate(
+            diskRead, diskWrite, DiskMaxBytesPerSec);
 
-                var diskRead = ExtractRate(rawMetrics, "disk.all.read_bytes");
-                var diskWrite = ExtractRate(rawMetrics, "disk.all.write_bytes");
-                hostDict["disk"] = FleetMetricNormaliser.NormaliseRate(
-                    diskRead, diskWrite, DiskMaxBytesPerSec);
+        var netIn = ExtractRate(rawMetrics, "network.interface.in.bytes");
+        var netOut = ExtractRate(rawMetrics, "network.interface.out.bytes");
+        hostDict["network"] = FleetMetricNormaliser.NormaliseRate(
+            netIn, netOut, NetworkMaxBytesPerSec);
 
-                var netIn = ExtractRate(rawMetrics, "network.interface.in.bytes");
-                var netOut = ExtractRate(rawMetrics, "network.interface.out.bytes");
-                hostDict["network"] = FleetMetricNormaliser.NormaliseRate(
-                    netIn, netOut, NetworkMaxBytesPerSec);
-
-                result[hostname] = hostDict;
-            }
-        }
-
-        return result;
+        return hostDict;
     }
 
     /// <summary>
@@ -279,5 +346,13 @@ public partial class FleetMetricPoller : Node
         foreach (var key in instances.Keys)
             sum += instances[key].AsDouble();
         return sum;
+    }
+
+    public override void _ExitTree()
+    {
+        foreach (var shard in _shards)
+            shard.QueueFree();
+        _shards.Clear();
+        _sharedHttpClient.Dispose();
     }
 }
