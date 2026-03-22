@@ -312,7 +312,19 @@ func _setup_fleet_poller(config: Dictionary) -> void:
 	print("[FleetView]   StartPolling called successfully")
 
 
+var _fleet_update_count: int = 0
+
 func _on_fleet_metrics_updated(metrics: Dictionary) -> void:
+	_fleet_update_count += 1
+	if _fleet_update_count <= 3 or _fleet_update_count % 10 == 0:
+		# Log first 3 updates and then every 10th
+		var sample_host: String = ""
+		for key: String in metrics:
+			sample_host = key
+			break
+		if not sample_host.is_empty():
+			print("[FleetView] Update #%d — sample host '%s': %s" % [
+				_fleet_update_count, sample_host, metrics[sample_host]])
 	for host: Node3D in _hosts:
 		var data: Dictionary = metrics.get(host.hostname, {})
 		for metric_name: String in data:

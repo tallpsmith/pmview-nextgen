@@ -117,6 +117,7 @@ public partial class FleetMetricPoller : Node
         Log.LogWarning("FleetMetricPoller.StartPolling called with {Count} hostnames, endpoint={Endpoint}",
             hostnames.Length, Endpoint);
         ConfigureShards(hostnames, Endpoint, PollIntervalMs);
+        _scrapeStopwatch = Stopwatch.StartNew();
         CreateShardPollers();
         // Shards auto-start via MetricPoller._Ready() since MetricNames is pre-set.
         // Discovery runs deferred to populate ncpu cache.
@@ -158,7 +159,6 @@ public partial class FleetMetricPoller : Node
         // One-time discovery: fetch hinv.ncpu per host
         await DiscoverHostCapacities();
         // Shards already auto-started via MetricPoller._Ready()
-        _scrapeStopwatch = Stopwatch.StartNew();
     }
 
     private async Task DiscoverHostCapacities()
