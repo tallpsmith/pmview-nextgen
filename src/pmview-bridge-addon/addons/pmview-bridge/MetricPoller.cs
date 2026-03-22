@@ -432,6 +432,7 @@ public partial class MetricPoller : Node
 		if (_timeCursor.Mode == CursorMode.Paused)
 			return;
 
+		var scrapeWatch = System.Diagnostics.Stopwatch.StartNew();
 		try
 		{
 			if (_timeCursor.Mode == CursorMode.Live)
@@ -444,6 +445,16 @@ public partial class MetricPoller : Node
 				// Playback mode — query historical values via /series/*
 				await FetchHistoricalMetrics();
 			}
+
+			scrapeWatch.Stop();
+			var scrapeMs = scrapeWatch.ElapsedMilliseconds;
+			var spareMs = PollIntervalMs - scrapeMs;
+			if (spareMs < 0)
+				Log.LogWarning("Poll scrape took {ScrapeMs}ms, {OverrunMs}ms over budget (interval={IntervalMs}ms)",
+					scrapeMs, -spareMs, PollIntervalMs);
+			else
+				Log.LogDebug("Poll scrape took {ScrapeMs}ms, {SpareMs}ms spare (interval={IntervalMs}ms)",
+					scrapeMs, spareMs, PollIntervalMs);
 		}
 		catch (PcpConnectionException ex)
 		{
