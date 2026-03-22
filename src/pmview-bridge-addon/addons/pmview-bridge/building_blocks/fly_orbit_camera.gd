@@ -181,7 +181,9 @@ func _process_orbit(delta: float) -> void:
 			_orbit_look_pitch_offset = 0.0
 			_orbit_look_easing_back = false
 
-	# Apply look direction
+	# Apply look direction (guard against same-position when radius is zero)
+	if position.is_equal_approx(orbit_center):
+		return
 	if _orbit_look_yaw_offset == 0.0 and _orbit_look_pitch_offset == 0.0:
 		look_at(orbit_center, Vector3.UP)
 	else:
