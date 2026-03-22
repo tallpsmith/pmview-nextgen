@@ -856,6 +856,10 @@ public partial class MetricPoller : Node
 				var json = await response.Content.ReadAsStringAsync();
 				var seriesValues = PcpSeriesQuery.ParseValuesResponse(json);
 
+				Log.LogInformation(
+					"[Fleet] {Metric}: {Count} raw series values from API (isCounter={IsCounter}, window={Window:F1}s)",
+					metricName, seriesValues.Count, isCounter, windowSeconds);
+
 				if (seriesValues.Count == 0)
 					continue;
 
@@ -866,6 +870,9 @@ public partial class MetricPoller : Node
 				{
 					resolvedValues = PcpSeriesQuery.ComputeRatesFromSeriesValues(
 						seriesValues);
+					Log.LogInformation(
+						"[Fleet] {Metric}: {RawCount} raw → {RateCount} rate values after ComputeRates",
+						metricName, seriesValues.Count, resolvedValues.Count);
 					if (resolvedValues.Count == 0)
 						continue;
 				}
@@ -882,6 +889,7 @@ public partial class MetricPoller : Node
 				// Sum values per hostname/metric for multi-instance metrics
 				// (e.g. network.interface.in.bytes has one series per interface).
 				var hostSums = new Dictionary<string, double>();
+				var unmappedCount = 0;
 				foreach (var sv in resolvedValues)
 				{
 					var lookupKey = sv.InstanceId ?? sv.SeriesId;
@@ -889,6 +897,7 @@ public partial class MetricPoller : Node
 					if (!_cachedSeriesIdToHostname.TryGetValue(lookupKey, out var hostname)
 						&& !_cachedSeriesIdToHostname.TryGetValue(sv.SeriesId, out hostname))
 					{
+						unmappedCount++;
 						continue; // Unknown series — skip
 					}
 
@@ -897,6 +906,15 @@ public partial class MetricPoller : Node
 					else
 						hostSums[hostname] = sv.NumericValue;
 				}
+
+				if (unmappedCount > 0)
+					Log.LogWarning(
+						"[Fleet] {Metric}: {Unmapped} series values had no hostname mapping (of {Total} resolved)",
+						metricName, unmappedCount, resolvedValues.Count);
+
+				// Log per-host sums for this metric
+				foreach (var (h, v) in hostSums)
+					Log.LogInformation("[Fleet] {Metric}: {Host} = {Value:F4}", metricName, h, v);
 
 				// Build the metric dict entries per hostname
 				foreach (var (hostname, summedValue) in hostSums)

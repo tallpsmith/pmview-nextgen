@@ -121,7 +121,6 @@ public partial class FleetMetricPoller : Node
         Log.LogWarning("FleetMetricPoller.StartPolling called with {Count} hostnames, endpoint={Endpoint}",
             hostnames.Length, Endpoint);
         ConfigureShards(hostnames, Endpoint, PollIntervalMs);
-        _scrapeStopwatch = Stopwatch.StartNew();
         CreateShardPollers();
         // Shards auto-start via MetricPoller._Ready() since MetricNames is pre-set.
         // Discovery runs deferred to populate series mapping cache.
@@ -275,8 +274,27 @@ public partial class FleetMetricPoller : Node
 
     private void OnShardMetricsUpdated(string hostname, Godot.Collections.Dictionary metrics)
     {
+        StartScrapeTimerIfNeeded();
         var normalised = NormaliseHostMetrics(hostname, metrics);
+        Log.LogInformation(
+            "[Fleet] Normalised {Host}: cpu={Cpu:F3} mem={Mem:F3} disk={Disk:F3} net={Net:F3}",
+            hostname,
+            normalised.ContainsKey("cpu") ? normalised["cpu"].AsDouble() : -1,
+            normalised.ContainsKey("memory") ? normalised["memory"].AsDouble() : -1,
+            normalised.ContainsKey("disk") ? normalised["disk"].AsDouble() : -1,
+            normalised.ContainsKey("network") ? normalised["network"].AsDouble() : -1);
         EmitSignal(SignalName.FleetMetricsUpdated, hostname, normalised);
+    }
+
+    /// <summary>
+    /// Called when the first shard reports its MetricsUpdated for a tick.
+    /// Starts the scrape stopwatch — measures actual scrape time, not idle
+    /// time between poll intervals.
+    /// </summary>
+    private void StartScrapeTimerIfNeeded()
+    {
+        if (_shardsCompletedThisTick == 0)
+            _scrapeStopwatch = Stopwatch.StartNew();
     }
 
     private void OnShardPollCompleted()
@@ -289,6 +307,10 @@ public partial class FleetMetricPoller : Node
         var elapsed = _scrapeStopwatch?.ElapsedMilliseconds ?? 0;
         _budgetTracker?.RecordScrapeCompleted(elapsed);
 
+        Log.LogInformation(
+            "[Fleet] All shards complete: scrape={Elapsed}ms, budget={Interval}ms, lagging={Lagging}",
+            elapsed, PollIntervalMs, _budgetTracker?.IsLagging ?? false);
+
         if (_budgetTracker is { IsLagging: true })
         {
             Log.LogWarning(
@@ -298,7 +320,6 @@ public partial class FleetMetricPoller : Node
         }
 
         _shardsCompletedThisTick = 0;
-        _scrapeStopwatch = Stopwatch.StartNew();
     }
 
     private Godot.Collections.Dictionary NormaliseHostMetrics(
