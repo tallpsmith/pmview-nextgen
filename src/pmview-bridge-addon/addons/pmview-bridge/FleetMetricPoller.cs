@@ -118,6 +118,8 @@ public partial class FleetMetricPoller : Node
     /// </summary>
     public void StartPolling(string[] hostnames)
     {
+        GD.Print($"[FleetMetricPoller] StartPolling: {hostnames.Length} hostnames, endpoint={Endpoint}");
+        GD.Print($"[FleetMetricPoller] Logger type: {Log.GetType().FullName}");
         Log.LogWarning("FleetMetricPoller.StartPolling called with {Count} hostnames, endpoint={Endpoint}",
             hostnames.Length, Endpoint);
         ConfigureShards(hostnames, Endpoint, PollIntervalMs);
@@ -160,7 +162,9 @@ public partial class FleetMetricPoller : Node
 
     private async void DeferredStartShards()
     {
+        GD.Print("[FleetMetricPoller] DeferredStartShards — starting discovery...");
         await DiscoverSeriesMapping();
+        GD.Print("[FleetMetricPoller] DeferredStartShards — discovery complete");
     }
 
     private async Task DiscoverSeriesMapping()
@@ -280,8 +284,11 @@ public partial class FleetMetricPoller : Node
     private Stopwatch? _scrapeStopwatch;
     private int _shardsCompletedThisTick;
 
+    private static int _gdPrintCount;
     private void OnShardMetricsUpdated(string hostname, Godot.Collections.Dictionary metrics)
     {
+        if (_gdPrintCount++ < 5)
+            GD.Print($"[FleetMetricPoller] OnShardMetricsUpdated: host={hostname}, metrics={metrics.Count} keys");
         StartScrapeTimerIfNeeded();
         var normalised = NormaliseHostMetrics(hostname, metrics);
         Log.LogWarning(
