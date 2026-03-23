@@ -218,6 +218,18 @@ func _process_flying_to_focus(delta: float) -> void:
 		fly_to_focus_completed.emit()
 
 
+## Get the nearest racetrack point to the camera's current position.
+func get_nearest_racetrack_point() -> Vector3:
+	var min_dist := INF
+	var nearest := _racetrack_points[0]
+	for pt in _racetrack_points:
+		var dist := position.distance_to(pt)
+		if dist < min_dist:
+			min_dist = dist
+			nearest = pt
+	return nearest
+
+
 ## Return to patrol from nearest racetrack point
 func return_to_patrol() -> void:
 	_mode = Mode.PATROL

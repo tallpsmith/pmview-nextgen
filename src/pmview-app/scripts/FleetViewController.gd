@@ -224,6 +224,34 @@ func _enter_focus(host_index: int) -> void:
 func _exit_focus() -> void:
 	_view_mode = ViewMode.TRANSITIONING_TO_PATROL
 
+	# Hand control back to patrol camera at the focus camera's position
+	patrol_camera.global_transform = focus_camera.global_transform
+	patrol_camera.make_current()
+
+	# Find the nearest racetrack point to fly back to
+	var nearest_pos: Vector3 = patrol_camera.get_nearest_racetrack_point()
+	var grid_centre := Vector3(
+		_grid_bounds.position.x + _grid_bounds.size.x / 2.0,
+		0,
+		_grid_bounds.position.y + _grid_bounds.size.y / 2.0)
+
+	# Fly out to the racetrack, looking at the grid centre
+	patrol_camera.fly_to_focus(nearest_pos, grid_centre)
+
+	# Fade out beam during fly-out
+	if _beam and _beam.has_method("fade_in"):
+		# Reverse fade — tween alpha to 0
+		var mat: ShaderMaterial = _beam.mesh.surface_get_material(0)
+		if mat:
+			var tween := _beam.create_tween()
+			tween.tween_method(
+				func(val: float) -> void: mat.set_shader_parameter("global_alpha", val),
+				1.0, 0.0, 1.0
+			).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_CUBIC)
+
+	await patrol_camera.fly_to_focus_completed
+
+	# Clean up after fly-out completes
 	if _detail_view:
 		_detail_view.queue_free()
 		_detail_view = null
@@ -231,14 +259,12 @@ func _exit_focus() -> void:
 		_beam.queue_free()
 		_beam = null
 
-	# Restore patrol camera
-	patrol_camera.global_transform = focus_camera.global_transform
-	patrol_camera.make_current()
-	patrol_camera.return_to_patrol()
-
 	# Restore all host opacities
 	for host: Node3D in _hosts:
 		host.set_opacity(1.0)
+
+	# Resume patrol from the nearest point
+	patrol_camera.return_to_patrol()
 
 	_focused_host_index = -1
 	_view_mode = ViewMode.PATROL
