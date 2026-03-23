@@ -869,8 +869,8 @@ public partial class MetricPoller : Node
 				var seriesValues = PcpSeriesQuery.ParseValuesResponse(json);
 
 				Log.LogWarning(
-					"[Fleet] {Metric}: {Count} raw series values from API (isCounter={IsCounter}, window={Window:F1}s)",
-					metricName, seriesValues.Count, isCounter, windowSeconds);
+					"[Fleet] {Metric}: {Count} raw series values from API (isCounter={IsCounter}, mode={Mode})",
+					metricName, seriesValues.Count, isCounter, isPlayback ? "playback" : "live");
 
 				if (seriesValues.Count == 0)
 					continue;
