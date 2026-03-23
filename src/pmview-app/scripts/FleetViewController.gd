@@ -113,6 +113,7 @@ func get_grid_bounds() -> Rect2:
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
 		_handle_esc()
+		return
 	# Dive-in: Enter or double-click in focus mode with preview ready
 	if _view_mode == ViewMode.FOCUS and _preview_ready:
 		if event.is_action_pressed("ui_accept"):
@@ -365,6 +366,13 @@ func _dive_into_host_view() -> void:
 	remove_child(_preview_zones)
 	var zones: Node3D = _preview_zones
 	_preview_zones = null
+
+	# Graft the UI layer and controller script onto the zones root.
+	# Must do this before cleanup because we need the pipeline's C# bridge.
+	var config: Dictionary = SceneManager.connection_config
+	var mode: String = config.get("mode", "live")
+	if _fleet_pipeline:
+		_fleet_pipeline.graft_host_view_ui(zones, mode)
 
 	# Clean up fleet state (beam, pipeline, grid) without freeing the zones
 	_cleanup_focus_state()

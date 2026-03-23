@@ -81,6 +81,13 @@ func is_complete() -> bool:
 	return _is_complete
 
 
+## Graft the HostView UI (panels, help, controller script) onto a zones root.
+## Bridges GDScript → C# since HostSceneBuilder is a static class.
+func graft_host_view_ui(zones: Node3D, mode: String) -> void:
+	if _pipeline:
+		_pipeline.GraftHostViewUi(zones, mode)
+
+
 ## Clean up the pipeline node.
 func cancel() -> void:
 	if _pipeline:

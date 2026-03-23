@@ -129,6 +129,16 @@ public partial class LoadingPipeline : Node
 		}
 	}
 
+	/// <summary>
+	/// Grafts the HostView UI layer (panels, help, controller script) onto a
+	/// zones-only scene. Callable from GDScript since static C# methods are not
+	/// accessible from GDScript.
+	/// </summary>
+	public void GraftHostViewUi(Node3D zonesRoot, string mode = "live")
+	{
+		HostSceneBuilder.AddHostViewUi(zonesRoot, mode);
+	}
+
 	private async Task EnforceMinPhaseDelay(DateTime phaseStart)
 	{
 		if (MinPhaseDelayMs <= 0) return;
