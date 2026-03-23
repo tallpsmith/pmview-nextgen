@@ -323,8 +323,13 @@ func _setup_fleet_poller(config: Dictionary) -> void:
 		var start_time: String = config.get("start_time", "")
 		if start_time.is_empty():
 			# Default: archive end minus 24h, clamped to archive start
-			var arch_start: float = config.get("archive_start_epoch", 0.0)
-			var arch_end: float = config.get("archive_end_epoch", 0.0)
+			var arch_start_raw = config.get("archive_start_epoch", null)
+			var arch_end_raw = config.get("archive_end_epoch", null)
+			print("[FleetView]   raw archive_start_epoch=%s (type=%s)" % [arch_start_raw, typeof(arch_start_raw)])
+			print("[FleetView]   raw archive_end_epoch=%s (type=%s)" % [arch_end_raw, typeof(arch_end_raw)])
+			var arch_start: float = float(arch_start_raw) if arch_start_raw != null else 0.0
+			var arch_end: float = float(arch_end_raw) if arch_end_raw != null else 0.0
+			print("[FleetView]   arch_start=%f arch_end=%f" % [arch_start, arch_end])
 			if arch_end > 0.0:
 				var default_start: float = maxf(arch_end - 86400.0, arch_start)
 				# Convert epoch to ISO 8601 UTC
