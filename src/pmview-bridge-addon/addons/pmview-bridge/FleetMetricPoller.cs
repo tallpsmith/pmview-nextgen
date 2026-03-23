@@ -213,47 +213,43 @@ public partial class FleetMetricPoller : Node
         Log.LogWarning("[Fleet] DiscoverSeriesMapping: starting for {Count} hosts at {Endpoint}",
             allHostnames.Length, Endpoint);
         var endpointUri = new Uri(Endpoint);
-        var allSeriesIds = new HashSet<string>();
+        var seriesIdToHostname = new Dictionary<string, string>();
         var seriesIdsPerMetric = new Dictionary<string, List<string>>();
 
         // Default ncpu to 1 for all hosts (refined when hinv.ncpu wired)
         foreach (var host in allHostnames)
             _hostNcpu[host] = 1;
 
-        // Phase 1: Query series IDs per metric, batched by hostname
+        // Query series IDs per hostname per metric. Since we query with a
+        // hostname filter, the returned series IDs are definitively from
+        // that hostname — no need for a separate labels mapping phase.
+        // The /series/labels hostname label reflects the pmproxy container,
+        // not the archive source, so per-hostname queries are the only
+        // reliable way to map series → source hostname.
         foreach (var metricName in FleetMetricNames)
         {
             var metricSeriesIds = new List<string>();
-            for (var i = 0; i < allHostnames.Length; i += MaxHostsPerQueryBatch)
+            foreach (var hostname in allHostnames)
             {
-                var batch = allHostnames
-                    .Skip(i)
-                    .Take(MaxHostsPerQueryBatch)
-                    .ToArray();
                 try
                 {
-                    var queryUrl = PcpSeriesQuery.BuildMultiHostFilteredQueryUrl(
-                        endpointUri, metricName, batch);
+                    var queryUrl = PcpSeriesQuery.BuildHostnameFilteredQueryUrl(
+                        endpointUri, metricName, hostname);
                     var response = await _sharedHttpClient.GetAsync(queryUrl);
                     if (!response.IsSuccessStatusCode)
-                    {
-                        Log.LogWarning(
-                            "Discovery query failed for {Metric} batch {Batch}: {Status}",
-                            metricName, i / MaxHostsPerQueryBatch, response.StatusCode);
                         continue;
-                    }
 
                     var json = await response.Content.ReadAsStringAsync();
                     var ids = PcpSeriesQuery.ParseQueryResponse(json);
                     metricSeriesIds.AddRange(ids);
                     foreach (var id in ids)
-                        allSeriesIds.Add(id);
+                        seriesIdToHostname[id] = hostname;
                 }
                 catch (Exception ex)
                 {
                     Log.LogWarning(
-                        "Discovery query error for {Metric}: {Message}",
-                        metricName, ex.Message);
+                        "Discovery query error for {Metric}/{Host}: {Message}",
+                        metricName, hostname, ex.Message);
                 }
             }
 
@@ -262,49 +258,13 @@ public partial class FleetMetricPoller : Node
                 seriesIdsPerMetric[metricName] = metricSeriesIds;
         }
 
-        GD.Print($"[FleetMetricPoller] Discovery phase 1 done: {allSeriesIds.Count} total series IDs across {seriesIdsPerMetric.Count} metrics");
+        GD.Print($"[FleetMetricPoller] Discovery complete: {seriesIdToHostname.Count} series mapped to {allHostnames.Length} hostnames across {seriesIdsPerMetric.Count} metrics");
 
-        if (allSeriesIds.Count == 0)
+        if (seriesIdToHostname.Count == 0)
         {
             GD.Print("[FleetMetricPoller] Discovery found NO series IDs — fleet polling will be idle");
             return;
         }
-
-        // Phase 2: Map series_id -> hostname via /series/labels
-        Dictionary<string, string> seriesIdToHostname;
-        try
-        {
-            var labelsUrl = PcpSeriesQuery.BuildPerSeriesLabelsUrl(
-                endpointUri, allSeriesIds);
-            Log.LogWarning("Discovery labels URL: {Url}", labelsUrl.AbsoluteUri);
-            var labelsResponse = await _sharedHttpClient.GetAsync(labelsUrl);
-            if (!labelsResponse.IsSuccessStatusCode)
-            {
-                var errorBody = await labelsResponse.Content.ReadAsStringAsync();
-                Log.LogWarning(
-                    "Discovery labels query failed: {Status} — {Body}",
-                    labelsResponse.StatusCode, errorBody);
-                return;
-            }
-
-            var labelsJson = await labelsResponse.Content.ReadAsStringAsync();
-            seriesIdToHostname = PcpSeriesQuery.ParsePerSeriesHostnameLabels(labelsJson);
-            GD.Print($"[FleetMetricPoller] Labels phase: {seriesIdToHostname.Count} series mapped to hostnames");
-            if (seriesIdToHostname.Count > 0)
-            {
-                // Show first few mappings
-                var sample = seriesIdToHostname.Take(5);
-                foreach (var kv in sample)
-                    GD.Print($"[FleetMetricPoller]   {kv.Key[..Math.Min(12, kv.Key.Length)]}... → {kv.Value}");
-            }
-        }
-        catch (Exception ex)
-        {
-            GD.Print($"[FleetMetricPoller] Discovery labels error: {ex.Message}");
-            return;
-        }
-
-        GD.Print($"[FleetMetricPoller] Discovery complete: {seriesIdToHostname.Count} series → {seriesIdsPerMetric.Count} metrics");
 
         // Phase 3: Partition by shard and distribute
         var partitioned = FleetMetricNormaliser.PartitionSeriesMapByShard(
