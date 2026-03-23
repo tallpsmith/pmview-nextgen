@@ -208,9 +208,12 @@ func _process_flying_to_focus(delta: float) -> void:
 	var smooth_t := t * t * t * (t * (t * 6.0 - 15.0) + 10.0)
 
 	position = _fly_start_pos.lerp(_fly_target_pos, smooth_t)
-	# Look at the target from the current interpolated position each frame,
-	# not slerp towards a pre-computed final orientation
-	look_at(_fly_target_look, Vector3.UP)
+	# Slerp orientation from starting basis toward the target look direction.
+	# Computing the target basis each frame (from the interpolated position)
+	# keeps the look-at accurate as the camera moves, while slerp prevents
+	# the jarring instant snap that a raw look_at() would cause.
+	var target_xform := Transform3D(Basis.IDENTITY, position).looking_at(_fly_target_look, Vector3.UP)
+	global_transform.basis = _fly_start_basis.slerp(target_xform.basis, smooth_t)
 
 	if t >= 1.0:
 		_mode = Mode.PATROL  # stop processing, await return_to_patrol() to resume
