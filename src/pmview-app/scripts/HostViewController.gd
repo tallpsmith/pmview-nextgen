@@ -235,9 +235,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
-	# ESC — double-press to return to menu
+	# ESC — return to fleet if launched from fleet (single press)
 	if event.is_action_pressed("ui_cancel"):
 		get_viewport().set_input_as_handled()
+		if SceneManager.origin_scene == "fleet":
+			SceneManager.return_to_fleet()
+			return
+		# Original double-ESC for main menu
 		if _esc_pending:
 			SceneManager.go_to_main_menu()
 		else:
@@ -368,8 +372,14 @@ func _setup_help_content() -> void:
 		HelpGroup.HelpEntry.create("H / ?", "This help panel"),
 	])
 
+	var esc_text: String
+	if SceneManager.origin_scene == "fleet":
+		esc_text = "Return to Fleet"
+	else:
+		esc_text = "Return to main menu"
 	var general_group := HelpGroup.create("General", orange, [
-		HelpGroup.HelpEntry.create("ESC × 2", "Return to main menu"),
+		HelpGroup.HelpEntry.create("ESC", esc_text) if SceneManager.origin_scene == "fleet" \
+			else HelpGroup.HelpEntry.create("ESC × 2", esc_text),
 	])
 
 	_help_panel.set_groups([camera_group, viewpoints_group, archive_group, panels_group, general_group])
