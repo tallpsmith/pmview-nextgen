@@ -40,7 +40,10 @@ var _fly_start_basis: Basis
 var _fly_target_pos: Vector3
 var _fly_target_look: Vector3
 var _fly_elapsed: float = 0.0
-const FLYTO_DURATION := 1.5
+## Minimum fly duration — short hops won't be instant
+const FLYTO_MIN_DURATION := 2.0
+## Metres per second for fly-to speed — longer distances take proportionally longer
+const FLYTO_SPEED := 15.0
 
 signal fly_to_focus_completed
 
@@ -190,13 +193,19 @@ func fly_to_focus(target_pos: Vector3, look_at_pos: Vector3) -> void:
 	_fly_target_pos = target_pos
 	_fly_target_look = look_at_pos
 	_fly_elapsed = 0.0
+	# Scale duration by distance so long flights feel cinematic,
+	# short hops don't drag. Minimum ensures it's never instant.
+	var dist := position.distance_to(target_pos)
+	_fly_duration = maxf(dist / FLYTO_SPEED, FLYTO_MIN_DURATION)
 
+var _fly_duration: float = FLYTO_MIN_DURATION
 
 func _process_flying_to_focus(delta: float) -> void:
 	_fly_elapsed += delta
-	var t := clampf(_fly_elapsed / FLYTO_DURATION, 0.0, 1.0)
-	# Smooth ease-in-out
-	var smooth_t := t * t * (3.0 - 2.0 * t)
+	var t := clampf(_fly_elapsed / _fly_duration, 0.0, 1.0)
+	# Quintic ease-in-out — slower start/stop than Hermite smoothstep,
+	# gives that cinematic dolly feel.
+	var smooth_t := t * t * t * (t * (t * 6.0 - 15.0) + 10.0)
 
 	position = _fly_start_pos.lerp(_fly_target_pos, smooth_t)
 	# Look at the target from the current interpolated position each frame,
