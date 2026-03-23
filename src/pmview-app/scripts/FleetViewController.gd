@@ -176,18 +176,30 @@ func _enter_focus(host_index: int) -> void:
 	if _beam and _beam.has_method("fade_in"):
 		_beam.fade_in(0.4)
 
-	# Phase 1: Fly toward the host at ground level first, keeping the
-	# selected host visually centred the entire time. This prevents the
-	# camera from looking away during the transition.
-	var host_ground := host.position + Vector3(0, 1.0, 0)
-	var approach_pos := host.position + Vector3(0, DETAIL_VIEW_HEIGHT * 0.5, 14.0)
-	patrol_camera.fly_to_focus(approach_pos, host_ground)
-	await patrol_camera.fly_to_focus_completed
-
-	# Phase 2: Spawn detail view, then rise to orbit height
-	_spawn_mock_detail_view(host)
+	# Compute the orbit destination: a point on the orbit circle around
+	# the HostView at the correct height. Use the camera's current XZ
+	# direction to the host as the approach angle — the camera arrives
+	# from the same side it's currently viewing from, no swooping.
 	var detail_centre := host.position + Vector3(0, DETAIL_VIEW_HEIGHT, 0)
-	var orbit_pos := detail_centre + Vector3(0, 3.0, 18.0)
+	var orbit_radius := 18.0
+	var orbit_height_offset := 3.0
+
+	# Direction from host to camera (XZ plane) gives our approach angle
+	var cam_pos := patrol_camera.global_position
+	var to_cam := Vector2(cam_pos.x - host.position.x, cam_pos.z - host.position.z)
+	if to_cam.length() < 0.1:
+		to_cam = Vector2(0, 1)  # fallback if camera is directly above
+	to_cam = to_cam.normalized()
+
+	var orbit_pos := detail_centre + Vector3(
+		to_cam.x * orbit_radius,
+		orbit_height_offset,
+		to_cam.y * orbit_radius
+	)
+
+	# Single smooth fly: straight to orbit position, looking at the host
+	# column (detail centre) the entire way. No swooping down then back up.
+	_spawn_mock_detail_view(host)
 	patrol_camera.fly_to_focus(orbit_pos, detail_centre)
 	await patrol_camera.fly_to_focus_completed
 
