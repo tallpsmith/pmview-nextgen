@@ -132,20 +132,24 @@ public partial class MetricPoller : Node
 
 	public async void StartPlayback(string startTimeIso)
 	{
+		GD.Print($"[MetricPoller] StartPlayback called: '{startTimeIso}'");
 		if (DateTime.TryParse(startTimeIso, null,
 			DateTimeStyles.AdjustToUniversal, out var startTime))
 		{
+			GD.Print($"[MetricPoller] Parsed start time: {startTime:o}");
 			_lastEmittedTimestamp.Clear();
 			_seriesInstanceMap.Clear();
 			_liveInstanceNames.Clear();
 			_liveInstanceNamesPopulated.Clear();
 			await DiscoverArchiveMetadata();
+			GD.Print($"[MetricPoller] Archive metadata discovered, starting playback at {startTime:o}");
 			_timeCursor.StartPlayback(startTime);
 			EmitSignal(SignalName.PlaybackPositionChanged,
 				startTime.ToString("o"), "Playback");
 		}
 		else
 		{
+			GD.Print($"[MetricPoller] FAILED to parse start time: '{startTimeIso}'");
 			EmitSignal(SignalName.ErrorOccurred,
 				$"Invalid start time format: {startTimeIso}");
 		}

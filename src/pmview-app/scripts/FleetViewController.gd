@@ -318,9 +318,13 @@ func _setup_fleet_poller(config: Dictionary) -> void:
 	fleet_poller.PlaybackPositionChanged.connect(_on_playback_position_changed)
 
 	var mode: String = config.get("mode", "live")
+	print("[FleetView]   mode: %s" % mode)
 	if mode == "archive":
 		var start_time: String = config.get("start_time", "")
-		print("[FleetView]   calling StartArchivePlayback at %s..." % start_time)
+		print("[FleetView]   start_time='%s' (empty=%s)" % [start_time, start_time.is_empty()])
+		print("[FleetView]   archive_start_epoch=%s archive_end_epoch=%s" % [
+			config.get("archive_start_epoch", "?"), config.get("archive_end_epoch", "?")])
+		print("[FleetView]   calling StartArchivePlayback at '%s'..." % start_time)
 		fleet_poller.StartArchivePlayback(hostnames, start_time)
 	else:
 		print("[FleetView]   calling StartPolling (live)...")
