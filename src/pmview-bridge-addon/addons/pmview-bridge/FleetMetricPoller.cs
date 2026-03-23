@@ -193,11 +193,56 @@ public partial class FleetMetricPoller : Node
 
         // In archive mode, start playback on all shards so they query at
         // the cursor position and advance through the archive each tick.
-        if (_archiveStartTimeIso != null)
+        if (_archiveStartTimeIso == null)
+            return;
+
+        var startTimeIso = _archiveStartTimeIso;
+        if (string.IsNullOrEmpty(startTimeIso))
         {
-            GD.Print($"[FleetMetricPoller] Starting archive playback at {_archiveStartTimeIso}");
-            foreach (var shard in _shards)
-                shard.StartPlayback(_archiveStartTimeIso);
+            // No start time provided — discover archive bounds and compute default
+            startTimeIso = await DiscoverDefaultStartTime();
+            if (startTimeIso == null)
+            {
+                GD.Print("[FleetMetricPoller] Could not discover archive bounds — staying in live mode");
+                return;
+            }
+        }
+
+        GD.Print($"[FleetMetricPoller] Starting archive playback at {startTimeIso}");
+        foreach (var shard in _shards)
+            shard.StartPlayback(startTimeIso);
+    }
+
+    /// <summary>
+    /// Probes a fleet metric to find archive time bounds, then computes
+    /// a default start time (end - 24h, clamped to start).
+    /// </summary>
+    private async Task<string?> DiscoverDefaultStartTime()
+    {
+        var endpointUri = new Uri(Endpoint);
+        try
+        {
+            // Pick any hostname — they all share the same archive time range
+            var anyHostname = _assignment?.Shards.SelectMany(s => s).FirstOrDefault();
+            if (anyHostname == null) return null;
+
+            var discovery = new ArchiveSourceDiscovery(endpointUri, _sharedHttpClient);
+            var bounds = await discovery.DiscoverTimeBoundsAsync(anyHostname);
+            if (bounds == null)
+            {
+                GD.Print("[FleetMetricPoller] DiscoverTimeBounds returned null");
+                return null;
+            }
+
+            var defaultStart = ArchiveSourceDiscovery.ComputeDefaultStartTime(
+                bounds.Value.Start, bounds.Value.End);
+            GD.Print($"[FleetMetricPoller] Archive bounds: {bounds.Value.Start:o} to {bounds.Value.End:o}, default start: {defaultStart:o}");
+            return defaultStart.ToString("o");
+        }
+        catch (Exception ex)
+        {
+            GD.Print($"[FleetMetricPoller] Archive bounds discovery failed: {ex.Message}");
+            return null;
         }
     }
 
