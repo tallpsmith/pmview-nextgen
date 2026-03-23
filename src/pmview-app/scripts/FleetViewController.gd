@@ -170,14 +170,25 @@ func _enter_focus(host_index: int) -> void:
 		if i != host_index:
 			_hosts[i].set_opacity(0.3)
 
-	# Camera sits at detail view height, offset to the side so we see the
-	# detail view and beam from outside, not from inside the beam.
-	var detail_centre := host.position + Vector3(0, DETAIL_VIEW_HEIGHT, 0)
-	var target_pos := detail_centre + Vector3(0, 3.0, 18.0)
-	var look_pos := detail_centre
+	# Spawn beam immediately with a fade-in — gives instant visual feedback
+	# that the host was selected before the camera even starts moving.
+	_spawn_beam(host)
+	if _beam and _beam.has_method("fade_in"):
+		_beam.fade_in(0.4)
 
-	# Fly the patrol camera toward the focus position
-	patrol_camera.fly_to_focus(target_pos, look_pos)
+	# Phase 1: Fly toward the host at ground level first, keeping the
+	# selected host visually centred the entire time. This prevents the
+	# camera from looking away during the transition.
+	var host_ground := host.position + Vector3(0, 1.0, 0)
+	var approach_pos := host.position + Vector3(0, DETAIL_VIEW_HEIGHT * 0.5, 14.0)
+	patrol_camera.fly_to_focus(approach_pos, host_ground)
+	await patrol_camera.fly_to_focus_completed
+
+	# Phase 2: Spawn detail view, then rise to orbit height
+	_spawn_mock_detail_view(host)
+	var detail_centre := host.position + Vector3(0, DETAIL_VIEW_HEIGHT, 0)
+	var orbit_pos := detail_centre + Vector3(0, 3.0, 18.0)
+	patrol_camera.fly_to_focus(orbit_pos, detail_centre)
 	await patrol_camera.fly_to_focus_completed
 
 	# Switch to focus camera at the destination.
@@ -193,10 +204,6 @@ func _enter_focus(host_index: int) -> void:
 		focus_camera.position.z - detail_centre.z,
 		focus_camera.position.x - detail_centre.x)
 	focus_camera.make_current()
-
-	# Spawn mock detail view (placeholder — real HostView spawning comes later)
-	_spawn_mock_detail_view(host)
-	_spawn_beam(host)
 
 	_view_mode = ViewMode.FOCUS
 	_update_esc_hint()

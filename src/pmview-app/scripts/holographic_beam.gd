@@ -97,3 +97,16 @@ func configure(p_floor_size: Vector2, p_ceiling_size: Vector2, p_height: float) 
 	ceiling_size = p_ceiling_size
 	beam_height = p_height
 	rebuild()
+
+
+## Fade in from invisible over the given duration.
+func fade_in(duration: float = 0.4) -> void:
+	var mat: ShaderMaterial = mesh.surface_get_material(0)
+	if not mat:
+		return
+	mat.set_shader_parameter("global_alpha", 0.0)
+	var tween := create_tween()
+	tween.tween_method(
+		func(val: float) -> void: mat.set_shader_parameter("global_alpha", val),
+		0.0, 1.0, duration
+	).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
