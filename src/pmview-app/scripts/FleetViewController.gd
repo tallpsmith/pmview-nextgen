@@ -321,10 +321,21 @@ func _setup_fleet_poller(config: Dictionary) -> void:
 	print("[FleetView]   mode: %s" % mode)
 	if mode == "archive":
 		var start_time: String = config.get("start_time", "")
-		print("[FleetView]   start_time='%s' (empty=%s)" % [start_time, start_time.is_empty()])
-		print("[FleetView]   archive_start_epoch=%s archive_end_epoch=%s" % [
-			config.get("archive_start_epoch", "?"), config.get("archive_end_epoch", "?")])
-		print("[FleetView]   calling StartArchivePlayback at '%s'..." % start_time)
+		if start_time.is_empty():
+			# Default: archive end minus 24h, clamped to archive start
+			var arch_start: float = config.get("archive_start_epoch", 0.0)
+			var arch_end: float = config.get("archive_end_epoch", 0.0)
+			if arch_end > 0.0:
+				var default_start: float = maxf(arch_end - 86400.0, arch_start)
+				# Convert epoch to ISO 8601 UTC
+				var dt := Time.get_datetime_dict_from_unix_time(int(default_start))
+				start_time = "%04d-%02d-%02dT%02d:%02d:%02dZ" % [
+					dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second]
+				print("[FleetView]   computed default start_time: %s (end-24h)" % start_time)
+			else:
+				push_warning("[FleetView] No archive bounds — cannot compute default start time")
+		print("[FleetView]   start_time='%s'" % start_time)
+		print("[FleetView]   calling StartArchivePlayback...")
 		fleet_poller.StartArchivePlayback(hostnames, start_time)
 	else:
 		print("[FleetView]   calling StartPolling (live)...")
