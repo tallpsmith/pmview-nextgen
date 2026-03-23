@@ -5,7 +5,8 @@ extends Node3D
 
 const CompactHostScript := preload("res://scripts/compact_host.gd")
 const HolographicBeamScript := preload("res://scripts/holographic_beam.gd")
-const BAR_SCENE := preload("res://addons/pmview-bridge/building_blocks/grounded_bar.tscn")
+const FleetHostPipelineScript := preload("res://scripts/fleet_host_pipeline.gd")
+const MatrixGridScript := preload("res://addons/pmview-bridge/building_blocks/matrix_progress_grid.gd")
 
 @onready var fleet_grid: Node3D = %FleetGrid
 @onready var patrol_camera: Camera3D = %PatrolCamera
@@ -27,8 +28,11 @@ var _grid_columns: int = 0
 var _grid_bounds: Rect2 = Rect2()
 var _view_mode: ViewMode = ViewMode.PATROL
 var _focused_host_index: int = -1
-var _detail_view: Node3D = null
 var _beam: MeshInstance3D = null
+var _fleet_pipeline: Node = null
+var _matrix_grid: MeshInstance3D = null
+var _preview_zones: Node3D = null
+var _preview_ready: bool = false
 const DETAIL_VIEW_HEIGHT := 15.0
 
 
@@ -43,6 +47,15 @@ func _ready() -> void:
 	_update_esc_hint()
 	_setup_time_control(config)
 	_setup_fleet_poller(config)
+
+	# Restore focus if returning from HostView dive-in
+	var restore_hostname: String = SceneManager.fleet_focused_hostname
+	if not restore_hostname.is_empty():
+		SceneManager.fleet_focused_hostname = ""
+		for i in range(_hosts.size()):
+			if _hosts[i].hostname == restore_hostname:
+				_enter_focus.call_deferred(i)
+				break
 
 
 func _generate_mock_hostnames(count: int) -> PackedStringArray:
@@ -100,6 +113,15 @@ func get_grid_bounds() -> Rect2:
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
 		_handle_esc()
+	# Dive-in: Enter or double-click in focus mode with preview ready
+	if _view_mode == ViewMode.FOCUS and _preview_ready:
+		if event.is_action_pressed("ui_accept"):
+			_dive_into_host_view()
+			return
+		if event is InputEventMouseButton and event.pressed \
+				and event.button_index == MOUSE_BUTTON_LEFT and event.double_click:
+			_dive_into_host_view()
+			return
 	if event.is_action_pressed("ui_accept") and _view_mode == ViewMode.PATROL:
 		_select_nearest_host()
 	elif event is InputEventMouseButton and event.pressed \
@@ -161,6 +183,9 @@ func _raycast_select(from: Vector3, direction: Vector3) -> void:
 # --- Focus mode ---
 
 func _enter_focus(host_index: int) -> void:
+	# Cancel any existing preview/pipeline if re-entering focus
+	if _fleet_pipeline or _preview_zones:
+		_cleanup_focus_state()
 	_focused_host_index = host_index
 	_view_mode = ViewMode.TRANSITIONING_TO_FOCUS
 	var host: Node3D = _hosts[host_index]
@@ -197,9 +222,8 @@ func _enter_focus(host_index: int) -> void:
 		to_cam.y * orbit_radius
 	)
 
-	# Single smooth fly: straight to orbit position, looking at the host
-	# column (detail centre) the entire way. No swooping down then back up.
-	_spawn_mock_detail_view(host)
+	# Start the preview pipeline (replaces mock detail view)
+	_start_preview_pipeline(host)
 	patrol_camera.fly_to_focus(orbit_pos, detail_centre)
 	await patrol_camera.fly_to_focus_completed
 
@@ -240,7 +264,6 @@ func _exit_focus() -> void:
 
 	# Fade out beam during fly-out
 	if _beam and _beam.has_method("fade_in"):
-		# Reverse fade — tween alpha to 0
 		var mat: ShaderMaterial = _beam.mesh.surface_get_material(0)
 		if mat:
 			var tween := _beam.create_tween()
@@ -251,38 +274,103 @@ func _exit_focus() -> void:
 
 	await patrol_camera.fly_to_focus_completed
 
-	# Clean up after fly-out completes
-	if _detail_view:
-		_detail_view.queue_free()
-		_detail_view = null
-	if _beam:
-		_beam.queue_free()
-		_beam = null
-
-	# Restore all host opacities
-	for host: Node3D in _hosts:
-		host.set_opacity(1.0)
+	_cleanup_focus_state()
 
 	# Resume patrol from the nearest point
 	patrol_camera.return_to_patrol()
 
-	_focused_host_index = -1
 	_view_mode = ViewMode.PATROL
 	_update_esc_hint()
 
 
-func _spawn_mock_detail_view(host: Node3D) -> void:
-	_detail_view = Node3D.new()
-	_detail_view.name = "DetailView"
-	_detail_view.position = host.position + Vector3(0, DETAIL_VIEW_HEIGHT, 0)
-	# Placeholder bars to visualise the detail view space
-	for i in range(8):
-		var bar: Node3D = BAR_SCENE.instantiate()
-		bar.position = Vector3((i - 3.5) * 2.0, 0, 0)
-		bar.height = randf_range(0.3, 1.0)
-		bar.colour = Color(randf(), randf(), randf())
-		_detail_view.add_child(bar)
-	add_child(_detail_view)
+# --- Preview pipeline ---
+
+func _start_preview_pipeline(host: Node3D) -> void:
+	var config: Dictionary = SceneManager.connection_config
+	var endpoint: String = config.get("endpoint", "http://localhost:54322")
+	var mode: String = config.get("mode", "live")
+	var hostname: String = host.hostname
+
+	# Spawn matrix grid on beam top
+	_matrix_grid = MeshInstance3D.new()
+	_matrix_grid.set_script(MatrixGridScript)
+	_matrix_grid.name = "MatrixProgressGrid"
+	_matrix_grid.position = host.position + Vector3(0, DETAIL_VIEW_HEIGHT + 0.1, 0)
+	add_child(_matrix_grid)
+
+	# Start the pipeline
+	_fleet_pipeline = Node.new()
+	_fleet_pipeline.set_script(FleetHostPipelineScript)
+	_fleet_pipeline.name = "FleetHostPipeline"
+	add_child(_fleet_pipeline)
+
+	_fleet_pipeline.build_completed.connect(_on_preview_build_completed)
+	_fleet_pipeline.build_failed.connect(_on_preview_build_failed)
+	_fleet_pipeline.start(endpoint, mode, hostname, _matrix_grid)
+
+
+func _on_preview_build_completed(zones_root: Node3D) -> void:
+	_preview_zones = zones_root
+	_preview_ready = true
+
+	if _matrix_grid and _matrix_grid.has_method("dissolve"):
+		_matrix_grid.dissolve(0.5)
+
+	if _preview_zones and _focused_host_index >= 0:
+		var host: Node3D = _hosts[_focused_host_index]
+		_preview_zones.position = host.position + Vector3(0, DETAIL_VIEW_HEIGHT, 0)
+		add_child(_preview_zones)
+
+
+func _on_preview_build_failed(error: String) -> void:
+	push_warning("[FleetView] Preview build failed: %s" % error)
+	if _matrix_grid:
+		_matrix_grid.queue_free()
+		_matrix_grid = null
+
+
+func _cleanup_focus_state() -> void:
+	if _beam:
+		_beam.queue_free()
+		_beam = null
+	if _fleet_pipeline:
+		if _fleet_pipeline.has_method("cancel"):
+			_fleet_pipeline.cancel()
+		_fleet_pipeline.queue_free()
+		_fleet_pipeline = null
+	if _matrix_grid:
+		_matrix_grid.queue_free()
+		_matrix_grid = null
+	if _preview_zones:
+		_preview_zones.queue_free()
+		_preview_zones = null
+	_preview_ready = false
+
+	for host: Node3D in _hosts:
+		host.set_opacity(1.0)
+
+	_focused_host_index = -1
+
+
+# --- Dive into full HostView ---
+
+func _dive_into_host_view() -> void:
+	if not _preview_zones or _focused_host_index < 0:
+		return
+
+	var host: Node3D = _hosts[_focused_host_index]
+	var hostname: String = host.hostname
+
+	# Detach the zones from our scene tree (don't free — we're handing it off)
+	remove_child(_preview_zones)
+	var zones: Node3D = _preview_zones
+	_preview_zones = null
+
+	# Clean up fleet state (beam, pipeline, grid) without freeing the zones
+	_cleanup_focus_state()
+
+	# Hand off to SceneManager — HostViewController will receive this as built_scene
+	SceneManager.go_to_host_view_from_fleet(zones, hostname)
 
 
 func _spawn_beam(host: Node3D) -> void:
