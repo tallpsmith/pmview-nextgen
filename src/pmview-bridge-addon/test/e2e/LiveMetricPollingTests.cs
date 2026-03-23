@@ -77,7 +77,7 @@ public partial class LiveMetricPollingTests
 		runner.Scene().AddChild(poller);
 
 		Godot.Collections.Dictionary? receivedMetrics = null;
-		poller.MetricsUpdated += metrics => receivedMetrics = metrics;
+		poller.MetricsUpdated += (_, metrics) => receivedMetrics = metrics;
 
 		poller.StartPolling();
 		await Task.Delay(8000);
@@ -104,7 +104,7 @@ public partial class LiveMetricPollingTests
 		runner.Scene().AddChild(poller);
 
 		Godot.Collections.Dictionary? receivedMetrics = null;
-		poller.MetricsUpdated += metrics => receivedMetrics = metrics;
+		poller.MetricsUpdated += (_, metrics) => receivedMetrics = metrics;
 
 		poller.StartPolling();
 		await Task.Delay(8000);

@@ -1,12 +1,13 @@
 shader_type spatial;
 render_mode unshaded, cull_disabled, blend_add;
 
-uniform vec4 beam_colour : source_color = vec4(0.3, 0.75, 0.97, 0.15);
+uniform vec4 beam_colour : source_color = vec4(0.3, 0.75, 0.97, 0.06);
 uniform float scan_line_count : hint_range(5.0, 50.0) = 20.0;
 uniform float scan_line_speed : hint_range(0.0, 5.0) = 1.5;
-uniform float scan_line_intensity : hint_range(0.0, 1.0) = 0.3;
-uniform float edge_fade : hint_range(0.0, 0.5) = 0.15;
+uniform float scan_line_intensity : hint_range(0.0, 1.0) = 0.15;
+uniform float edge_fade : hint_range(0.0, 0.5) = 0.3;
 uniform float beam_height : hint_range(1.0, 100.0) = 15.0;
+uniform float global_alpha : hint_range(0.0, 1.0) = 1.0;
 
 varying float v_height_ratio;
 
@@ -28,5 +29,5 @@ void fragment() {
 	float edge = smoothstep(0.0, edge_fade, UV.x) * smoothstep(0.0, edge_fade, 1.0 - UV.x);
 
 	ALBEDO = beam_colour.rgb;
-	ALPHA = beam_colour.a * vertical_fade * edge * (1.0 + scan_contribution);
+	ALPHA = beam_colour.a * vertical_fade * edge * (1.0 + scan_contribution) * global_alpha;
 }

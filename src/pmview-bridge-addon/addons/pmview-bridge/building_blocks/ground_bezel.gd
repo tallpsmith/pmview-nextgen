@@ -38,8 +38,11 @@ func _rebuild_mesh() -> void:
 	var box := BoxMesh.new()
 	box.size = Vector3(padded_w, 0.02, padded_d)
 	mesh = box
+	_apply_colour()
 
 func _apply_colour() -> void:
+	if mesh == null:
+		return  # mesh not built yet — _rebuild_mesh() will trigger _apply_colour()
 	var mat := get_surface_override_material(0)
 	if mat == null:
 		mat = StandardMaterial3D.new()

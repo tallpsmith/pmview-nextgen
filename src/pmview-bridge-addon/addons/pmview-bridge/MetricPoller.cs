@@ -19,7 +19,7 @@ public partial class MetricPoller : Node
 {
 	[Signal]
 	public delegate void MetricsUpdatedEventHandler(
-		Godot.Collections.Dictionary metrics);
+		string hostname, Godot.Collections.Dictionary metrics);
 
 	[Signal]
 	public delegate void ConnectionStateChangedEventHandler(string state);
@@ -34,6 +34,9 @@ public partial class MetricPoller : Node
 
 	[Signal]
 	public delegate void PlaybackPositionChangedEventHandler(string position, string mode);
+
+	[Signal]
+	public delegate void ShardPollCompletedEventHandler();
 
 	private ILogger? _log;
 	private ILogger Log => _log ??= PmviewLogger.GetLogger("MetricPoller");
@@ -102,24 +105,51 @@ public partial class MetricPoller : Node
 		MetricNames = metricNames;
 	}
 
+	private IReadOnlyDictionary<string, string>? _cachedSeriesIdToHostname;
+	private IReadOnlyDictionary<string, IReadOnlyList<string>>? _cachedSeriesIdsPerMetric;
+
+	/// <summary>
+	/// Whether this poller has a pre-cached series map from FleetMetricPoller
+	/// discovery. When true, uses FetchSeriesMetricsForHosts instead of the
+	/// standard live/historical fetch paths.
+	/// </summary>
+	public bool HasCachedSeriesMap => _cachedSeriesIdToHostname != null;
+
+	/// <summary>
+	/// Initialise with a pre-resolved series map from centralised discovery.
+	/// Caller must pass independent immutable copies — no shared state between shards.
+	/// Skips per-shard discovery; shard goes straight to polling with cached data.
+	/// </summary>
+	public void InitialiseWithCachedSeriesMap(
+		IReadOnlyDictionary<string, string> seriesIdToHostname,
+		IReadOnlyDictionary<string, IReadOnlyList<string>> seriesIdsPerMetric)
+	{
+		_cachedSeriesIdToHostname = seriesIdToHostname;
+		_cachedSeriesIdsPerMetric = seriesIdsPerMetric;
+	}
+
 	public TimeCursor TimeCursor => _timeCursor;
 
 	public async void StartPlayback(string startTimeIso)
 	{
+		GD.Print($"[MetricPoller] StartPlayback called: '{startTimeIso}'");
 		if (DateTime.TryParse(startTimeIso, null,
 			DateTimeStyles.AdjustToUniversal, out var startTime))
 		{
+			GD.Print($"[MetricPoller] Parsed start time: {startTime:o}");
 			_lastEmittedTimestamp.Clear();
 			_seriesInstanceMap.Clear();
 			_liveInstanceNames.Clear();
 			_liveInstanceNamesPopulated.Clear();
 			await DiscoverArchiveMetadata();
+			GD.Print($"[MetricPoller] Archive metadata discovered, starting playback at {startTime:o}");
 			_timeCursor.StartPlayback(startTime);
 			EmitSignal(SignalName.PlaybackPositionChanged,
 				startTime.ToString("o"), "Playback");
 		}
 		else
 		{
+			GD.Print($"[MetricPoller] FAILED to parse start time: '{startTimeIso}'");
 			EmitSignal(SignalName.ErrorOccurred,
 				$"Invalid start time format: {startTimeIso}");
 		}
@@ -432,11 +462,18 @@ public partial class MetricPoller : Node
 		if (_timeCursor.Mode == CursorMode.Paused)
 			return;
 
+		var scrapeWatch = System.Diagnostics.Stopwatch.StartNew();
 		try
 		{
-			if (_timeCursor.Mode == CursorMode.Live)
+			if (HasCachedSeriesMap)
 			{
-				// Live mode — fetch current values via /pmapi/fetch
+				Log.LogWarning("[Fleet] Shard {Name}: using FetchSeriesMetricsForHosts ({MetricCount} metrics, {SeriesCount} series IDs)",
+					Name, _cachedSeriesIdsPerMetric?.Count ?? 0, _cachedSeriesIdToHostname?.Count ?? 0);
+				await FetchSeriesMetricsForHosts();
+			}
+			else if (_timeCursor.Mode == CursorMode.Live)
+			{
+				Log.LogWarning("[Fleet] Shard {Name}: NO cached series map — falling back to FetchLiveMetrics", Name);
 				await FetchLiveMetrics();
 			}
 			else
@@ -444,6 +481,16 @@ public partial class MetricPoller : Node
 				// Playback mode — query historical values via /series/*
 				await FetchHistoricalMetrics();
 			}
+
+			scrapeWatch.Stop();
+			var scrapeMs = scrapeWatch.ElapsedMilliseconds;
+			var spareMs = PollIntervalMs - scrapeMs;
+			if (spareMs < 0)
+				Log.LogWarning("Poll scrape took {ScrapeMs}ms, {OverrunMs}ms over budget (interval={IntervalMs}ms)",
+					scrapeMs, -spareMs, PollIntervalMs);
+			else
+				Log.LogDebug("Poll scrape took {ScrapeMs}ms, {SpareMs}ms spare (interval={IntervalMs}ms)",
+					scrapeMs, spareMs, PollIntervalMs);
 		}
 		catch (PcpConnectionException ex)
 		{
@@ -474,7 +521,7 @@ public partial class MetricPoller : Node
 			Log.LogInformation("Replaying {Count} cached metrics for new scene", _lastEmittedMetrics.Count);
 			var dict = _lastEmittedMetrics.Duplicate(true);   // deep copy — inner dicts are independent
 			InjectVirtualMetrics(dict);
-			EmitSignal(SignalName.MetricsUpdated, dict);
+			EmitSignal(SignalName.MetricsUpdated, Hostname ?? "", dict);
 		}
 	}
 
@@ -519,7 +566,7 @@ public partial class MetricPoller : Node
 			var dict = MarshalMetricValues(converted);
 			InjectVirtualMetrics(dict);
 			_lastEmittedMetrics = dict;
-			EmitSignal(SignalName.MetricsUpdated, dict);
+			EmitSignal(SignalName.MetricsUpdated, Hostname ?? "", dict);
 		}
 	}
 
@@ -762,8 +809,168 @@ public partial class MetricPoller : Node
 		{
 			Log.LogInformation("Historical update: {Count} metrics with new data", dict.Count);
 			_lastEmittedMetrics = dict;
-			EmitSignal(SignalName.MetricsUpdated, dict);
+			EmitSignal(SignalName.MetricsUpdated, Hostname ?? "", dict);
 		}
+	}
+
+	/// <summary>
+	/// Fetches metric values using the cached series map from centralised discovery.
+	/// Queries one /series/values call per metric with all cached series IDs,
+	/// partitions results by hostname, and fires MetricsUpdated per host.
+	/// Handles counter metrics via rate conversion (needs 2+ samples).
+	/// Used for both fleet live mode (near-now window) and fleet playback.
+	/// </summary>
+	private async Task FetchSeriesMetricsForHosts()
+	{
+		if (_cachedSeriesIdToHostname == null || _cachedSeriesIdsPerMetric == null)
+		{
+			GD.Print($"[MetricPoller] FetchSeriesMetricsForHosts: cached map is null — bailing");
+			return;
+		}
+
+		var endpointUri = new Uri(Endpoint);
+		var isPlayback = _timeCursor.Mode == CursorMode.Playback;
+
+		// Collect values per hostname across all metrics
+		var hostMetrics = new Dictionary<string, Godot.Collections.Dictionary>();
+
+		foreach (var (metricName, seriesIds) in _cachedSeriesIdsPerMetric)
+		{
+			try
+			{
+				var isCounter = _rateConverter?.IsCounter(metricName) == true;
+
+				Uri valuesUrl;
+				if (isPlayback)
+				{
+					// Archive playback — query at cursor position with time window.
+					// Counters need 2 samples for rate, so widen the window.
+					var windowSeconds = isCounter
+						? _archiveSamplingIntervalSeconds * 2.5
+						: _archiveSamplingIntervalSeconds * 1.5;
+					if (windowSeconds < 1.0) windowSeconds = isCounter ? 120.0 : 60.0;
+					valuesUrl = PcpSeriesQuery.BuildValuesUrlWithTimeWindow(
+						endpointUri, seriesIds, _timeCursor.Position,
+						windowSeconds: windowSeconds);
+				}
+				else
+				{
+					// Live mode — get latest values, no time window needed.
+					var baseValuesUrl = PcpSeriesQuery.BuildValuesUrl(
+						endpointUri, seriesIds);
+					valuesUrl = new Uri($"{baseValuesUrl}&count=5");
+				}
+
+				var response = await _sharedHttpClient.GetAsync(valuesUrl);
+				if (!response.IsSuccessStatusCode)
+				{
+					Log.LogError("Series values query failed for {Metric}: {StatusCode}",
+						metricName, response.StatusCode);
+					continue;
+				}
+
+				var json = await response.Content.ReadAsStringAsync();
+				var seriesValues = PcpSeriesQuery.ParseValuesResponse(json);
+
+				Log.LogWarning(
+					"[Fleet] {Metric}: {Count} raw series values from API (isCounter={IsCounter}, mode={Mode})",
+					metricName, seriesValues.Count, isCounter, isPlayback ? "playback" : "live");
+
+				if (seriesValues.Count == 0)
+					continue;
+
+				// Counters: compute per-second rates from consecutive samples
+				// Instant/discrete: take latest timestamp's values directly
+				IReadOnlyList<SeriesValue> resolvedValues;
+				if (isCounter)
+				{
+					resolvedValues = PcpSeriesQuery.ComputeRatesFromSeriesValues(
+						seriesValues);
+					Log.LogWarning(
+						"[Fleet] {Metric}: {RawCount} raw → {RateCount} rate values after ComputeRates",
+						metricName, seriesValues.Count, resolvedValues.Count);
+					if (resolvedValues.Count == 0)
+						continue;
+				}
+				else
+				{
+					var latestTimestamp = seriesValues.Max(v => v.Timestamp);
+					resolvedValues = seriesValues
+						.Where(v => Math.Abs(v.Timestamp - latestTimestamp) < 1.0
+							&& !v.IsString)
+						.ToList();
+				}
+
+				// Partition by hostname using cached series_id → hostname map.
+				// Sum values per hostname/metric for multi-instance metrics
+				// (e.g. network.interface.in.bytes has one series per interface).
+				var hostSums = new Dictionary<string, double>();
+				var unmappedCount = 0;
+				foreach (var sv in resolvedValues)
+				{
+					var lookupKey = sv.InstanceId ?? sv.SeriesId;
+					// Try instance hash first, then series hash
+					if (!_cachedSeriesIdToHostname.TryGetValue(lookupKey, out var hostname)
+						&& !_cachedSeriesIdToHostname.TryGetValue(sv.SeriesId, out hostname))
+					{
+						unmappedCount++;
+						continue; // Unknown series — skip
+					}
+
+					if (hostSums.TryGetValue(hostname, out var existing))
+						hostSums[hostname] = existing + sv.NumericValue;
+					else
+						hostSums[hostname] = sv.NumericValue;
+				}
+
+				if (unmappedCount > 0)
+					Log.LogWarning(
+						"[Fleet] {Metric}: {Unmapped} series values had no hostname mapping (of {Total} resolved)",
+						metricName, unmappedCount, resolvedValues.Count);
+
+				// Log per-host sums for this metric
+				foreach (var (h, v) in hostSums)
+					Log.LogWarning("[Fleet] {Metric}: {Host} = {Value:F4}", metricName, h, v);
+
+				// Build the metric dict entries per hostname
+				foreach (var (hostname, summedValue) in hostSums)
+				{
+					if (!hostMetrics.TryGetValue(hostname, out var hostDict))
+					{
+						hostDict = new Godot.Collections.Dictionary();
+						hostMetrics[hostname] = hostDict;
+					}
+
+					// Use the latest timestamp from the actual data
+					var dataTimestamp = resolvedValues.Max(v => v.Timestamp);
+					hostDict[metricName] = new Godot.Collections.Dictionary
+					{
+						["timestamp"] = dataTimestamp / 1000.0,
+						["instances"] = new Godot.Collections.Dictionary
+						{
+							[-1] = summedValue
+						},
+						["name_to_id"] = new Godot.Collections.Dictionary()
+					};
+				}
+			}
+			catch (Exception ex)
+			{
+				Log.LogError("Series fetch error for {Metric}: {Message}",
+					metricName, ex.Message);
+			}
+		}
+
+		// Emit per-host signals — do NOT set _lastEmittedMetrics here;
+		// it is a single-host concept and ReplayLastMetrics makes no
+		// sense for fleet shards (which serve multiple hosts).
+		foreach (var (hostname, metrics) in hostMetrics)
+		{
+			InjectVirtualMetricsForHost(metrics, hostname);
+			EmitSignal(SignalName.MetricsUpdated, hostname, metrics);
+		}
+
+		EmitSignal(SignalName.ShardPollCompleted);
 	}
 
 	/// <summary>
@@ -862,8 +1069,20 @@ public partial class MetricPoller : Node
 	/// <summary>
 	/// Adds synthetic pmview.meta.* keys to the outgoing metric dictionary.
 	/// These are derived from local poller state, not fetched from pmproxy.
+	/// Delegates to InjectVirtualMetricsForHost using the Hostname property.
 	/// </summary>
 	internal void InjectVirtualMetrics(Godot.Collections.Dictionary dict)
+	{
+		InjectVirtualMetricsForHost(dict, Hostname);
+	}
+
+	/// <summary>
+	/// Variant of InjectVirtualMetrics that takes an explicit hostname
+	/// parameter instead of reading the Hostname property. Used by the fleet
+	/// series path where each signal carries a different host's data.
+	/// </summary>
+	internal void InjectVirtualMetricsForHost(
+		Godot.Collections.Dictionary dict, string hostname)
 	{
 		var now = _timeCursor.Mode == CursorMode.Playback
 			? _timeCursor.Position
@@ -874,11 +1093,11 @@ public partial class MetricPoller : Node
 			["text_value"] = now.ToString("yyyy-MM-dd · HH:mm:ss")
 		};
 
-		if (!string.IsNullOrEmpty(Hostname))
+		if (!string.IsNullOrEmpty(hostname))
 		{
 			dict["pmview.meta.hostname"] = new Godot.Collections.Dictionary
 			{
-				["text_value"] = Hostname
+				["text_value"] = hostname
 			};
 		}
 

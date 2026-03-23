@@ -75,6 +75,23 @@ public static class PcpSeriesQuery
         return new Uri(baseUrl, $"/series/query?expr={Uri.EscapeDataString(filter)}");
     }
 
+    /// <summary>
+    /// Builds a /series/query URL with an OR-chained hostname label filter for
+    /// multiple hosts. Used during fleet discovery to batch hostname queries.
+    /// Empty hostnames array returns an unfiltered query.
+    /// </summary>
+    public static Uri BuildMultiHostFilteredQueryUrl(
+        Uri baseUrl, string metricName, string[] hostnames)
+    {
+        if (hostnames.Length == 0)
+            return BuildQueryUrl(baseUrl, metricName);
+
+        var clauses = hostnames
+            .Select(h => $"hostname==\"{h}\"");
+        var filter = $"{metricName}{{{string.Join(" || ", clauses)}}}";
+        return new Uri(baseUrl, $"/series/query?expr={Uri.EscapeDataString(filter)}");
+    }
+
     public static Uri BuildValuesUrl(Uri baseUrl, IEnumerable<string> seriesIds)
     {
         var ids = string.Join(",", seriesIds);
@@ -239,6 +256,52 @@ public static class PcpSeriesQuery
     public static Uri BuildLabelsUrl(Uri baseUrl, string labelName)
     {
         return new Uri(baseUrl, $"/series/labels?names={Uri.EscapeDataString(labelName)}");
+    }
+
+    /// <summary>
+    /// Builds a /series/labels URL to look up labels for specific series IDs.
+    /// DISTINCT from BuildLabelsUrl which queries by label name (?names=).
+    /// This queries by series IDs (?series=) to get all labels for those series.
+    /// </summary>
+    public static Uri BuildPerSeriesLabelsUrl(
+        Uri baseUrl, IEnumerable<string> seriesIds)
+    {
+        // pmproxy expects literal commas in the series parameter — do NOT
+        // percent-encode them or you get 400 Bad Request.
+        var ids = string.Join(",", seriesIds);
+        return new Uri(baseUrl, $"/series/labels?series={ids}");
+    }
+
+    /// <summary>
+    /// Parses a /series/labels?series=... response to extract hostname labels.
+    /// Returns series_id → hostname mapping. Skips entries without a hostname label.
+    /// DISTINCT from ParseLabelsResponse which returns a flat list of label values.
+    ///
+    /// Response format (from pmwebapi docs):
+    /// [{"series": "abc123", "labels": {"hostname": "host-01", ...}}, ...]
+    /// </summary>
+    public static Dictionary<string, string> ParsePerSeriesHostnameLabels(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var result = new Dictionary<string, string>();
+
+        foreach (var item in doc.RootElement.EnumerateArray())
+        {
+            var seriesId = item.GetProperty("series").GetString();
+            if (seriesId == null)
+                continue;
+
+            // Labels are nested under a "labels" object
+            if (item.TryGetProperty("labels", out var labelsProp)
+                && labelsProp.TryGetProperty("hostname", out var hostnameProp))
+            {
+                var hostname = hostnameProp.GetString();
+                if (hostname != null)
+                    result[seriesId] = hostname;
+            }
+        }
+
+        return result;
     }
 
     private static double ToEpochSeconds(DateTime utcTime)

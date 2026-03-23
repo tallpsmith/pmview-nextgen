@@ -555,7 +555,7 @@ func _get_stack_bindings(stack: Node) -> Dictionary:
 	return {"zone": zone, "instance": instance, "properties": all_properties}
 
 
-func _on_metrics_updated_for_detail(_metrics: Dictionary) -> void:
+func _on_metrics_updated_for_detail(_hostname: String, _metrics: Dictionary) -> void:
 	if _selected_shape == null or _detail_panel == null or not _detail_panel.visible:
 		return
 	var bindings: Dictionary

@@ -761,4 +761,116 @@ public class SeriesQueryTests
         Assert.DoesNotContain(" ", urlStr);
         Assert.Contains("web%20server.local", urlStr);
     }
+
+    // ── Multi-host filtered query URL building ──
+
+    [Fact]
+    public void BuildMultiHostFilteredQueryUrl_TwoHosts_BuildsOrChainedFilter()
+    {
+        var baseUrl = new Uri("http://localhost:44322");
+        var url = PcpSeriesQuery.BuildMultiHostFilteredQueryUrl(
+            baseUrl, "kernel.all.cpu.idle", ["host-01", "host-02"]);
+
+        var urlStr = url.AbsoluteUri;
+        Assert.Contains("/series/query", urlStr);
+        var decoded = Uri.UnescapeDataString(urlStr);
+        Assert.Contains("hostname==\"host-01\"", decoded);
+        Assert.Contains("hostname==\"host-02\"", decoded);
+        Assert.Contains("||", decoded);
+    }
+
+    [Fact]
+    public void BuildMultiHostFilteredQueryUrl_SingleHost_NoOrOperator()
+    {
+        var baseUrl = new Uri("http://localhost:44322");
+        var url = PcpSeriesQuery.BuildMultiHostFilteredQueryUrl(
+            baseUrl, "kernel.all.load", ["app-server-1"]);
+
+        var decoded = Uri.UnescapeDataString(url.AbsoluteUri);
+        Assert.Contains("hostname==\"app-server-1\"", decoded);
+        Assert.DoesNotContain("||", decoded);
+    }
+
+    [Fact]
+    public void BuildMultiHostFilteredQueryUrl_EmptyArray_ReturnsUnfilteredQuery()
+    {
+        var baseUrl = new Uri("http://localhost:44322");
+        var url = PcpSeriesQuery.BuildMultiHostFilteredQueryUrl(
+            baseUrl, "kernel.all.load", []);
+
+        var decoded = Uri.UnescapeDataString(url.AbsoluteUri);
+        Assert.Contains("kernel.all.load", decoded);
+        Assert.DoesNotContain("hostname", decoded);
+    }
+
+    [Fact]
+    public void BuildMultiHostFilteredQueryUrl_SpecialCharsInHostname_EncodesCorrectly()
+    {
+        var baseUrl = new Uri("http://localhost:44322");
+        var url = PcpSeriesQuery.BuildMultiHostFilteredQueryUrl(
+            baseUrl, "kernel.all.load", ["web server.local", "app-01"]);
+
+        var urlStr = url.AbsoluteUri;
+        Assert.DoesNotContain(" ", urlStr);
+    }
+
+    // ── Per-series labels URL and parsing ──
+
+    [Fact]
+    public void BuildPerSeriesLabelsUrl_FormatsCorrectly()
+    {
+        var baseUrl = new Uri("http://localhost:44322");
+        var url = PcpSeriesQuery.BuildPerSeriesLabelsUrl(
+            baseUrl, ["abc123", "def456"]);
+
+        var urlStr = url.AbsoluteUri;
+        Assert.Contains("/series/labels", urlStr);
+        Assert.Contains("series=", urlStr);
+        Assert.Contains("abc123", urlStr);
+        Assert.Contains("def456", urlStr);
+    }
+
+    [Fact]
+    public void ParsePerSeriesHostnameLabels_ExtractsHostnames()
+    {
+        // Actual pmproxy response nests labels under a "labels" key
+        var json = """
+        [
+            {"series": "abc123", "labels": {"hostname": "host-01", "agent": "linux"}},
+            {"series": "def456", "labels": {"hostname": "host-02", "agent": "linux"}},
+            {"series": "ghi789", "labels": {"hostname": "host-01", "agent": "linux"}}
+        ]
+        """;
+
+        var result = PcpSeriesQuery.ParsePerSeriesHostnameLabels(json);
+
+        Assert.Equal(3, result.Count);
+        Assert.Equal("host-01", result["abc123"]);
+        Assert.Equal("host-02", result["def456"]);
+        Assert.Equal("host-01", result["ghi789"]);
+    }
+
+    [Fact]
+    public void ParsePerSeriesHostnameLabels_MissingHostnameLabel_SkipsEntry()
+    {
+        var json = """
+        [
+            {"series": "abc123", "labels": {"hostname": "host-01"}},
+            {"series": "def456", "labels": {"agent": "pmcd"}}
+        ]
+        """;
+
+        var result = PcpSeriesQuery.ParsePerSeriesHostnameLabels(json);
+
+        Assert.Single(result);
+        Assert.Equal("host-01", result["abc123"]);
+    }
+
+    [Fact]
+    public void ParsePerSeriesHostnameLabels_EmptyArray_ReturnsEmpty()
+    {
+        var json = "[]";
+        var result = PcpSeriesQuery.ParsePerSeriesHostnameLabels(json);
+        Assert.Empty(result);
+    }
 }

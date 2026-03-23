@@ -13,6 +13,8 @@ const BAR_SCENE := preload("res://addons/pmview-bridge/building_blocks/grounded_
 @onready var master_timestamp: Label3D = %MasterTimestamp
 @onready var esc_hint: Label = %EscHint
 @onready var time_control: Control = %TimeControl
+@onready var warning_toast: Control = %WarningToast
+@onready var fleet_poller: Node = %FleetMetricPoller
 
 ## Spacing between host grid cells (centre to centre)
 @export var host_spacing: float = 6.0
@@ -20,6 +22,7 @@ const BAR_SCENE := preload("res://addons/pmview-bridge/building_blocks/grounded_
 enum ViewMode { PATROL, TRANSITIONING_TO_FOCUS, FOCUS, TRANSITIONING_TO_PATROL }
 
 var _hosts: Array[Node3D] = []
+var _host_lookup: Dictionary = {}
 var _grid_columns: int = 0
 var _grid_bounds: Rect2 = Rect2()
 var _view_mode: ViewMode = ViewMode.PATROL
@@ -39,6 +42,7 @@ func _ready() -> void:
 	patrol_camera.setup(_grid_bounds)
 	_update_esc_hint()
 	_setup_time_control(config)
+	_setup_fleet_poller(config)
 
 
 func _generate_mock_hostnames(count: int) -> PackedStringArray:
@@ -67,6 +71,7 @@ func _build_grid(hostnames: PackedStringArray) -> void:
 		host_node.name = "CompactHost_%d" % i
 		fleet_grid.add_child(host_node)
 		_hosts.append(host_node)
+		_host_lookup[hostnames[i]] = host_node
 
 	_grid_bounds = Rect2(
 		Vector2(offset.x, offset.z),
@@ -79,7 +84,7 @@ func _position_master_timestamp() -> void:
 		return
 	var centre := Vector3(
 		_grid_bounds.position.x + _grid_bounds.size.x / 2.0,
-		15.0,
+		8.0,
 		_grid_bounds.position.y + _grid_bounds.size.y / 2.0,
 	)
 	master_timestamp.position = centre
@@ -165,24 +170,52 @@ func _enter_focus(host_index: int) -> void:
 		if i != host_index:
 			_hosts[i].set_opacity(0.3)
 
-	# Calculate focus camera target position (above and in front of the host)
-	var target_pos := host.position + Vector3(0, DETAIL_VIEW_HEIGHT + 5.0, 15.0)
-	var look_pos := host.position + Vector3(0, DETAIL_VIEW_HEIGHT / 2.0, 0)
+	# Spawn beam immediately with a fade-in — gives instant visual feedback
+	# that the host was selected before the camera even starts moving.
+	_spawn_beam(host)
+	if _beam and _beam.has_method("fade_in"):
+		_beam.fade_in(0.4)
 
-	# Fly the patrol camera toward the focus position
-	patrol_camera.fly_to_focus(target_pos, look_pos)
+	# Compute the orbit destination: a point on the orbit circle around
+	# the HostView at the correct height. Use the camera's current XZ
+	# direction to the host as the approach angle — the camera arrives
+	# from the same side it's currently viewing from, no swooping.
+	var detail_centre := host.position + Vector3(0, DETAIL_VIEW_HEIGHT, 0)
+	var orbit_radius := 18.0
+	var orbit_height_offset := 3.0
+
+	# Direction from host to camera (XZ plane) gives our approach angle
+	var cam_pos := patrol_camera.global_position
+	var to_cam := Vector2(cam_pos.x - host.position.x, cam_pos.z - host.position.z)
+	if to_cam.length() < 0.1:
+		to_cam = Vector2(0, 1)  # fallback if camera is directly above
+	to_cam = to_cam.normalized()
+
+	var orbit_pos := detail_centre + Vector3(
+		to_cam.x * orbit_radius,
+		orbit_height_offset,
+		to_cam.y * orbit_radius
+	)
+
+	# Single smooth fly: straight to orbit position, looking at the host
+	# column (detail centre) the entire way. No swooping down then back up.
+	_spawn_mock_detail_view(host)
+	patrol_camera.fly_to_focus(orbit_pos, detail_centre)
 	await patrol_camera.fly_to_focus_completed
 
-	# Switch to focus camera at the destination
+	# Switch to focus camera at the destination.
+	# Must set position BEFORE make_current, then re-init orbit params
+	# because fly_orbit_camera._ready() only runs once at scene load.
 	focus_camera.global_transform = patrol_camera.global_transform
+	focus_camera.orbit_center = detail_centre
+	focus_camera._orbit_height = focus_camera.position.y
+	focus_camera._radius = Vector2(
+		focus_camera.position.x - detail_centre.x,
+		focus_camera.position.z - detail_centre.z).length()
+	focus_camera._orbit_angle = atan2(
+		focus_camera.position.z - detail_centre.z,
+		focus_camera.position.x - detail_centre.x)
 	focus_camera.make_current()
-	# Wait a frame for fly_orbit_camera.gd's _ready() state
-	await get_tree().process_frame
-	focus_camera.orbit_center = host.position + Vector3(0, DETAIL_VIEW_HEIGHT / 2.0, 0)
-
-	# Spawn mock detail view (placeholder — real HostView spawning comes later)
-	_spawn_mock_detail_view(host)
-	_spawn_beam(host)
 
 	_view_mode = ViewMode.FOCUS
 	_update_esc_hint()
@@ -191,6 +224,34 @@ func _enter_focus(host_index: int) -> void:
 func _exit_focus() -> void:
 	_view_mode = ViewMode.TRANSITIONING_TO_PATROL
 
+	# Hand control back to patrol camera at the focus camera's position
+	patrol_camera.global_transform = focus_camera.global_transform
+	patrol_camera.make_current()
+
+	# Find the nearest racetrack point to fly back to
+	var nearest_pos: Vector3 = patrol_camera.get_nearest_racetrack_point()
+	var grid_centre := Vector3(
+		_grid_bounds.position.x + _grid_bounds.size.x / 2.0,
+		0,
+		_grid_bounds.position.y + _grid_bounds.size.y / 2.0)
+
+	# Fly out to the racetrack, looking at the grid centre
+	patrol_camera.fly_to_focus(nearest_pos, grid_centre)
+
+	# Fade out beam during fly-out
+	if _beam and _beam.has_method("fade_in"):
+		# Reverse fade — tween alpha to 0
+		var mat: ShaderMaterial = _beam.mesh.surface_get_material(0)
+		if mat:
+			var tween := _beam.create_tween()
+			tween.tween_method(
+				func(val: float) -> void: mat.set_shader_parameter("global_alpha", val),
+				1.0, 0.0, 1.0
+			).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_CUBIC)
+
+	await patrol_camera.fly_to_focus_completed
+
+	# Clean up after fly-out completes
 	if _detail_view:
 		_detail_view.queue_free()
 		_detail_view = null
@@ -198,14 +259,12 @@ func _exit_focus() -> void:
 		_beam.queue_free()
 		_beam = null
 
-	# Restore patrol camera
-	patrol_camera.global_transform = focus_camera.global_transform
-	patrol_camera.make_current()
-	patrol_camera.return_to_patrol()
-
 	# Restore all host opacities
 	for host: Node3D in _hosts:
 		host.set_opacity(1.0)
+
+	# Resume patrol from the nearest point
+	patrol_camera.return_to_patrol()
 
 	_focused_host_index = -1
 	_view_mode = ViewMode.PATROL
@@ -265,9 +324,105 @@ func _setup_time_control(config: Dictionary) -> void:
 
 
 ## Update the floating master timestamp billboard and TimeControl playhead.
-## Called by the fleet MetricPoller once polling is wired (Chunk 5).
 func update_master_timestamp(timestamp_iso: String) -> void:
 	if master_timestamp:
-		master_timestamp.text = timestamp_iso
+		# Format ISO 8601 to clean "YYYY-MM-DD · HH:MM:SS"
+		var clean := timestamp_iso
+		if "T" in timestamp_iso:
+			var parts := timestamp_iso.split("T")
+			var date_part := parts[0]
+			var time_part := parts[1].split(".")[0].rstrip("Z")  # strip fractional seconds and Z
+			clean = "%s · %s" % [date_part, time_part]
+		master_timestamp.text = clean
 	if time_control and time_control.has_method("update_playhead"):
 		time_control.update_playhead(timestamp_iso, "archive")
+
+
+func _on_playback_position_changed(position: String, mode: String) -> void:
+	if not position.is_empty():
+		print("[FleetView] PlaybackPosition: %s (%s)" % [position, mode])
+		update_master_timestamp(position)
+
+
+# --- Fleet metric poller ---
+
+func _setup_fleet_poller(config: Dictionary) -> void:
+	print("[FleetView] _setup_fleet_poller called")
+	print("[FleetView]   fleet_poller node: ", fleet_poller)
+	print("[FleetView]   config keys: ", config.keys())
+	if not fleet_poller:
+		print("[FleetView]   BAIL: fleet_poller is null")
+		return
+	var hostnames: PackedStringArray = config.get("hostnames", PackedStringArray())
+	print("[FleetView]   hostnames count: ", hostnames.size())
+	if hostnames.is_empty():
+		print("[FleetView]   BAIL: no hostnames in config")
+		return  # Mock mode — no polling
+
+	var endpoint: String = config.get("endpoint", "http://localhost:54322")
+	print("[FleetView]   endpoint: ", endpoint)
+	print("[FleetView]   fleet_poller script: ", fleet_poller.get_script())
+	fleet_poller.set("Endpoint", endpoint)
+
+	fleet_poller.FleetMetricsUpdated.connect(_on_fleet_metrics_updated)
+	fleet_poller.ScrapeBudgetExceeded.connect(_on_scrape_lagging)
+	fleet_poller.HostsDropped.connect(_on_hosts_dropped)
+	fleet_poller.PlaybackPositionChanged.connect(_on_playback_position_changed)
+
+	var mode: String = config.get("mode", "live")
+	print("[FleetView]   mode: %s" % mode)
+	if mode == "archive":
+		var start_time: String = config.get("start_time", "")
+		if start_time.is_empty():
+			# Default: archive end minus 24h, clamped to archive start
+			var arch_start_raw = config.get("archive_start_epoch", null)
+			var arch_end_raw = config.get("archive_end_epoch", null)
+			print("[FleetView]   raw archive_start_epoch=%s (type=%s)" % [arch_start_raw, typeof(arch_start_raw)])
+			print("[FleetView]   raw archive_end_epoch=%s (type=%s)" % [arch_end_raw, typeof(arch_end_raw)])
+			var arch_start: float = float(arch_start_raw) if arch_start_raw != null else 0.0
+			var arch_end: float = float(arch_end_raw) if arch_end_raw != null else 0.0
+			print("[FleetView]   arch_start=%f arch_end=%f" % [arch_start, arch_end])
+			if arch_end > 0.0:
+				var default_start: float = maxf(arch_end - 86400.0, arch_start)
+				# Convert epoch to ISO 8601 UTC
+				var dt := Time.get_datetime_dict_from_unix_time(int(default_start))
+				start_time = "%04d-%02d-%02dT%02d:%02d:%02dZ" % [
+					dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second]
+				print("[FleetView]   computed default start_time: %s (end-24h)" % start_time)
+			else:
+				push_warning("[FleetView] No archive bounds — cannot compute default start time")
+		print("[FleetView]   start_time='%s'" % start_time)
+		print("[FleetView]   calling StartArchivePlayback...")
+		fleet_poller.StartArchivePlayback(hostnames, start_time)
+	else:
+		print("[FleetView]   calling StartPolling (live)...")
+		fleet_poller.StartPolling(hostnames)
+	print("[FleetView]   polling started successfully")
+
+
+var _fleet_update_count: int = 0
+
+func _on_fleet_metrics_updated(hostname: String, metrics: Dictionary) -> void:
+	_fleet_update_count += 1
+	if _fleet_update_count <= 3 or _fleet_update_count % 10 == 0:
+		print("[FleetView] Update #%d — host '%s': %s" % [
+			_fleet_update_count, hostname, metrics])
+	var host: Node3D = _host_lookup.get(hostname)
+	if not host:
+		return
+	for metric_name: String in metrics:
+		host.set_metric_value(metric_name, metrics[metric_name])
+
+
+func _on_scrape_lagging() -> void:
+	if warning_toast and warning_toast.has_method("show_toast"):
+		warning_toast.show_toast(
+			"METRIC POLLING LAGGING", WarningToast.Severity.WARNING,
+			5.0, "scrape_lag")
+
+
+func _on_hosts_dropped(count: int, hostnames: Array) -> void:
+	if warning_toast and warning_toast.has_method("show_toast"):
+		warning_toast.show_toast(
+			"250 HOST LIMIT - %d HOSTS DROPPED (SEE LOGS)" % count,
+			WarningToast.Severity.WARNING, 10.0)

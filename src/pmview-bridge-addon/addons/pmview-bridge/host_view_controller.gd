@@ -22,7 +22,9 @@ func _ready() -> void:
 	poller.MetricNames = metric_names
 
 	print("[host_view_controller] Connecting MetricsUpdated signal...")
-	poller.connect("MetricsUpdated", binder.ApplyMetrics)
+	poller.connect("MetricsUpdated", func(_hostname: String, metrics: Dictionary) -> void:
+		binder.ApplyMetrics(metrics)
+	)
 
 	print("[host_view_controller] Calling StartPolling...")
 	poller.StartPolling()
