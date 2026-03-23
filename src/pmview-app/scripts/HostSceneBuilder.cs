@@ -41,13 +41,28 @@ public static class HostSceneBuilder
     /// <summary>
     /// Builds a live node hierarchy from a <see cref="SceneLayout"/>,
     /// mirroring the structure TscnWriter emits to .tscn.
+    /// Delegates to <see cref="BuildZones"/> then <see cref="AddHostViewUi"/>.
     /// </summary>
     public static Node3D Build(SceneLayout layout, string pmproxyEndpoint,
         string mode = "live", string? hostnameOverride = null,
         IProgress<float>? progress = null)
     {
-        _log.LogInformation("Build starting...");
-        var root = CreateHostViewRoot();
+        var root = BuildZones(layout, pmproxyEndpoint, mode, hostnameOverride, progress);
+        AddHostViewUi(root, mode);
+        return root;
+    }
+
+    /// <summary>
+    /// Creates a plain Node3D with MetricPoller, SceneBinder, metric zones,
+    /// and ambient labels — but NO controller script or UI panels.
+    /// Suitable for embedding as a read-only preview (e.g. fleet view).
+    /// </summary>
+    public static Node3D BuildZones(SceneLayout layout, string pmproxyEndpoint,
+        string mode = "live", string? hostnameOverride = null,
+        IProgress<float>? progress = null)
+    {
+        _log.LogInformation("BuildZones starting...");
+        var root = new Node3D { Name = "HostViewZones" };
         var hostname = hostnameOverride ?? layout.Hostname;
         AddMetricPoller(root, pmproxyEndpoint, hostname);
         AddSceneBinder(root);
@@ -60,33 +75,37 @@ public static class HostSceneBuilder
         }
 
         BuildAmbientLabels(root);
-        AddRangeTuningPanel(root);
-
-        if (mode == "archive")
-            AddTimeControl(root);
-
-        // Set Owner on all descendants so find_child(owned=true) works —
-        // programmatic nodes don't get an owner automatically unlike .tscn scenes.
         SetOwnerRecursive(root, root);
 
-        _log.LogInformation("Build complete. Root children: {ChildCount}", root.GetChildCount());
+        _log.LogInformation("BuildZones complete. Root children: {ChildCount}", root.GetChildCount());
         return root;
     }
 
-    // ── root + infrastructure ──────────────────────────────────────────
-
-    private static Node3D CreateHostViewRoot()
+    /// <summary>
+    /// Attaches the host_view_controller script, renames to "HostView",
+    /// adds UI panels (range tuning, help, detail) and optionally TimeControl,
+    /// then re-sets ownership on all descendants.
+    /// </summary>
+    public static void AddHostViewUi(Node3D zonesRoot, string mode = "live")
     {
-        var root = new Node3D { Name = "HostView" };
+        _log.LogInformation("AddHostViewUi starting...");
+
         var script = GD.Load<Script>(ControllerScriptPath);
         if (script == null)
             _log.LogError("FAILED to load controller script: {ScriptPath}", ControllerScriptPath);
         else
-            _log.LogInformation("Loaded controller script: {ScriptPath}", script.ResourcePath);
-        if (script != null)
-            root.SetScript(script);
-        _log.LogInformation("Root script after SetScript: {Script}", root.GetScript());
-        return root;
+            zonesRoot.SetScript(script);
+
+        zonesRoot.Name = "HostView";
+
+        AddRangeTuningPanel(zonesRoot);
+
+        if (mode == "archive")
+            AddTimeControl(zonesRoot);
+
+        SetOwnerRecursive(zonesRoot, zonesRoot);
+
+        _log.LogInformation("AddHostViewUi complete.");
     }
 
     private static void AddMetricPoller(Node3D root, string endpoint, string hostname)
