@@ -96,7 +96,7 @@ func _fetch_hostnames() -> void:
 	http.request_completed.connect(_on_hostnames_response.bind(http))
 	var url := endpoint_input.text.strip_edges()
 	if url.is_empty():
-		url = "http://localhost:44322"
+		url = "http://localhost:54322"
 	http.request(url + "/series/labels?names=hostname")
 
 
@@ -157,7 +157,7 @@ func _set_launch_enabled(enabled: bool) -> void:
 func _probe_time_bounds(hostname: String) -> void:
 	var url := endpoint_input.text.strip_edges()
 	if url.is_empty():
-		url = "http://localhost:44322"
+		url = "http://localhost:54322"
 
 	# Query series for this hostname (URL-encoded filter)
 	var filter := "kernel.all.load{hostname==\"%s\"}" % hostname
@@ -282,7 +282,7 @@ func _on_launch_gui_input(event: InputEvent) -> void:
 func _launch() -> void:
 	var url := endpoint_input.text.strip_edges()
 	if url.is_empty():
-		url = "http://localhost:44322"
+		url = "http://localhost:54322"
 
 	if archive_button.button_pressed:
 		if not start_time_input.editable:
@@ -317,7 +317,7 @@ func _on_all_hosts_pressed() -> void:
 func _launch_fleet(hostnames: PackedStringArray) -> void:
 	var url: String = endpoint_input.text.strip_edges()
 	if url.is_empty():
-		url = "http://localhost:44322"
+		url = "http://localhost:54322"
 	var config := {
 		"endpoint": url,
 		"mode": "archive" if archive_button.button_pressed else "live",

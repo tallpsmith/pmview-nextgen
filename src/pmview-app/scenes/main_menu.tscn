@@ -251,7 +251,7 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(480, 44)
 layout_mode = 2
 theme_override_font_sizes/font_size = 16
-text = "http://localhost:44322"
+text = "http://localhost:54322"
 alignment = 1
 
 [node name="HSeparator" type="HSeparator" parent="CanvasLayer/Control/UIPanel/CenterContainer/VBoxContainer" unique_id=348019049]
