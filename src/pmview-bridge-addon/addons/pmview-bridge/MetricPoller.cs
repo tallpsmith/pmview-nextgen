@@ -825,12 +825,7 @@ public partial class MetricPoller : Node
 		}
 
 		var endpointUri = new Uri(Endpoint);
-
-		// Fleet series path: query the latest N values per series instead of
-		// a time window. This works for both live (near-now) and archive
-		// (historical) data — no need to know the time bounds.
-		// Counters need 2+ samples for rate conversion, so fetch 5 for headroom.
-		var sampleCount = 5;
+		var isPlayback = _timeCursor.Mode == CursorMode.Playback;
 
 		// Collect values per hostname across all metrics
 		var hostMetrics = new Dictionary<string, Godot.Collections.Dictionary>();
@@ -841,9 +836,26 @@ public partial class MetricPoller : Node
 			{
 				var isCounter = _rateConverter?.IsCounter(metricName) == true;
 
-				var baseValuesUrl = PcpSeriesQuery.BuildValuesUrl(
-					endpointUri, seriesIds);
-				var valuesUrl = new Uri($"{baseValuesUrl}&count={sampleCount}");
+				Uri valuesUrl;
+				if (isPlayback)
+				{
+					// Archive playback — query at cursor position with time window.
+					// Counters need 2 samples for rate, so widen the window.
+					var windowSeconds = isCounter
+						? _archiveSamplingIntervalSeconds * 2.5
+						: _archiveSamplingIntervalSeconds * 1.5;
+					if (windowSeconds < 1.0) windowSeconds = isCounter ? 120.0 : 60.0;
+					valuesUrl = PcpSeriesQuery.BuildValuesUrlWithTimeWindow(
+						endpointUri, seriesIds, _timeCursor.Position,
+						windowSeconds: windowSeconds);
+				}
+				else
+				{
+					// Live mode — get latest values, no time window needed.
+					var baseValuesUrl = PcpSeriesQuery.BuildValuesUrl(
+						endpointUri, seriesIds);
+					valuesUrl = new Uri($"{baseValuesUrl}&count=5");
+				}
 
 				var response = await _sharedHttpClient.GetAsync(valuesUrl);
 				if (!response.IsSuccessStatusCode)

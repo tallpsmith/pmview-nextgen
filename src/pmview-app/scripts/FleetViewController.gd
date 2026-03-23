@@ -286,6 +286,11 @@ func update_master_timestamp(timestamp_iso: String) -> void:
 		time_control.update_playhead(timestamp_iso, "archive")
 
 
+func _on_playback_position_changed(position: String, mode: String) -> void:
+	if not position.is_empty():
+		update_master_timestamp(position)
+
+
 # --- Fleet metric poller ---
 
 func _setup_fleet_poller(config: Dictionary) -> void:
@@ -309,9 +314,17 @@ func _setup_fleet_poller(config: Dictionary) -> void:
 	fleet_poller.FleetMetricsUpdated.connect(_on_fleet_metrics_updated)
 	fleet_poller.ScrapeBudgetExceeded.connect(_on_scrape_lagging)
 	fleet_poller.HostsDropped.connect(_on_hosts_dropped)
-	print("[FleetView]   calling StartPolling...")
-	fleet_poller.StartPolling(hostnames)
-	print("[FleetView]   StartPolling called successfully")
+	fleet_poller.PlaybackPositionChanged.connect(_on_playback_position_changed)
+
+	var mode: String = config.get("mode", "live")
+	if mode == "archive":
+		var start_time: String = config.get("start_time", "")
+		print("[FleetView]   calling StartArchivePlayback at %s..." % start_time)
+		fleet_poller.StartArchivePlayback(hostnames, start_time)
+	else:
+		print("[FleetView]   calling StartPolling (live)...")
+		fleet_poller.StartPolling(hostnames)
+	print("[FleetView]   polling started successfully")
 
 
 var _fleet_update_count: int = 0

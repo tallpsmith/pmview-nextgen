@@ -30,6 +30,9 @@ public partial class FleetMetricPoller : Node
     [Signal]
     public delegate void ConnectionStateChangedEventHandler(string state);
 
+    [Signal]
+    public delegate void PlaybackPositionChangedEventHandler(string position, string mode);
+
     [Export] public string Endpoint { get; set; } = "http://localhost:44322";
     [Export] public int PollIntervalMs { get; set; } = 2000;
     [Export] public int MaxHostsPerShard { get; set; } = 25;
@@ -112,6 +115,8 @@ public partial class FleetMetricPoller : Node
             AssignedHostCount, ShardCount);
     }
 
+    private string? _archiveStartTimeIso;
+
     /// <summary>
     /// Start polling: create MetricPoller child nodes for each shard,
     /// discover series mapping, then distribute to shards.
@@ -119,13 +124,27 @@ public partial class FleetMetricPoller : Node
     public void StartPolling(string[] hostnames)
     {
         GD.Print($"[FleetMetricPoller] StartPolling: {hostnames.Length} hostnames, endpoint={Endpoint}");
-        GD.Print($"[FleetMetricPoller] Logger type: {Log.GetType().FullName}");
         Log.LogWarning("FleetMetricPoller.StartPolling called with {Count} hostnames, endpoint={Endpoint}",
             hostnames.Length, Endpoint);
         ConfigureShards(hostnames, Endpoint, PollIntervalMs);
         CreateShardPollers();
         // Shards auto-start via MetricPoller._Ready() since MetricNames is pre-set.
         // Discovery runs deferred to populate series mapping cache.
+        CallDeferred(nameof(DeferredStartShards));
+    }
+
+    /// <summary>
+    /// Start polling in archive playback mode. Shards become slaves to
+    /// the playback timecode, advancing through the archive like a movie.
+    /// </summary>
+    public void StartArchivePlayback(string[] hostnames, string startTimeIso)
+    {
+        _archiveStartTimeIso = startTimeIso;
+        GD.Print($"[FleetMetricPoller] StartArchivePlayback: {hostnames.Length} hostnames, start={startTimeIso}");
+        Log.LogWarning("FleetMetricPoller.StartArchivePlayback: {Count} hostnames, start={Start}",
+            hostnames.Length, startTimeIso);
+        ConfigureShards(hostnames, Endpoint, PollIntervalMs);
+        CreateShardPollers();
         CallDeferred(nameof(DeferredStartShards));
     }
 
@@ -153,8 +172,12 @@ public partial class FleetMetricPoller : Node
             shard.MetricsUpdated += OnShardMetricsUpdated;
             shard.ShardPollCompleted += OnShardPollCompleted;
             if (i == 0)
+            {
                 shard.ConnectionStateChanged += state =>
                     EmitSignal(SignalName.ConnectionStateChanged, state);
+                shard.PlaybackPositionChanged += (position, mode) =>
+                    EmitSignal(SignalName.PlaybackPositionChanged, position, mode);
+            }
             AddChild(shard);
             _shards.Add(shard);
         }
@@ -167,6 +190,15 @@ public partial class FleetMetricPoller : Node
         GD.Print($"[FleetMetricPoller] DeferredStartShards — discovery complete, {_shards.Count} shards");
         foreach (var shard in _shards)
             GD.Print($"[FleetMetricPoller]   Shard {shard.Name}: HasCachedSeriesMap={shard.HasCachedSeriesMap}");
+
+        // In archive mode, start playback on all shards so they query at
+        // the cursor position and advance through the archive each tick.
+        if (_archiveStartTimeIso != null)
+        {
+            GD.Print($"[FleetMetricPoller] Starting archive playback at {_archiveStartTimeIso}");
+            foreach (var shard in _shards)
+                shard.StartPlayback(_archiveStartTimeIso);
+        }
     }
 
     private async Task DiscoverSeriesMapping()
