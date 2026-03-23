@@ -84,7 +84,7 @@ func _position_master_timestamp() -> void:
 		return
 	var centre := Vector3(
 		_grid_bounds.position.x + _grid_bounds.size.x / 2.0,
-		15.0,
+		8.0,
 		_grid_bounds.position.y + _grid_bounds.size.y / 2.0,
 	)
 	master_timestamp.position = centre
@@ -281,7 +281,14 @@ func _setup_time_control(config: Dictionary) -> void:
 ## Update the floating master timestamp billboard and TimeControl playhead.
 func update_master_timestamp(timestamp_iso: String) -> void:
 	if master_timestamp:
-		master_timestamp.text = timestamp_iso
+		# Format ISO 8601 to clean "YYYY-MM-DD · HH:MM:SS"
+		var clean := timestamp_iso
+		if "T" in timestamp_iso:
+			var parts := timestamp_iso.split("T")
+			var date_part := parts[0]
+			var time_part := parts[1].split(".")[0].rstrip("Z")  # strip fractional seconds and Z
+			clean = "%s · %s" % [date_part, time_part]
+		master_timestamp.text = clean
 	if time_control and time_control.has_method("update_playhead"):
 		time_control.update_playhead(timestamp_iso, "archive")
 
@@ -307,7 +314,7 @@ func _setup_fleet_poller(config: Dictionary) -> void:
 		print("[FleetView]   BAIL: no hostnames in config")
 		return  # Mock mode — no polling
 
-	var endpoint: String = config.get("endpoint", "http://localhost:44322")
+	var endpoint: String = config.get("endpoint", "http://localhost:54322")
 	print("[FleetView]   endpoint: ", endpoint)
 	print("[FleetView]   fleet_poller script: ", fleet_poller.get_script())
 	fleet_poller.set("Endpoint", endpoint)

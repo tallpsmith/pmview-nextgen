@@ -22,7 +22,7 @@ var _has_error := false
 
 func _ready() -> void:
 	var config := SceneManager.connection_config
-	var endpoint: String = config.get("endpoint", "http://localhost:44322")
+	var endpoint: String = config.get("endpoint", "http://localhost:54322")
 	var mode: String = config.get("mode", "live")
 	var hostname: String = config.get("hostname", "")
 	var start_time: String = config.get("start_time", "")
