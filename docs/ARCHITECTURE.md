@@ -23,7 +23,7 @@ graph TD
     subgraph "Standalone App (Godot)"
         App["pmview-app"]
         App -- "discovers topology at launch" --> pmproxy
-        App -- "builds live nodes via" --> RuntimeBuilder["RuntimeSceneBuilder"]
+        App -- "builds live nodes via" --> RuntimeBuilder["HostSceneBuilder"]
         App -- "uses" --> Bridge
     end
 
@@ -62,7 +62,7 @@ From scene surface down to the wire:
 - PmviewProjectionCore is Godot-free: topology discovery, layout, and OS profiles live here so any consumer (CLI, standalone app) can reuse them
 - The Bridge Plugin is the only Godot-dependent layer — kept thin by design
 - Scenes are GDScript: lightweight controllers, no business logic
-- **Three-mode model:** the same `SceneLayout` drives TscnWriter (CLI → `.tscn` text), the bridge addon (editor workflow), and RuntimeSceneBuilder (standalone app → live nodes)
+- **Three-mode model:** the same `SceneLayout` drives TscnWriter (CLI → `.tscn` text), the bridge addon (editor workflow), and HostSceneBuilder (standalone app → live nodes)
 
 ### PmviewProjectionCore
 
@@ -95,12 +95,12 @@ A self-contained Godot application that performs topology discovery and scene bu
 
 A `SceneManager` autoload singleton carries data between scenes (connection config, built scene graph).
 
-**RuntimeSceneBuilder vs TscnWriter:**
+**HostSceneBuilder vs TscnWriter:**
 
 Both consume the same `SceneLayout` from PmviewProjectionCore. They produce the exact same node hierarchy, but through different mechanisms:
 
 - **TscnWriter** (Host Projector CLI) serialises the layout to `.tscn` text files on disk. Godot loads these at editor or runtime. This is the offline/batch path.
-- **RuntimeSceneBuilder** (pmview-app) instantiates live Godot `Node3D`, `MeshInstance3D`, `Label3D` nodes in-process, loading packed scenes for building blocks and attaching scripts/bindings programmatically. This is the online/interactive path.
+- **HostSceneBuilder** (pmview-app) instantiates live Godot `Node3D`, `MeshInstance3D`, `Label3D` nodes in-process, loading packed scenes for building blocks and attaching scripts/bindings programmatically. This is the online/interactive path.
 
 The structural equivalence means SceneBinder works identically regardless of which builder created the tree.
 
@@ -138,7 +138,7 @@ pmview-nextgen/
 │   ├── pmview-app/                     # Standalone Godot application
 │   │   ├── addons/pmview-bridge/       # Bridge addon (copied from pmview-bridge-addon)
 │   │   ├── scenes/                     # main_menu, loading, host_view
-│   │   ├── scripts/                    # GDScript controllers + RuntimeSceneBuilder.cs
+│   │   ├── scripts/                    # GDScript controllers + HostSceneBuilder.cs
 │   │   └── pmview-app.csproj
 │   └── pmview-bridge-addon/            # Addon development workspace (Godot project)
 │       ├── addons/pmview-bridge/       # Self-contained addon (copied to target projects)

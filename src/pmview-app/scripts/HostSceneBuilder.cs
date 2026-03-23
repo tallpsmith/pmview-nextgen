@@ -11,9 +11,9 @@ namespace PmviewApp;
 /// SceneLayout, producing the exact same node hierarchy that TscnWriter emits
 /// as .tscn text — so SceneBinder can find and validate bindings identically.
 /// </summary>
-public static class RuntimeSceneBuilder
+public static class HostSceneBuilder
 {
-    private static readonly ILogger _log = PmviewLogger.GetLogger("RuntimeSceneBuilder");
+    private static readonly ILogger _log = PmviewLogger.GetLogger("HostSceneBuilder");
 
     // -- script paths --
     private const string ControllerScriptPath = "res://addons/pmview-bridge/host_view_controller.gd";
@@ -389,7 +389,7 @@ public static class RuntimeSceneBuilder
         }
         else
         {
-            GD.PushWarning($"[RuntimeSceneBuilder] Failed to load HelpPanel scene: {HelpPanelScenePath}");
+            GD.PushWarning($"[HostSceneBuilder] Failed to load HelpPanel scene: {HelpPanelScenePath}");
         }
 
         var helpHintScene = GD.Load<PackedScene>(HelpHintScenePath);
@@ -401,7 +401,7 @@ public static class RuntimeSceneBuilder
         }
         else
         {
-            GD.PushWarning($"[RuntimeSceneBuilder] Failed to load HelpHint scene: {HelpHintScenePath}");
+            GD.PushWarning($"[HostSceneBuilder] Failed to load HelpHint scene: {HelpHintScenePath}");
         }
 
         var detailPanelScene = GD.Load<PackedScene>(DetailPanelScenePath);
@@ -413,7 +413,7 @@ public static class RuntimeSceneBuilder
         }
         else
         {
-            GD.PushWarning($"[RuntimeSceneBuilder] Failed to load DetailPanel scene: {DetailPanelScenePath}");
+            GD.PushWarning($"[HostSceneBuilder] Failed to load DetailPanel scene: {DetailPanelScenePath}");
         }
 
         sceneRoot.AddChild(canvas);
