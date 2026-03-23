@@ -288,6 +288,7 @@ func update_master_timestamp(timestamp_iso: String) -> void:
 
 func _on_playback_position_changed(position: String, mode: String) -> void:
 	if not position.is_empty():
+		print("[FleetView] PlaybackPosition: %s (%s)" % [position, mode])
 		update_master_timestamp(position)
 
 

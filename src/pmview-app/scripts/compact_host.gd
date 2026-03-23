@@ -14,6 +14,12 @@ const BAR_SCENE := preload("res://addons/pmview-bridge/building_blocks/grounded_
 ## Spacing between the 2x2 bar centres
 @export var bar_spacing: float = 1.2
 
+## Maximum bar height in world units (normalised 1.0 maps to this)
+@export var max_bar_height: float = 4.0
+
+## Minimum bar height so zero-values don't shimmer at ground level
+@export var min_bar_height: float = 0.05
+
 ## Colours for each aggregate metric bar
 const BAR_COLOURS := {
 	"cpu": Color(0.2, 0.8, 0.2),       # green
@@ -85,10 +91,13 @@ func _build_label() -> void:
 	add_child(_label)
 
 
-## Update a single metric bar height (called by poller later)
+## Update a single metric bar height (called by poller later).
+## value is normalised 0.0–1.0, scaled to max_bar_height with a
+## minimum floor to prevent z-fighting shimmer at ground level.
 func set_metric_value(metric_name: String, value: float) -> void:
 	if _bars.has(metric_name):
-		_bars[metric_name].height = value
+		var scaled := clampf(value, 0.0, 1.0) * max_bar_height
+		_bars[metric_name].height = maxf(scaled, min_bar_height)
 
 
 ## Set opacity for translucent mode during focus.
