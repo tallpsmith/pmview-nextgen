@@ -650,7 +650,13 @@ func _setup_fleet_poller(config: Dictionary) -> void:
 	var mode: String = config.get("mode", "live")
 	print("[FleetView]   mode: %s" % mode)
 	if mode == "archive":
-		var start_time: String = config.get("start_time", "")
+		# On return from HostView, continue from where we left off
+		var start_time: String = ""
+		if not SceneManager.fleet_playback_position.is_empty():
+			start_time = SceneManager.fleet_playback_position
+			print("[FleetView]   Resuming from fleet_playback_position: %s" % start_time)
+		else:
+			start_time = config.get("start_time", "")
 		if start_time.is_empty():
 			# Default: archive end minus 24h, clamped to archive start
 			var arch_start_raw = config.get("archive_start_epoch", null)

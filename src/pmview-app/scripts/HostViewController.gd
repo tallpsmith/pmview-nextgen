@@ -169,6 +169,9 @@ func _on_poller_connected(state: String, start_time: String) -> void:
 
 
 func _on_playback_position_changed(_position: String, mode: String) -> void:
+	# Track current position for fleet return continuity
+	if not _position.is_empty():
+		SceneManager.fleet_playback_position = _position
 	# Ghost the 3D timestamp when paused
 	if _timestamp_label_3d:
 		if mode == "Paused":
