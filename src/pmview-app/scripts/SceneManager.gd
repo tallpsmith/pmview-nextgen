@@ -15,6 +15,9 @@ var origin_scene: String = ""
 ## Hostname that was focused when dive-in occurred (for restoring fleet focus)
 var fleet_focused_hostname: String = ""
 
+## Current playback position when diving in from fleet (ISO 8601)
+var fleet_playback_position: String = ""
+
 func go_to_loading(config: Dictionary) -> void:
 	connection_config = config
 	get_tree().change_scene_to_file("res://scenes/loading.tscn")
@@ -27,9 +30,11 @@ func go_to_fleet_view(config: Dictionary) -> void:
 	connection_config = config
 	get_tree().change_scene_to_file("res://scenes/fleet_view.tscn")
 
-func go_to_host_view_from_fleet(scene: Node3D, focused_hostname: String) -> void:
+func go_to_host_view_from_fleet(scene: Node3D, focused_hostname: String,
+		playback_position: String = "") -> void:
 	origin_scene = "fleet"
 	fleet_focused_hostname = focused_hostname
+	fleet_playback_position = playback_position
 	built_scene = scene
 	get_tree().change_scene_to_file("res://scenes/host_view.tscn")
 
@@ -48,6 +53,7 @@ func go_to_main_menu() -> void:
 	connection_config = {}
 	origin_scene = ""
 	fleet_focused_hostname = ""
+	fleet_playback_position = ""
 	if built_scene:
 		built_scene.queue_free()
 		built_scene = null

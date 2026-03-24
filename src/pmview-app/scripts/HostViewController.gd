@@ -91,19 +91,33 @@ func _ready() -> void:
 		_time_control = scene.find_child("TimeControl", true, false)
 
 		if _poller:
-			var start_time: String = config.get("start_time", "")
-			if start_time.is_empty():
-				# No start time provided — default to 24h ago
-				var default_epoch := Time.get_unix_time_from_system() - 86400.0
-				start_time = Time.get_datetime_string_from_unix_time(
-					int(default_epoch)) + "Z"
-				print("[HostView] No start time in config, defaulting to: %s" % start_time)
+			# When coming from fleet, use the fleet's current playback position
+			# so the HostView continues seamlessly from where the fleet was.
+			var start_time: String = ""
+			if SceneManager.origin_scene == "fleet" and not SceneManager.fleet_playback_position.is_empty():
+				start_time = SceneManager.fleet_playback_position
+				print("[HostView] Continuing fleet playback at: %s" % start_time)
 			else:
-				print("[HostView] Starting archive playback at: %s" % start_time)
-			# Defer StartPlayback so it runs after MetricPoller._Ready() has
-			# connected to pmproxy and started the poll timer via CallDeferred.
-			_poller.ConnectionStateChanged.connect(
-				_on_poller_connected.bind(start_time), CONNECT_ONE_SHOT)
+				start_time = config.get("start_time", "")
+				if start_time.is_empty():
+					var default_epoch := Time.get_unix_time_from_system() - 86400.0
+					start_time = Time.get_datetime_string_from_unix_time(
+						int(default_epoch)) + "Z"
+					print("[HostView] No start time in config, defaulting to: %s" % start_time)
+				else:
+					print("[HostView] Starting archive playback at: %s" % start_time)
+
+			# If coming from fleet, the poller is already connected and polling.
+			# Start playback immediately instead of waiting for ConnectionStateChanged
+			# (which already fired during the fleet preview and won't fire again).
+			if SceneManager.origin_scene == "fleet":
+				print("[HostView] Poller from fleet — starting playback immediately")
+				# Defer so the scene tree is fully set up first
+				_poller.call_deferred("StartPlayback", start_time)
+			else:
+				# Fresh load from loading screen — wait for connection
+				_poller.ConnectionStateChanged.connect(
+					_on_poller_connected.bind(start_time), CONNECT_ONE_SHOT)
 
 			if _time_control:
 				_poller.PlaybackPositionChanged.connect(

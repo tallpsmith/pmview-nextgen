@@ -33,6 +33,7 @@ var _fleet_pipeline: Node = null
 var _matrix_grid: MeshInstance3D = null
 var _preview_zones: Node3D = null
 var _preview_ready: bool = false
+var _current_playback_position: String = ""
 const DETAIL_VIEW_HEIGHT := 11.0
 ## Scale factor for the HostView preview — full HostView is too large for fleet context
 const PREVIEW_SCALE := 0.4
@@ -265,7 +266,7 @@ func _exit_focus() -> void:
 	# Fly out to the racetrack, looking at the grid centre
 	patrol_camera.fly_to_focus(nearest_pos, grid_centre)
 
-	# Fade out beam during fly-out
+	# Fade out beam and matrix grid during fly-out
 	if _beam and _beam.has_method("fade_in"):
 		var mat: ShaderMaterial = _beam.mesh.surface_get_material(0)
 		if mat:
@@ -274,6 +275,8 @@ func _exit_focus() -> void:
 				func(val: float) -> void: mat.set_shader_parameter("global_alpha", val),
 				1.0, 0.0, 1.0
 			).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_CUBIC)
+	if _matrix_grid and _matrix_grid.has_method("dissolve"):
+		_matrix_grid.dissolve(1.0)
 
 	await patrol_camera.fly_to_focus_completed
 
@@ -448,8 +451,9 @@ func _dive_into_host_view() -> void:
 	_cleanup_focus_state()
 	canvas.queue_free()
 
-	# Hand off to SceneManager — HostViewController will receive this as built_scene
-	SceneManager.go_to_host_view_from_fleet(zones, hostname)
+	# Hand off to SceneManager — pass current playback position so HostView
+	# continues from where the fleet was, not from the archive start.
+	SceneManager.go_to_host_view_from_fleet(zones, hostname, _current_playback_position)
 
 
 func _spawn_beam(host: Node3D) -> void:
@@ -508,6 +512,7 @@ func update_master_timestamp(timestamp_iso: String) -> void:
 func _on_playback_position_changed(position: String, mode: String) -> void:
 	if not position.is_empty():
 		print("[FleetView] PlaybackPosition: %s (%s)" % [position, mode])
+		_current_playback_position = position
 		update_master_timestamp(position)
 
 
