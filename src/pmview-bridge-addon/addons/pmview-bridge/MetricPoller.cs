@@ -1115,8 +1115,9 @@ public partial class MetricPoller : Node
 	public override void _ExitTree()
 	{
 		StopPolling();
-		_client?.Dispose();
-		_client = null;
-		_sharedHttpClient.Dispose();
+		// Allow re-start if node re-enters a tree (e.g. fleet → HostView handoff).
+		// Without this, StartPolling() returns early on re-entry because the
+		// guard flag is still set from the previous tree.
+		_startPollingCalled = false;
 	}
 }
