@@ -38,8 +38,9 @@ func start(endpoint: String, mode: String, hostname: String,
 	# Re-fetch managed wrapper after SetScript
 	_pipeline = instance_from_id(_pipeline.get_instance_id())
 
-	# No artificial delay — let it rip, the matrix animation is the visual feedback
-	_pipeline.set("MinPhaseDelayMs", 0)
+	# Small per-phase delay so the matrix cells fill gradually during discovery.
+	# The 3s minimum animation ensures visibility even when phases are fast.
+	_pipeline.set("MinPhaseDelayMs", 300)
 	# Build zones only — no UI panels or controller script
 	_pipeline.set("ZonesOnly", true)
 

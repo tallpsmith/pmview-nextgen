@@ -300,6 +300,7 @@ func _start_preview_pipeline(host: Node3D) -> void:
 	_matrix_grid.name = "MatrixProgressGrid"
 	_matrix_grid.position = host.position + Vector3(0, DETAIL_VIEW_HEIGHT + 0.1, 0)
 	add_child(_matrix_grid)
+	print("[FleetView] Matrix grid spawned at %s" % _matrix_grid.position)
 
 	# Start the pipeline
 	_fleet_pipeline = Node.new()
@@ -310,6 +311,7 @@ func _start_preview_pipeline(host: Node3D) -> void:
 	_fleet_pipeline.build_completed.connect(_on_preview_build_completed)
 	_fleet_pipeline.build_failed.connect(_on_preview_build_failed)
 	_fleet_pipeline.start(endpoint, mode, hostname, _matrix_grid)
+	print("[FleetView] Preview pipeline started for '%s' (mode=%s)" % [hostname, mode])
 
 
 func _on_preview_build_completed(zones_root: Node3D) -> void:
@@ -327,6 +329,49 @@ func _on_preview_build_completed(zones_root: Node3D) -> void:
 		# Scale down the full HostView layout to fit the fleet context
 		_preview_zones.scale = Vector3.ONE * PREVIEW_SCALE
 		add_child(_preview_zones)
+		# The MetricPoller in the built scene auto-starts live polling in _Ready().
+		# In archive mode, we need to switch it to playback at the correct timestamp.
+		_configure_preview_poller()
+
+
+func _configure_preview_poller() -> void:
+	if not _preview_zones:
+		return
+	var poller: Node = _preview_zones.find_child("MetricPoller", true, false)
+	if not poller:
+		push_warning("[FleetView] No MetricPoller found in preview zones")
+		return
+
+	var config: Dictionary = SceneManager.connection_config
+	var mode: String = config.get("mode", "live")
+	if mode != "archive":
+		return  # Live mode: MetricPoller._Ready() already auto-started polling
+
+	# Archive mode: the poller auto-started live polling in _Ready().
+	# We need to tell it to switch to archive playback at the current timestamp.
+	# Wait for it to connect first, then start playback.
+	var start_time: String = config.get("start_time", "")
+	if start_time.is_empty():
+		var arch_start: float = float(config.get("archive_start_epoch", 0.0))
+		var arch_end: float = float(config.get("archive_end_epoch", 0.0))
+		if arch_end > 0.0:
+			var default_start: float = maxf(arch_end - 86400.0, arch_start)
+			var dt := Time.get_datetime_dict_from_unix_time(int(default_start))
+			start_time = "%04d-%02d-%02dT%02d:%02d:%02dZ" % [
+				dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second]
+
+	if start_time.is_empty():
+		push_warning("[FleetView] No archive start time for preview poller")
+		return
+
+	print("[FleetView] Configuring preview poller for archive playback at %s" % start_time)
+	# Wait for connection, then start playback
+	if poller.has_signal("ConnectionStateChanged"):
+		poller.ConnectionStateChanged.connect(
+			func(state: String) -> void:
+				if state == "Connected":
+					poller.StartPlayback(start_time),
+			CONNECT_ONE_SHOT)
 
 
 func _on_preview_build_failed(error: String) -> void:
