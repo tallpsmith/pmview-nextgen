@@ -38,6 +38,18 @@ const DETAIL_VIEW_HEIGHT := 11.0
 ## Scale factor for the HostView preview — full HostView is too large for fleet context
 const PREVIEW_SCALE := 0.4
 
+# Hover tooltip state
+var _hover_tooltip: Label = null
+var _hovered_host: Node3D = null
+
+## Bar metric names in the 2x2 grid layout order for tooltip display
+const BAR_METRIC_LABELS := {
+	"cpu": "CPU",
+	"memory": "Memory",
+	"disk": "Disk",
+	"network": "Network",
+}
+
 
 func _ready() -> void:
 	var config: Dictionary = SceneManager.connection_config
@@ -50,6 +62,7 @@ func _ready() -> void:
 	_update_esc_hint()
 	_setup_time_control(config)
 	_setup_fleet_poller(config)
+	_create_hover_tooltip()
 
 	# Restore focus if returning from HostView dive-in
 	var restore_hostname: String = SceneManager.fleet_focused_hostname
@@ -132,6 +145,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			and event.button_index == MOUSE_BUTTON_LEFT:
 		if _view_mode == ViewMode.PATROL:
 			_select_host_by_click(event.position)
+	# Hover tooltip on mouse motion
+	if event is InputEventMouseMotion and _view_mode == ViewMode.PATROL:
+		_update_hover_tooltip(event.position)
 
 
 var _esc_pressed_at: float = 0.0
@@ -503,6 +519,72 @@ func _update_esc_hint() -> void:
 			esc_hint.text = "ESC \u2192 Return to Patrol"
 		_:
 			esc_hint.text = ""
+
+
+func _create_hover_tooltip() -> void:
+	_hover_tooltip = Label.new()
+	_hover_tooltip.name = "HoverTooltip"
+	_hover_tooltip.visible = false
+	_hover_tooltip.add_theme_font_override("font",
+		preload("res://assets/fonts/PressStart2P-Regular.ttf"))
+	_hover_tooltip.add_theme_font_size_override("font_size", 12)
+	_hover_tooltip.modulate = Color(1.0, 0.85, 0.3, 0.95)
+	# Place it in the HUD control so it renders over 3D
+	var hud_control: Control = esc_hint.get_parent() if esc_hint else null
+	if hud_control:
+		hud_control.add_child(_hover_tooltip)
+
+
+func _update_hover_tooltip(screen_pos: Vector2) -> void:
+	var camera: Camera3D = get_viewport().get_camera_3d()
+	if not camera:
+		_hide_tooltip()
+		return
+	var from := camera.project_ray_origin(screen_pos)
+	var dir := camera.project_ray_normal(screen_pos)
+
+	var space_state := get_world_3d().direct_space_state
+	var query := PhysicsRayQueryParameters3D.create(from, from + dir * 200.0)
+	query.collision_mask = 2
+	var result := space_state.intersect_ray(query)
+	if result.is_empty():
+		_hide_tooltip()
+		return
+
+	# Walk up to find the CompactHost
+	var node: Node = result.collider
+	var host_node: Node3D = null
+	while node:
+		if node.has_method("set_metric_value"):
+			host_node = node as Node3D
+			break
+		node = node.get_parent()
+
+	if not host_node:
+		_hide_tooltip()
+		return
+
+	# Build tooltip text: hostname + bar metric if hovering a specific bar
+	var text: String = host_node.hostname
+	var hit_node: Node = result.collider
+	# Walk up from collider to find the bar (parent of StaticBody3D)
+	var bar_node: Node = hit_node.get_parent() if hit_node else null
+	if bar_node and bar_node.has_method("get") and bar_node != host_node:
+		# Check if this is one of the metric bars by matching against the host's bar names
+		for metric_name: String in BAR_METRIC_LABELS:
+			if bar_node.name.to_lower().contains(metric_name):
+				text += " · %s" % BAR_METRIC_LABELS[metric_name]
+				break
+
+	_hover_tooltip.text = text
+	_hover_tooltip.visible = true
+	_hover_tooltip.position = screen_pos + Vector2(16, -8)
+
+
+func _hide_tooltip() -> void:
+	if _hover_tooltip:
+		_hover_tooltip.visible = false
+	_hovered_host = null
 
 
 func _setup_time_control(config: Dictionary) -> void:
