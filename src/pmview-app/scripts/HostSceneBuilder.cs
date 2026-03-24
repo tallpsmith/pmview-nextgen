@@ -96,6 +96,12 @@ public static class HostSceneBuilder
         else
             zonesRoot.SetScript(script);
 
+        // The zones node may have been in a previous scene tree (fleet preview),
+        // which sets its internal "ready" flag. RequestReady() clears it so
+        // the controller script's _ready() fires when the node enters the
+        // HostView tree — essential for SceneBinder wiring and metric polling.
+        zonesRoot.RequestReady();
+
         zonesRoot.Name = "HostView";
 
         AddRangeTuningPanel(zonesRoot);
