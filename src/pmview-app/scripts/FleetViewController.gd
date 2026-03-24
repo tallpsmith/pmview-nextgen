@@ -328,10 +328,19 @@ func _on_preview_build_completed(zones_root: Node3D) -> void:
 
 	if _preview_zones and _focused_host_index >= 0:
 		var host: Node3D = _hosts[_focused_host_index]
-		_preview_zones.position = host.position + Vector3(0, DETAIL_VIEW_HEIGHT, 0)
 		# Scale down the full HostView layout to fit the fleet context
 		_preview_zones.scale = Vector3.ONE * PREVIEW_SCALE
+		# Centre the zones on the beam top. The layout has zones at Y=0 (ground)
+		# with background zones at Z=-8, so the visual centroid is offset.
+		# Compute the AABB after scaling to find the true centre.
 		add_child(_preview_zones)
+		var aabb := _compute_zones_aabb(_preview_zones)
+		var centre_offset := aabb.position + aabb.size / 2.0
+		_preview_zones.position = host.position + Vector3(
+			-centre_offset.x,
+			DETAIL_VIEW_HEIGHT - centre_offset.y,
+			-centre_offset.z
+		)
 		# The MetricPoller in the built scene auto-starts live polling in _Ready().
 		# In archive mode, we need to switch it to playback at the correct timestamp.
 		_configure_preview_poller()
@@ -454,6 +463,21 @@ func _dive_into_host_view() -> void:
 	# Hand off to SceneManager — pass current playback position so HostView
 	# continues from where the fleet was, not from the archive start.
 	SceneManager.go_to_host_view_from_fleet(zones, hostname, _current_playback_position)
+
+
+## Compute the combined AABB of all child positions in a zones tree.
+## Uses child positions (not mesh bounds) for a fast centroid estimate.
+func _compute_zones_aabb(zones: Node3D) -> AABB:
+	var min_pos := Vector3(INF, INF, INF)
+	var max_pos := Vector3(-INF, -INF, -INF)
+	for child in zones.get_children():
+		if child is Node3D:
+			var pos: Vector3 = child.position * PREVIEW_SCALE
+			min_pos = Vector3(minf(min_pos.x, pos.x), minf(min_pos.y, pos.y), minf(min_pos.z, pos.z))
+			max_pos = Vector3(maxf(max_pos.x, pos.x), maxf(max_pos.y, pos.y), maxf(max_pos.z, pos.z))
+	if min_pos.x == INF:
+		return AABB(Vector3.ZERO, Vector3.ZERO)
+	return AABB(min_pos, max_pos - min_pos)
 
 
 func _spawn_beam(host: Node3D) -> void:
