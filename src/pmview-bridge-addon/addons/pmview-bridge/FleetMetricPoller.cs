@@ -224,13 +224,26 @@ public partial class FleetMetricPoller : Node
         {
             // Pick any hostname — they all share the same archive time range
             var anyHostname = _assignment?.Shards.SelectMany(s => s).FirstOrDefault();
-            if (anyHostname == null) return null;
+            if (anyHostname == null)
+            {
+                GD.Print("[FleetMetricPoller] DiscoverDefaultStartTime: no hostname in assignment");
+                return null;
+            }
 
+            GD.Print($"[FleetMetricPoller] DiscoverDefaultStartTime: probing hostname='{anyHostname}' at {Endpoint}");
             var discovery = new ArchiveSourceDiscovery(endpointUri, _sharedHttpClient);
             var bounds = await discovery.DiscoverTimeBoundsAsync(anyHostname);
             if (bounds == null)
             {
-                GD.Print("[FleetMetricPoller] DiscoverTimeBounds returned null");
+                // Hostname-filtered query found nothing — try unfiltered as fallback.
+                // This handles cases where archive hostnames don't match fleet hostnames
+                // (e.g. synthetic pmlogsynth names vs. real collector hostnames).
+                GD.Print($"[FleetMetricPoller] Hostname-filtered probe failed for '{anyHostname}', trying unfiltered...");
+                bounds = await DiscoverTimeBoundsUnfiltered(endpointUri);
+            }
+            if (bounds == null)
+            {
+                GD.Print("[FleetMetricPoller] DiscoverTimeBounds returned null (both filtered and unfiltered)");
                 return null;
             }
 
@@ -242,6 +255,46 @@ public partial class FleetMetricPoller : Node
         catch (Exception ex)
         {
             GD.Print($"[FleetMetricPoller] Archive bounds discovery failed: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Fallback: discovers archive time bounds without a hostname filter.
+    /// Uses the same probe metric but queries all series, then extracts bounds
+    /// from any returned values. Works when archive hostnames don't match fleet names.
+    /// </summary>
+    private async Task<(DateTime Start, DateTime End)?> DiscoverTimeBoundsUnfiltered(Uri endpointUri)
+    {
+        try
+        {
+            var queryUrl = PcpSeriesQuery.BuildQueryUrl(endpointUri, "kernel.all.load");
+            var queryResponse = await _sharedHttpClient.GetAsync(queryUrl);
+            queryResponse.EnsureSuccessStatusCode();
+            var queryJson = await queryResponse.Content.ReadAsStringAsync();
+            var seriesIds = PcpSeriesQuery.ParseQueryResponse(queryJson);
+
+            GD.Print($"[FleetMetricPoller] Unfiltered probe: {seriesIds.Count} series IDs for kernel.all.load");
+            if (seriesIds.Count == 0)
+                return null;
+
+            var now = DateTime.UtcNow;
+            var valuesUrl = PcpSeriesQuery.BuildValuesUrlWithTimeWindow(
+                endpointUri, seriesIds, now, windowSeconds: 30.0 * 86400);
+            var valuesResponse = await _sharedHttpClient.GetAsync(valuesUrl);
+            valuesResponse.EnsureSuccessStatusCode();
+            var valuesJson = await valuesResponse.Content.ReadAsStringAsync();
+            var values = PcpSeriesQuery.ParseValuesResponse(valuesJson);
+
+            GD.Print($"[FleetMetricPoller] Unfiltered probe: {values.Count} values returned");
+            if (values.Count == 0)
+                return null;
+
+            return ArchiveDiscovery.DetectTimeBounds(values);
+        }
+        catch (Exception ex)
+        {
+            GD.Print($"[FleetMetricPoller] Unfiltered probe failed: {ex.Message}");
             return null;
         }
     }
