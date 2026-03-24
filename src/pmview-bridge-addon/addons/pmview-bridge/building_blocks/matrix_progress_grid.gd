@@ -4,8 +4,8 @@ extends MeshInstance3D
 
 signal progress_complete
 
-@export var grid_width: float = 28.0
-@export var grid_depth: float = 20.0
+@export var grid_width: float = 16.0
+@export var grid_depth: float = 12.0
 
 const GRID_SIZE := 10
 const TOTAL_CELLS := GRID_SIZE * GRID_SIZE
@@ -77,10 +77,18 @@ func set_progress(progress: float) -> void:
 		progress_complete.emit()
 
 
+## Dissolve the grid (fade out all cells then free)
 func dissolve(duration: float = 0.5) -> void:
 	var tween := create_tween()
 	tween.tween_method(_set_global_alpha, 1.0, 0.0, duration)
 	tween.tween_callback(queue_free)
+
+
+## Keep the grid visible at a target opacity as a contrasting floor.
+## Fades from full brightness to the target over duration, then stays.
+func set_final_opacity(target: float = 0.9, duration: float = 0.5) -> void:
+	var tween := create_tween()
+	tween.tween_method(_set_global_alpha, 1.0, target, duration)
 
 
 func _set_global_alpha(val: float) -> void:

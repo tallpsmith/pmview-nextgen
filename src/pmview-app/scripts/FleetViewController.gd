@@ -33,7 +33,9 @@ var _fleet_pipeline: Node = null
 var _matrix_grid: MeshInstance3D = null
 var _preview_zones: Node3D = null
 var _preview_ready: bool = false
-const DETAIL_VIEW_HEIGHT := 13.0
+const DETAIL_VIEW_HEIGHT := 11.0
+## Scale factor for the HostView preview — full HostView is too large for fleet context
+const PREVIEW_SCALE := 0.4
 
 
 func _ready() -> void:
@@ -314,12 +316,16 @@ func _on_preview_build_completed(zones_root: Node3D) -> void:
 	_preview_zones = zones_root
 	_preview_ready = true
 
-	if _matrix_grid and _matrix_grid.has_method("dissolve"):
-		_matrix_grid.dissolve(0.5)
+	# Keep the matrix grid visible at reduced opacity as a contrasting floor
+	# beneath the HostView preview — improves visual contrast.
+	if _matrix_grid and _matrix_grid.has_method("set_final_opacity"):
+		_matrix_grid.set_final_opacity(0.9)
 
 	if _preview_zones and _focused_host_index >= 0:
 		var host: Node3D = _hosts[_focused_host_index]
 		_preview_zones.position = host.position + Vector3(0, DETAIL_VIEW_HEIGHT, 0)
+		# Scale down the full HostView layout to fit the fleet context
+		_preview_zones.scale = Vector3.ONE * PREVIEW_SCALE
 		add_child(_preview_zones)
 
 
@@ -358,9 +364,14 @@ func _cleanup_focus_state() -> void:
 func _dive_into_host_view() -> void:
 	if not _preview_zones or _focused_host_index < 0:
 		return
+	# Prevent double-trigger during fade
+	_preview_ready = false
 
 	var host: Node3D = _hosts[_focused_host_index]
 	var hostname: String = host.hostname
+
+	# Reset scale to 1.0 before handing off — HostView expects full-size zones
+	_preview_zones.scale = Vector3.ONE
 
 	# Detach the zones from our scene tree (don't free — we're handing it off)
 	remove_child(_preview_zones)
@@ -374,8 +385,23 @@ func _dive_into_host_view() -> void:
 	if _fleet_pipeline:
 		_fleet_pipeline.graft_host_view_ui(zones, mode)
 
+	# Fade out the fleet scene before transitioning — less jarring than an instant cut
+	var fade_rect := ColorRect.new()
+	fade_rect.color = Color(0, 0, 0, 0)
+	fade_rect.anchors_preset = Control.PRESET_FULL_RECT
+	fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var canvas := CanvasLayer.new()
+	canvas.layer = 100  # on top of everything
+	canvas.add_child(fade_rect)
+	add_child(canvas)
+
+	var tween := create_tween()
+	tween.tween_property(fade_rect, "color:a", 1.0, 0.8)
+	await tween.finished
+
 	# Clean up fleet state (beam, pipeline, grid) without freeing the zones
 	_cleanup_focus_state()
+	canvas.queue_free()
 
 	# Hand off to SceneManager — HostViewController will receive this as built_scene
 	SceneManager.go_to_host_view_from_fleet(zones, hostname)
@@ -387,7 +413,7 @@ func _spawn_beam(host: Node3D) -> void:
 	_beam.set_script(HolographicBeamScript)
 	_beam.position = host.position
 	var host_footprint: Vector2 = host.get_footprint()
-	var detail_footprint := Vector2(28.0, 20.0)
+	var detail_footprint := Vector2(16.0, 12.0)
 	_beam.configure(host_footprint, detail_footprint, DETAIL_VIEW_HEIGHT)
 	add_child(_beam)
 
