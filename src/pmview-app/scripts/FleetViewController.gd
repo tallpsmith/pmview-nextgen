@@ -33,7 +33,7 @@ var _fleet_pipeline: Node = null
 var _matrix_grid: MeshInstance3D = null
 var _preview_zones: Node3D = null
 var _preview_ready: bool = false
-const DETAIL_VIEW_HEIGHT := 15.0
+const DETAIL_VIEW_HEIGHT := 13.0
 
 
 func _ready() -> void:
@@ -387,7 +387,7 @@ func _spawn_beam(host: Node3D) -> void:
 	_beam.set_script(HolographicBeamScript)
 	_beam.position = host.position
 	var host_footprint: Vector2 = host.get_footprint()
-	var detail_footprint := Vector2(18.0, 10.0)
+	var detail_footprint := Vector2(28.0, 20.0)
 	_beam.configure(host_footprint, detail_footprint, DETAIL_VIEW_HEIGHT)
 	add_child(_beam)
 

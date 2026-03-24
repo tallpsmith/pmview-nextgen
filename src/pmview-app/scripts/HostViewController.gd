@@ -45,6 +45,10 @@ func _ready() -> void:
 		print("[HostView]   child: %s (type: %s, script: %s)" % [
 			child.name, child.get_class(), child.get_script()])
 
+	# Reset position — fleet preview places the scene above the CompactHost,
+	# but HostView expects zones centred at the origin.
+	scene.position = Vector3.ZERO
+
 	print("[HostView] Adding built scene to tree...")
 	add_child(scene)
 	print("[HostView] Built scene added to tree")

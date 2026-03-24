@@ -4,8 +4,8 @@ extends MeshInstance3D
 
 signal progress_complete
 
-@export var grid_width: float = 18.0
-@export var grid_depth: float = 10.0
+@export var grid_width: float = 28.0
+@export var grid_depth: float = 20.0
 
 const GRID_SIZE := 10
 const TOTAL_CELLS := GRID_SIZE * GRID_SIZE

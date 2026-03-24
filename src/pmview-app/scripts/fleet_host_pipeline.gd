@@ -10,6 +10,11 @@ var _pipeline: Node = null
 var _matrix_grid: MeshInstance3D = null
 var _zones_root: Node3D = null
 var _is_complete: bool = false
+var _start_time_ms: int = 0
+
+## Minimum seconds for the matrix animation to play before revealing the preview.
+## Ensures the "computing" visual is always visible even when the pipeline is fast.
+const MIN_ANIMATION_SECONDS := 3.0
 
 ## Cell allocation per phase (must sum to 100)
 const PHASE_CELLS := {0: 10, 1: 20, 2: 0, 3: 10, 4: 20, 5: 40}
@@ -44,6 +49,7 @@ func start(endpoint: String, mode: String, hostname: String,
 	_pipeline.PipelineCompleted.connect(_on_pipeline_completed)
 	_pipeline.PipelineError.connect(_on_pipeline_error)
 
+	_start_time_ms = Time.get_ticks_msec()
 	_pipeline.StartPipeline(endpoint, mode, hostname, "", false)
 
 
@@ -60,6 +66,15 @@ func _on_pipeline_completed() -> void:
 	# Pipeline was started with ZonesOnly=true, so _zones_root has no
 	# controller script or UI layer — safe to add to the fleet scene tree.
 
+	# Ensure the matrix animation plays for at least MIN_ANIMATION_SECONDS
+	# so the user sees the "computing" effect even when the pipeline is fast.
+	var elapsed_s := (Time.get_ticks_msec() - _start_time_ms) / 1000.0
+	var remaining_s := MIN_ANIMATION_SECONDS - elapsed_s
+	if remaining_s > 0.0:
+		# Animate the remaining cells over the remaining time
+		_animate_remaining_cells(remaining_s)
+		await get_tree().create_timer(remaining_s).timeout
+
 	if _matrix_grid and _matrix_grid.has_method("set_progress"):
 		_matrix_grid.set_progress(1.0)
 
@@ -69,6 +84,20 @@ func _on_pipeline_completed() -> void:
 func _on_pipeline_error(_phase_index: int, error: String) -> void:
 	push_error("[FleetHostPipeline] Pipeline failed: %s" % error)
 	build_failed.emit(error)
+
+
+## Gradually fills remaining matrix cells over the given duration.
+func _animate_remaining_cells(duration: float) -> void:
+	if not _matrix_grid or not _matrix_grid.has_method("set_progress"):
+		return
+	var start_progress := float(_cells_so_far) / 100.0
+	var tween := create_tween()
+	tween.tween_method(
+		func(val: float) -> void:
+			if _matrix_grid and _matrix_grid.has_method("set_progress"):
+				_matrix_grid.set_progress(val),
+		start_progress, 0.95, duration  # stop at 95% — the final 100% snap happens after
+	).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
 
 
 ## Returns the built zones root, or null if not yet complete.
