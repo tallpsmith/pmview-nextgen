@@ -110,3 +110,17 @@ func fade_in(duration: float = 0.4) -> void:
 		func(val: float) -> void: mat.set_shader_parameter("global_alpha", val),
 		0.0, 1.0, duration
 	).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+
+
+## Dim the beam to a target opacity over the given duration.
+## Reads the current global_alpha from the shader, so it works from any starting value.
+func dim_to(target: float, duration: float = 0.5) -> void:
+	var mat: ShaderMaterial = mesh.surface_get_material(0)
+	if not mat:
+		return
+	var current: float = mat.get_shader_parameter("global_alpha")
+	var tween := create_tween()
+	tween.tween_method(
+		func(val: float) -> void: mat.set_shader_parameter("global_alpha", val),
+		current, target, duration
+	).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
