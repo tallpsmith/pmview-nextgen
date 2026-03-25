@@ -723,6 +723,51 @@ func _on_fleet_metrics_updated(hostname: String, metrics: Dictionary) -> void:
 	for metric_name: String in metrics:
 		host.set_metric_value(metric_name, metrics[metric_name])
 
+	# Track sample counts for startup reveal
+	if is_instance_valid(_startup_matrix):
+		var count: int = _host_sample_counts.get(hostname, 0) + 1
+		_host_sample_counts[hostname] = count
+		if count == 2:
+			_reveal_host(host)
+
+
+## Fade a compact host in once its second metric sample arrives.
+## The host appears "already running" with meaningful bar heights.
+func _reveal_host(host: Node3D) -> void:
+	_hosts_ready_count += 1
+
+	# Determine target opacity: 1.0 normally, 0.3 if in focus mode (dimmed)
+	var target_opacity := 1.0
+	if _view_mode == ViewMode.FOCUS and _focused_host_index >= 0 \
+			and host != _hosts[_focused_host_index]:
+		target_opacity = 0.3
+
+	var tween := host.create_tween()
+	tween.tween_method(
+		func(val: float) -> void: host.set_opacity(val),
+		0.0, target_opacity, 0.3
+	)
+	# Snap at end to reset transparency mode (avoids alpha-blend sorting artifacts)
+	tween.tween_callback(func() -> void: host.set_opacity(target_opacity))
+
+	# Advance startup matrix progress
+	if is_instance_valid(_startup_matrix):
+		_startup_matrix.set_progress(float(_hosts_ready_count) / float(_hosts.size()))
+
+	# Check if all hosts are ready
+	if _hosts_ready_count >= _hosts.size():
+		_dissolve_startup_matrix()
+
+
+## Dissolve the startup matrix overlay.
+## Does NOT clear _host_sample_counts — still needed by the dimming loop.
+func _dissolve_startup_matrix() -> void:
+	if not is_instance_valid(_startup_matrix):
+		return
+	_startup_matrix.tree_exiting.connect(func() -> void: _startup_matrix = null)
+	_startup_matrix.dissolve(0.8)
+	print("[FleetView] Startup matrix dissolving")
+
 
 func _on_scrape_lagging() -> void:
 	if warning_toast and warning_toast.has_method("show_toast"):
