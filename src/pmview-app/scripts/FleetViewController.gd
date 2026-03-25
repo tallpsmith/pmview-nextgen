@@ -300,14 +300,8 @@ func _exit_focus() -> void:
 	patrol_camera.fly_to_focus(nearest_pos, grid_centre)
 
 	# Fade out beam and matrix grid during fly-out
-	if _beam and _beam.has_method("fade_in"):
-		var mat: ShaderMaterial = _beam.mesh.surface_get_material(0)
-		if mat:
-			var tween := _beam.create_tween()
-			tween.tween_method(
-				func(val: float) -> void: mat.set_shader_parameter("global_alpha", val),
-				1.0, 0.0, 1.0
-			).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_CUBIC)
+	if _beam and _beam.has_method("dim_to"):
+		_beam.dim_to(0.0, 1.0)
 	if _matrix_grid and _matrix_grid.has_method("dissolve"):
 		_matrix_grid.dissolve(1.0)
 
@@ -354,10 +348,22 @@ func _on_preview_build_completed(zones_root: Node3D) -> void:
 	_preview_zones = zones_root
 	_preview_ready = true
 
-	# Keep the matrix grid visible at reduced opacity as a contrasting floor
-	# beneath the HostView preview — improves visual contrast.
-	if _matrix_grid and _matrix_grid.has_method("set_final_opacity"):
-		_matrix_grid.set_final_opacity(0.9)
+	# Dissolve the matrix grid — it's served its loading purpose.
+	# Null out the reference via tree_exiting to prevent freed-object access
+	# if ESC is pressed after dissolve completes.
+	if _matrix_grid and _matrix_grid.has_method("dissolve"):
+		_matrix_grid.tree_exiting.connect(func() -> void: _matrix_grid = null)
+		_matrix_grid.dissolve(0.8)
+
+	# After matrix dissolves, dim the beam to a whisper so the preview
+	# takes centre stage. Sequential: wait for dissolve, then dim.
+	if _beam and _beam.has_method("dim_to"):
+		var tween := create_tween()
+		tween.tween_interval(0.8)  # wait for matrix dissolve
+		tween.tween_callback(func() -> void:
+			if _beam and _beam.has_method("dim_to"):
+				_beam.dim_to(0.25, 0.5)
+		)
 
 	if _preview_zones and _focused_host_index >= 0:
 		var host: Node3D = _hosts[_focused_host_index]
