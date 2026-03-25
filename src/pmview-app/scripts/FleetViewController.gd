@@ -5,7 +5,8 @@ extends Node3D
 
 const CompactHostScript := preload("res://scripts/compact_host.gd")
 const HolographicBeamScript := preload("res://scripts/holographic_beam.gd")
-const BAR_SCENE := preload("res://addons/pmview-bridge/building_blocks/grounded_bar.tscn")
+const FleetHostPipelineScript := preload("res://scripts/fleet_host_pipeline.gd")
+const MatrixGridScript := preload("res://addons/pmview-bridge/building_blocks/matrix_progress_grid.gd")
 
 @onready var fleet_grid: Node3D = %FleetGrid
 @onready var patrol_camera: Camera3D = %PatrolCamera
@@ -27,9 +28,39 @@ var _grid_columns: int = 0
 var _grid_bounds: Rect2 = Rect2()
 var _view_mode: ViewMode = ViewMode.PATROL
 var _focused_host_index: int = -1
-var _detail_view: Node3D = null
 var _beam: MeshInstance3D = null
-const DETAIL_VIEW_HEIGHT := 15.0
+var _fleet_pipeline: Node = null
+var _matrix_grid: MeshInstance3D = null
+var _preview_zones: Node3D = null
+var _preview_ready: bool = false
+var _current_playback_position: String = ""
+const DETAIL_VIEW_HEIGHT := 11.0
+## Scale factor for the HostView preview — full HostView is too large for fleet context
+const PREVIEW_SCALE := 0.4
+
+# Startup matrix overlay state
+var _startup_matrix: MeshInstance3D = null
+var _host_sample_counts: Dictionary = {}
+var _hosts_ready_count: int = 0
+var _is_returning_from_hostview: bool = false
+## Padding around grid bounds to cover outermost host bezels
+const HOST_FOOTPRINT_PADDING := 2.4
+## Duration of the startup matrix fill animation (seconds)
+const STARTUP_MATRIX_FILL_DURATION := 3.0
+## Duration of the startup matrix fade-out after fill completes (seconds)
+const STARTUP_MATRIX_FADE_DURATION := 2.0
+
+# Hover tooltip state
+var _hover_tooltip: Label = null
+var _hovered_host: Node3D = null
+
+## Bar metric names in the 2x2 grid layout order for tooltip display
+const BAR_METRIC_LABELS := {
+	"cpu": "CPU",
+	"memory": "Memory",
+	"disk": "Disk",
+	"network": "Network",
+}
 
 
 func _ready() -> void:
@@ -37,12 +68,27 @@ func _ready() -> void:
 	var hostnames: PackedStringArray = config.get("hostnames", PackedStringArray())
 	if hostnames.is_empty():
 		hostnames = _generate_mock_hostnames(12)
+	# Detect return from HostView BEFORE building grid — affects host visibility
+	var restore_hostname: String = SceneManager.fleet_focused_hostname
+	_is_returning_from_hostview = not restore_hostname.is_empty()
+
 	_build_grid(hostnames)
+	if not _is_returning_from_hostview:
+		_spawn_startup_matrix()
 	_position_master_timestamp()
 	patrol_camera.setup(_grid_bounds)
 	_update_esc_hint()
 	_setup_time_control(config)
 	_setup_fleet_poller(config)
+	_create_hover_tooltip()
+
+	# Restore focus if returning from HostView dive-in
+	if _is_returning_from_hostview:
+		SceneManager.fleet_focused_hostname = ""
+		for i in range(_hosts.size()):
+			if _hosts[i].hostname == restore_hostname:
+				_enter_focus.call_deferred(i)
+				break
 
 
 func _generate_mock_hostnames(count: int) -> PackedStringArray:
@@ -70,6 +116,8 @@ func _build_grid(hostnames: PackedStringArray) -> void:
 		host_node.position = offset + Vector3(col * host_spacing, 0, row * host_spacing)
 		host_node.name = "CompactHost_%d" % i
 		fleet_grid.add_child(host_node)
+		if not _is_returning_from_hostview:
+			host_node.set_opacity(0.0)
 		_hosts.append(host_node)
 		_host_lookup[hostnames[i]] = host_node
 
@@ -100,12 +148,25 @@ func get_grid_bounds() -> Rect2:
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
 		_handle_esc()
+		return
+	# Dive-in: Enter or double-click in focus mode with preview ready
+	if _view_mode == ViewMode.FOCUS and _preview_ready:
+		if event.is_action_pressed("ui_accept"):
+			_dive_into_host_view()
+			return
+		if event is InputEventMouseButton and event.pressed \
+				and event.button_index == MOUSE_BUTTON_LEFT and event.double_click:
+			_dive_into_host_view()
+			return
 	if event.is_action_pressed("ui_accept") and _view_mode == ViewMode.PATROL:
 		_select_nearest_host()
 	elif event is InputEventMouseButton and event.pressed \
 			and event.button_index == MOUSE_BUTTON_LEFT:
 		if _view_mode == ViewMode.PATROL:
 			_select_host_by_click(event.position)
+	# Hover tooltip on mouse motion
+	if event is InputEventMouseMotion and _view_mode == ViewMode.PATROL:
+		_update_hover_tooltip(event.position)
 
 
 var _esc_pressed_at: float = 0.0
@@ -161,14 +222,25 @@ func _raycast_select(from: Vector3, direction: Vector3) -> void:
 # --- Focus mode ---
 
 func _enter_focus(host_index: int) -> void:
+	# Cancel any existing preview/pipeline if re-entering focus
+	if _fleet_pipeline or _preview_zones:
+		_cleanup_focus_state()
+	# Dissolve startup matrix early if still active
+	if is_instance_valid(_startup_matrix):
+		_dissolve_startup_matrix()
 	_focused_host_index = host_index
 	_view_mode = ViewMode.TRANSITIONING_TO_FOCUS
 	var host: Node3D = _hosts[host_index]
 
-	# Dim all other hosts
+	# Dim other hosts, but skip those that haven't received 2 samples yet
+	# (they're still invisible and have no meaningful data to show)
 	for i in range(_hosts.size()):
 		if i != host_index:
-			_hosts[i].set_opacity(0.3)
+			var h: Node3D = _hosts[i]
+			var samples: int = _host_sample_counts.get(h.hostname, 0)
+			if samples >= 2:
+				h.set_opacity(0.3)
+			# else: leave at 0.0 — _reveal_host will set 0.3 when ready
 
 	# Spawn beam immediately with a fade-in — gives instant visual feedback
 	# that the host was selected before the camera even starts moving.
@@ -197,9 +269,8 @@ func _enter_focus(host_index: int) -> void:
 		to_cam.y * orbit_radius
 	)
 
-	# Single smooth fly: straight to orbit position, looking at the host
-	# column (detail centre) the entire way. No swooping down then back up.
-	_spawn_mock_detail_view(host)
+	# Start the preview pipeline (replaces mock detail view)
+	_start_preview_pipeline(host)
 	patrol_camera.fly_to_focus(orbit_pos, detail_centre)
 	await patrol_camera.fly_to_focus_completed
 
@@ -238,51 +309,277 @@ func _exit_focus() -> void:
 	# Fly out to the racetrack, looking at the grid centre
 	patrol_camera.fly_to_focus(nearest_pos, grid_centre)
 
-	# Fade out beam during fly-out
-	if _beam and _beam.has_method("fade_in"):
-		# Reverse fade — tween alpha to 0
-		var mat: ShaderMaterial = _beam.mesh.surface_get_material(0)
-		if mat:
-			var tween := _beam.create_tween()
-			tween.tween_method(
-				func(val: float) -> void: mat.set_shader_parameter("global_alpha", val),
-				1.0, 0.0, 1.0
-			).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_CUBIC)
+	# Fade out beam and matrix grid during fly-out
+	if _beam and _beam.has_method("dim_to"):
+		_beam.dim_to(0.0, 1.0)
+	if _matrix_grid and _matrix_grid.has_method("dissolve"):
+		_matrix_grid.dissolve(1.0)
 
 	await patrol_camera.fly_to_focus_completed
 
-	# Clean up after fly-out completes
-	if _detail_view:
-		_detail_view.queue_free()
-		_detail_view = null
-	if _beam:
-		_beam.queue_free()
-		_beam = null
-
-	# Restore all host opacities
-	for host: Node3D in _hosts:
-		host.set_opacity(1.0)
+	_cleanup_focus_state()
 
 	# Resume patrol from the nearest point
 	patrol_camera.return_to_patrol()
 
-	_focused_host_index = -1
 	_view_mode = ViewMode.PATROL
 	_update_esc_hint()
 
 
-func _spawn_mock_detail_view(host: Node3D) -> void:
-	_detail_view = Node3D.new()
-	_detail_view.name = "DetailView"
-	_detail_view.position = host.position + Vector3(0, DETAIL_VIEW_HEIGHT, 0)
-	# Placeholder bars to visualise the detail view space
-	for i in range(8):
-		var bar: Node3D = BAR_SCENE.instantiate()
-		bar.position = Vector3((i - 3.5) * 2.0, 0, 0)
-		bar.height = randf_range(0.3, 1.0)
-		bar.colour = Color(randf(), randf(), randf())
-		_detail_view.add_child(bar)
-	add_child(_detail_view)
+# --- Preview pipeline ---
+
+func _start_preview_pipeline(host: Node3D) -> void:
+	var config: Dictionary = SceneManager.connection_config
+	var endpoint: String = config.get("endpoint", "http://localhost:54322")
+	var mode: String = config.get("mode", "live")
+	var hostname: String = host.hostname
+
+	# Spawn matrix grid on beam top
+	_matrix_grid = MeshInstance3D.new()
+	_matrix_grid.set_script(MatrixGridScript)
+	_matrix_grid.name = "MatrixProgressGrid"
+	_matrix_grid.position = host.position + Vector3(0, DETAIL_VIEW_HEIGHT + 0.1, 0)
+	add_child(_matrix_grid)
+	print("[FleetView] Matrix grid spawned at %s" % _matrix_grid.position)
+
+	# Start the pipeline
+	_fleet_pipeline = Node.new()
+	_fleet_pipeline.set_script(FleetHostPipelineScript)
+	_fleet_pipeline.name = "FleetHostPipeline"
+	add_child(_fleet_pipeline)
+
+	_fleet_pipeline.build_completed.connect(_on_preview_build_completed)
+	_fleet_pipeline.build_failed.connect(_on_preview_build_failed)
+	_fleet_pipeline.start(endpoint, mode, hostname, _matrix_grid)
+	print("[FleetView] Preview pipeline started for '%s' (mode=%s)" % [hostname, mode])
+
+
+func _on_preview_build_completed(zones_root: Node3D) -> void:
+	_preview_zones = zones_root
+	_preview_ready = true
+
+	# Dissolve the matrix grid — it's served its loading purpose.
+	# Null out the reference via tree_exiting to prevent freed-object access
+	# if ESC is pressed after dissolve completes.
+	if _matrix_grid and _matrix_grid.has_method("dissolve"):
+		_matrix_grid.tree_exiting.connect(func() -> void: _matrix_grid = null)
+		_matrix_grid.dissolve(0.8)
+
+	# After matrix dissolves, dim the beam to a whisper so the preview
+	# takes centre stage. Sequential: wait for dissolve, then dim.
+	if _beam and _beam.has_method("dim_to"):
+		var tween := create_tween()
+		tween.tween_interval(0.8)  # wait for matrix dissolve
+		tween.tween_callback(func() -> void:
+			if _beam and _beam.has_method("dim_to"):
+				_beam.dim_to(0.25, 0.5)
+		)
+
+	if _preview_zones and _focused_host_index >= 0:
+		var host: Node3D = _hosts[_focused_host_index]
+		# Scale down the full HostView layout to fit the fleet context
+		_preview_zones.scale = Vector3.ONE * PREVIEW_SCALE
+		# Centre the zones on the beam top in XZ only. The layout has zones
+		# at Y=0 (ground floor) which should land ON the beam top.
+		# Background zones at Z=-8 pull the XZ centroid off-centre.
+		add_child(_preview_zones)
+		var aabb := _compute_zones_aabb(_preview_zones)
+		var xz_centre := aabb.position + aabb.size / 2.0
+		_preview_zones.position = host.position + Vector3(
+			-xz_centre.x,
+			DETAIL_VIEW_HEIGHT,  # zones' Y=0 ground lands on beam top
+			-xz_centre.z
+		)
+		# The MetricPoller in the built scene auto-starts live polling in _Ready().
+		# In archive mode, we need to switch it to playback at the correct timestamp.
+		_configure_preview_poller()
+		_wire_preview_animation()
+
+
+## Connect MetricPoller → SceneBinder in the preview zones so bars animate.
+## In full HostView this wiring lives in host_view_controller.gd, but the
+## zones-only preview doesn't have that script attached.
+func _wire_preview_animation() -> void:
+	if not _preview_zones:
+		return
+	var poller: Node = _preview_zones.find_child("MetricPoller", true, false)
+	var binder: Node = _preview_zones.find_child("SceneBinder", true, false)
+	if not poller or not binder:
+		push_warning("[FleetView] Cannot wire preview animation — missing poller or binder")
+		return
+	poller.MetricsUpdated.connect(
+		func(_hostname: String, metrics: Dictionary) -> void:
+			binder.ApplyMetrics(metrics)
+	)
+	print("[FleetView] Wired preview MetricPoller → SceneBinder")
+
+
+func _configure_preview_poller() -> void:
+	if not _preview_zones:
+		return
+	var poller: Node = _preview_zones.find_child("MetricPoller", true, false)
+	if not poller:
+		push_warning("[FleetView] No MetricPoller found in preview zones")
+		return
+
+	var config: Dictionary = SceneManager.connection_config
+	var mode: String = config.get("mode", "live")
+	if mode != "archive":
+		return  # Live mode: MetricPoller._Ready() already auto-started polling
+
+	# Archive mode: the poller auto-started live polling in _Ready().
+	# We need to tell it to switch to archive playback at the current timestamp.
+	# Wait for it to connect first, then start playback.
+	var start_time: String = config.get("start_time", "")
+	if start_time.is_empty():
+		var arch_start: float = float(config.get("archive_start_epoch", 0.0))
+		var arch_end: float = float(config.get("archive_end_epoch", 0.0))
+		if arch_end > 0.0:
+			var default_start: float = maxf(arch_end - 86400.0, arch_start)
+			var dt := Time.get_datetime_dict_from_unix_time(int(default_start))
+			start_time = "%04d-%02d-%02dT%02d:%02d:%02dZ" % [
+				dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second]
+
+	if start_time.is_empty():
+		push_warning("[FleetView] No archive start time for preview poller")
+		return
+
+	print("[FleetView] Configuring preview poller for archive playback at %s" % start_time)
+	# Wait for connection, then start playback
+	if poller.has_signal("ConnectionStateChanged"):
+		poller.ConnectionStateChanged.connect(
+			func(state: String) -> void:
+				if state == "Connected":
+					poller.StartPlayback(start_time),
+			CONNECT_ONE_SHOT)
+
+
+func _on_preview_build_failed(error: String) -> void:
+	push_warning("[FleetView] Preview build failed: %s" % error)
+	if _matrix_grid:
+		_matrix_grid.queue_free()
+		_matrix_grid = null
+
+
+func _cleanup_focus_state() -> void:
+	if _beam:
+		_beam.queue_free()
+		_beam = null
+	if _fleet_pipeline:
+		if _fleet_pipeline.has_method("cancel"):
+			_fleet_pipeline.cancel()
+		_fleet_pipeline.queue_free()
+		_fleet_pipeline = null
+	if _matrix_grid:
+		_matrix_grid.queue_free()
+		_matrix_grid = null
+	if _preview_zones:
+		_preview_zones.queue_free()
+		_preview_zones = null
+	_preview_ready = false
+
+	# Restore opacity, but only for hosts that have been revealed (2+ samples).
+	# Un-revealed hosts stay at 0.0 and continue their normal reveal flow.
+	for host: Node3D in _hosts:
+		var samples: int = _host_sample_counts.get(host.hostname, 0)
+		if samples >= 2:
+			host.set_opacity(1.0)
+
+	_focused_host_index = -1
+
+
+# --- Dive into full HostView ---
+
+func _dive_into_host_view() -> void:
+	if not _preview_zones or _focused_host_index < 0:
+		return
+	# Prevent double-trigger during fade
+	_preview_ready = false
+
+	var host: Node3D = _hosts[_focused_host_index]
+	var hostname: String = host.hostname
+
+	# Reset scale to 1.0 before handing off — HostView expects full-size zones
+	_preview_zones.scale = Vector3.ONE
+
+	# Detach the zones from our scene tree (don't free — we're handing it off)
+	remove_child(_preview_zones)
+	var zones: Node3D = _preview_zones
+	_preview_zones = null
+
+	# Graft the UI layer and controller script onto the zones root.
+	# Must do this before cleanup because we need the pipeline's C# bridge.
+	var config: Dictionary = SceneManager.connection_config
+	var mode: String = config.get("mode", "live")
+	if _fleet_pipeline:
+		_fleet_pipeline.graft_host_view_ui(zones, mode)
+
+	# Fade out the fleet scene before transitioning — less jarring than an instant cut
+	var fade_rect := ColorRect.new()
+	fade_rect.color = Color(0, 0, 0, 0)
+	fade_rect.anchors_preset = Control.PRESET_FULL_RECT
+	fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var canvas := CanvasLayer.new()
+	canvas.layer = 100  # on top of everything
+	canvas.add_child(fade_rect)
+	add_child(canvas)
+
+	var tween := create_tween()
+	tween.tween_property(fade_rect, "color:a", 1.0, 0.8)
+	await tween.finished
+
+	# Clean up fleet state (beam, pipeline, grid) without freeing the zones
+	_cleanup_focus_state()
+	canvas.queue_free()
+
+	# Hand off to SceneManager — pass current playback position so HostView
+	# continues from where the fleet was, not from the archive start.
+	SceneManager.go_to_host_view_from_fleet(zones, hostname, _current_playback_position)
+
+
+## Compute the combined AABB of all child positions in a zones tree.
+## Uses child positions (not mesh bounds) for a fast centroid estimate.
+func _compute_zones_aabb(zones: Node3D) -> AABB:
+	var min_pos := Vector3(INF, INF, INF)
+	var max_pos := Vector3(-INF, -INF, -INF)
+	for child in zones.get_children():
+		if child is Node3D:
+			var pos: Vector3 = child.position * PREVIEW_SCALE
+			min_pos = Vector3(minf(min_pos.x, pos.x), minf(min_pos.y, pos.y), minf(min_pos.z, pos.z))
+			max_pos = Vector3(maxf(max_pos.x, pos.x), maxf(max_pos.y, pos.y), maxf(max_pos.z, pos.z))
+	if min_pos.x == INF:
+		return AABB(Vector3.ZERO, Vector3.ZERO)
+	return AABB(min_pos, max_pos - min_pos)
+
+
+func _spawn_startup_matrix() -> void:
+	_startup_matrix = MeshInstance3D.new()
+	_startup_matrix.set_script(MatrixGridScript)
+	_startup_matrix.name = "StartupMatrix"
+	# Set dimensions BEFORE add_child (which triggers _ready and builds PlaneMesh)
+	_startup_matrix.grid_width = _grid_bounds.size.x + HOST_FOOTPRINT_PADDING
+	_startup_matrix.grid_depth = _grid_bounds.size.y + HOST_FOOTPRINT_PADDING
+	_startup_matrix.position = Vector3(
+		_grid_bounds.position.x + _grid_bounds.size.x / 2.0,
+		0.1,
+		_grid_bounds.position.y + _grid_bounds.size.y / 2.0
+	)
+	add_child(_startup_matrix)
+	print("[FleetView] Startup matrix spawned (%sx%s)" % [
+		_startup_matrix.grid_width, _startup_matrix.grid_depth])
+
+	# Run a fluid autonomous animation — NOT tied to host loading.
+	# Smooth fill over 3s, then fade out over 2s.
+	var tween := create_tween()
+	tween.tween_method(
+		func(val: float) -> void:
+			if is_instance_valid(_startup_matrix):
+				_startup_matrix.set_progress(val),
+		0.0, 1.0, STARTUP_MATRIX_FILL_DURATION
+	).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+	tween.tween_callback(func() -> void:
+		_dissolve_startup_matrix()
+	)
 
 
 func _spawn_beam(host: Node3D) -> void:
@@ -291,7 +588,7 @@ func _spawn_beam(host: Node3D) -> void:
 	_beam.set_script(HolographicBeamScript)
 	_beam.position = host.position
 	var host_footprint: Vector2 = host.get_footprint()
-	var detail_footprint := Vector2(18.0, 10.0)
+	var detail_footprint := Vector2(16.0, 12.0)
 	_beam.configure(host_footprint, detail_footprint, DETAIL_VIEW_HEIGHT)
 	add_child(_beam)
 
@@ -308,6 +605,72 @@ func _update_esc_hint() -> void:
 			esc_hint.text = "ESC \u2192 Return to Patrol"
 		_:
 			esc_hint.text = ""
+
+
+func _create_hover_tooltip() -> void:
+	_hover_tooltip = Label.new()
+	_hover_tooltip.name = "HoverTooltip"
+	_hover_tooltip.visible = false
+	_hover_tooltip.add_theme_font_override("font",
+		preload("res://assets/fonts/PressStart2P-Regular.ttf"))
+	_hover_tooltip.add_theme_font_size_override("font_size", 12)
+	_hover_tooltip.modulate = Color(1.0, 0.85, 0.3, 0.95)
+	# Place it in the HUD control so it renders over 3D
+	var hud_control: Control = esc_hint.get_parent() if esc_hint else null
+	if hud_control:
+		hud_control.add_child(_hover_tooltip)
+
+
+func _update_hover_tooltip(screen_pos: Vector2) -> void:
+	var camera: Camera3D = get_viewport().get_camera_3d()
+	if not camera:
+		_hide_tooltip()
+		return
+	var from := camera.project_ray_origin(screen_pos)
+	var dir := camera.project_ray_normal(screen_pos)
+
+	var space_state := get_world_3d().direct_space_state
+	var query := PhysicsRayQueryParameters3D.create(from, from + dir * 200.0)
+	query.collision_mask = 2
+	var result := space_state.intersect_ray(query)
+	if result.is_empty():
+		_hide_tooltip()
+		return
+
+	# Walk up to find the CompactHost
+	var node: Node = result.collider
+	var host_node: Node3D = null
+	while node:
+		if node.has_method("set_metric_value"):
+			host_node = node as Node3D
+			break
+		node = node.get_parent()
+
+	if not host_node:
+		_hide_tooltip()
+		return
+
+	# Build tooltip text: hostname + bar metric if hovering a specific bar
+	var text: String = host_node.hostname
+	var hit_node: Node = result.collider
+	# Walk up from collider to find the bar (parent of StaticBody3D)
+	var bar_node: Node = hit_node.get_parent() if hit_node else null
+	if bar_node and bar_node.has_method("get") and bar_node != host_node:
+		# Check if this is one of the metric bars by matching against the host's bar names
+		for metric_name: String in BAR_METRIC_LABELS:
+			if bar_node.name.to_lower().contains(metric_name):
+				text += " · %s" % BAR_METRIC_LABELS[metric_name]
+				break
+
+	_hover_tooltip.text = text
+	_hover_tooltip.visible = true
+	_hover_tooltip.position = screen_pos + Vector2(16, -8)
+
+
+func _hide_tooltip() -> void:
+	if _hover_tooltip:
+		_hover_tooltip.visible = false
+	_hovered_host = null
 
 
 func _setup_time_control(config: Dictionary) -> void:
@@ -341,6 +704,7 @@ func update_master_timestamp(timestamp_iso: String) -> void:
 func _on_playback_position_changed(position: String, mode: String) -> void:
 	if not position.is_empty():
 		print("[FleetView] PlaybackPosition: %s (%s)" % [position, mode])
+		_current_playback_position = position
 		update_master_timestamp(position)
 
 
@@ -372,7 +736,13 @@ func _setup_fleet_poller(config: Dictionary) -> void:
 	var mode: String = config.get("mode", "live")
 	print("[FleetView]   mode: %s" % mode)
 	if mode == "archive":
-		var start_time: String = config.get("start_time", "")
+		# On return from HostView, continue from where we left off
+		var start_time: String = ""
+		if not SceneManager.fleet_playback_position.is_empty():
+			start_time = SceneManager.fleet_playback_position
+			print("[FleetView]   Resuming from fleet_playback_position: %s" % start_time)
+		else:
+			start_time = config.get("start_time", "")
 		if start_time.is_empty():
 			# Default: archive end minus 24h, clamped to archive start
 			var arch_start_raw = config.get("archive_start_epoch", null)
@@ -412,6 +782,44 @@ func _on_fleet_metrics_updated(hostname: String, metrics: Dictionary) -> void:
 		return
 	for metric_name: String in metrics:
 		host.set_metric_value(metric_name, metrics[metric_name])
+
+	# Track sample counts for startup reveal — hosts appear when their data is meaningful
+	if not _is_returning_from_hostview:
+		var count: int = _host_sample_counts.get(hostname, 0) + 1
+		_host_sample_counts[hostname] = count
+		if count == 2:
+			_reveal_host(host)
+
+
+## Fade a compact host in once its second metric sample arrives.
+## The host appears "already running" with meaningful bar heights.
+## Independent of the startup matrix animation — hosts reveal on their own schedule.
+func _reveal_host(host: Node3D) -> void:
+	_hosts_ready_count += 1
+
+	# Determine target opacity: 1.0 normally, 0.3 if in focus mode (dimmed)
+	var target_opacity := 1.0
+	if _view_mode == ViewMode.FOCUS and _focused_host_index >= 0 \
+			and host != _hosts[_focused_host_index]:
+		target_opacity = 0.3
+
+	var tween := host.create_tween()
+	tween.tween_method(
+		func(val: float) -> void: host.set_opacity(val),
+		0.0, target_opacity, 0.3
+	)
+	# Snap at end to reset transparency mode (avoids alpha-blend sorting artifacts)
+	tween.tween_callback(func() -> void: host.set_opacity(target_opacity))
+
+
+## Dissolve the startup matrix overlay with a slow fade.
+## Does NOT clear _host_sample_counts — still needed by the dimming loop.
+func _dissolve_startup_matrix() -> void:
+	if not is_instance_valid(_startup_matrix):
+		return
+	_startup_matrix.tree_exiting.connect(func() -> void: _startup_matrix = null)
+	_startup_matrix.dissolve(STARTUP_MATRIX_FADE_DURATION)
+	print("[FleetView] Startup matrix dissolving")
 
 
 func _on_scrape_lagging() -> void:

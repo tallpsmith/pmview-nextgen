@@ -65,8 +65,11 @@ public class SeriesQueryIntegrationTests : IntegrationTestBase
 
         Assert.NotEmpty(seriesIds);
 
-        var instancesUrl = PcpSeriesQuery.BuildInstancesUrl(PmproxyUri, seriesIds);
-        var instancesJson = await http.GetStringAsync(instancesUrl);
+        var instancesRequest = PcpSeriesQuery.BuildSeriesRequest(
+            PmproxyUri, "/series/instances", seriesIds);
+        var instancesResponse = await http.SendAsync(instancesRequest);
+        instancesResponse.EnsureSuccessStatusCode();
+        var instancesJson = await instancesResponse.Content.ReadAsStringAsync();
         var instances = PcpSeriesQuery.ParseInstancesResponse(instancesJson);
 
         Assert.NotEmpty(instances);

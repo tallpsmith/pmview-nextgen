@@ -703,6 +703,54 @@ public partial class SceneBinderTests
 		await runner.AwaitIdleFrame();
 	}
 
+	// ── UpdateSourceRangeMax ─────────────────────────────────────────────
+
+	[TestCase]
+	[RequireGodotRuntime]
+	public async Task UpdateSourceRangeMax_AnimationContinuesAfterRangeChange()
+	{
+		var runner = ISceneRunner.Load("res://test/scenes/test_node3d.tscn");
+		var node3D = (Node3D)runner.Scene();
+		var binder = new SceneBinder();
+		runner.Scene().AddChild(binder);
+
+		var bindable = new PcpBindable();
+		var binding = new PcpBindingResource
+		{
+			MetricName = "disk.dev.read_bytes",
+			TargetProperty = "height",
+			SourceRangeMin = 0f, SourceRangeMax = 500_000_000f, // 500 MB/s
+			TargetRangeMin = 0.2f, TargetRangeMax = 5.0f,
+			InitialValue = 0f,
+			ZoneName = "Disk"
+		};
+		bindable.PcpBindings = new Godot.Collections.Array<PcpBindingResource> { binding };
+		node3D.AddChild(bindable);
+		binder.BindFromSceneProperties(node3D);
+
+		// First update: establish a baseline value (250 MB/s = midpoint)
+		binder.ApplyMetrics(MakeSingularMetrics("disk.dev.read_bytes", 250_000_000.0));
+		binder.AdvanceInterpolations(0.016f);
+		var baselineY = node3D.Scale.Y;
+		AssertThat(baselineY).IsGreater(2.0f); // should be around 2.6
+
+		// Change the source range (simulates F1 tuner: 500 MB/s → 14 GB/s)
+		binder.UpdateSourceRangeMax("Disk", 14_000_000_000.0);
+
+		// Apply metrics with a NEW value after range change
+		binder.ApplyMetrics(MakeSingularMetrics("disk.dev.read_bytes", 1_000_000_000.0));
+
+		// Advance several frames — value must move toward the new target
+		for (int i = 0; i < 10; i++)
+			binder.AdvanceInterpolations(0.1f);
+
+		var afterTunerY = node3D.Scale.Y;
+		// The value should have changed — animation must not be frozen
+		AssertThat(afterTunerY).IsNotEqual(baselineY);
+
+		await runner.AwaitIdleFrame();
+	}
+
 	// ── Helpers ──────────────────────────────────────────────────────────
 
 	private static Godot.Collections.Dictionary MakeSingularMetrics(

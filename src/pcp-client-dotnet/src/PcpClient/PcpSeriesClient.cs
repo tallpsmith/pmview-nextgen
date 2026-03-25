@@ -39,8 +39,8 @@ public sealed class PcpSeriesClient
     public async Task<IReadOnlyList<SeriesMetricName>> GetMetricNamesAsync(
         IEnumerable<string> seriesIds, CancellationToken cancellationToken = default)
     {
-        var url = PcpSeriesQuery.BuildMetricsUrl(_baseUrl, seriesIds);
-        var response = await _httpClient.GetAsync(url, cancellationToken);
+        var request = PcpSeriesQuery.BuildSeriesRequest(_baseUrl, "/series/metrics", seriesIds);
+        var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         return PcpSeriesQuery.ParseMetricsResponse(json);
@@ -49,8 +49,8 @@ public sealed class PcpSeriesClient
     public async Task<IReadOnlyList<SeriesDescriptor>> GetDescriptorsAsync(
         IEnumerable<string> seriesIds, CancellationToken cancellationToken = default)
     {
-        var url = PcpSeriesQuery.BuildDescsUrl(_baseUrl, seriesIds);
-        var response = await _httpClient.GetAsync(url, cancellationToken);
+        var request = PcpSeriesQuery.BuildSeriesRequest(_baseUrl, "/series/descs", seriesIds);
+        var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         return PcpSeriesQuery.ParseDescsResponse(json);
@@ -59,8 +59,8 @@ public sealed class PcpSeriesClient
     public async Task<Dictionary<string, SeriesInstanceInfo>> GetInstancesAsync(
         IEnumerable<string> seriesIds, CancellationToken cancellationToken = default)
     {
-        var url = PcpSeriesQuery.BuildInstancesUrl(_baseUrl, seriesIds);
-        var response = await _httpClient.GetAsync(url, cancellationToken);
+        var request = PcpSeriesQuery.BuildSeriesRequest(_baseUrl, "/series/instances", seriesIds);
+        var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         return PcpSeriesQuery.ParseInstancesResponse(json);
@@ -70,9 +70,16 @@ public sealed class PcpSeriesClient
         IEnumerable<string> seriesIds, DateTime position, double windowSeconds = 2.0,
         CancellationToken cancellationToken = default)
     {
-        var url = PcpSeriesQuery.BuildValuesUrlWithTimeWindow(
-            _baseUrl, seriesIds, position, windowSeconds);
-        var response = await _httpClient.GetAsync(url, cancellationToken);
+        var startEpoch = PcpSeriesQuery.ToEpochSeconds(position.AddSeconds(-windowSeconds));
+        var finishEpoch = PcpSeriesQuery.ToEpochSeconds(position);
+        var extraParams = new Dictionary<string, string>
+        {
+            ["start"] = $"{startEpoch:F3}",
+            ["finish"] = $"{finishEpoch:F3}"
+        };
+        var request = PcpSeriesQuery.BuildSeriesRequest(
+            _baseUrl, "/series/values", seriesIds, extraParams);
+        var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         return PcpSeriesQuery.ParseValuesResponse(json);

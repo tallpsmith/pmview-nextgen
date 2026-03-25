@@ -41,9 +41,9 @@ var _fly_target_pos: Vector3
 var _fly_target_look: Vector3
 var _fly_elapsed: float = 0.0
 ## Minimum fly duration — short hops won't be instant
-const FLYTO_MIN_DURATION := 2.0
+@export var flyto_min_duration: float = 1.5
 ## Metres per second for fly-to speed — longer distances take proportionally longer
-const FLYTO_SPEED := 15.0
+@export var flyto_speed: float = 20.0
 
 signal fly_to_focus_completed
 
@@ -196,9 +196,9 @@ func fly_to_focus(target_pos: Vector3, look_at_pos: Vector3) -> void:
 	# Scale duration by distance so long flights feel cinematic,
 	# short hops don't drag. Minimum ensures it's never instant.
 	var dist := position.distance_to(target_pos)
-	_fly_duration = maxf(dist / FLYTO_SPEED, FLYTO_MIN_DURATION)
+	_fly_duration = maxf(dist / flyto_speed, flyto_min_duration)
 
-var _fly_duration: float = FLYTO_MIN_DURATION
+var _fly_duration: float = 1.5
 
 func _process_flying_to_focus(delta: float) -> void:
 	_fly_elapsed += delta

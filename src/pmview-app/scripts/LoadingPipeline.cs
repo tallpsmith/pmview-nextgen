@@ -36,6 +36,12 @@ public partial class LoadingPipeline : Node
 	/// </summary>
 	[Export] public int MinPhaseDelayMs { get; set; } = 500;
 
+	/// <summary>
+	/// When true, builds zones only (no UI panels or controller script).
+	/// Used by fleet preview to get a read-only visualisation.
+	/// </summary>
+	[Export] public bool ZonesOnly { get; set; } = false;
+
 	public async void StartPipeline(string endpoint, string mode = "live",
 		string hostname = "", string startTime = "", bool verbose = false)
 	{
@@ -99,7 +105,9 @@ public partial class LoadingPipeline : Node
 			phaseStart = DateTime.UtcNow;
 			var hostnameOverride = mode == "archive" && !string.IsNullOrEmpty(hostname)
 				? hostname : null;
-			BuiltScene = RuntimeSceneBuilder.Build(layout, endpoint, mode, hostnameOverride);
+			BuiltScene = ZonesOnly
+				? HostSceneBuilder.BuildZones(layout, endpoint, mode, hostnameOverride)
+				: HostSceneBuilder.Build(layout, endpoint, mode, hostnameOverride);
 			await EnforceMinPhaseDelay(phaseStart);
 			EmitSignal(SignalName.PhaseCompleted, 5, "BUILDING");
 
@@ -119,6 +127,16 @@ public partial class LoadingPipeline : Node
 				catch { /* swallow cleanup errors */ }
 			}
 		}
+	}
+
+	/// <summary>
+	/// Grafts the HostView UI layer (panels, help, controller script) onto a
+	/// zones-only scene. Callable from GDScript since static C# methods are not
+	/// accessible from GDScript.
+	/// </summary>
+	public void GraftHostViewUi(Node3D zonesRoot, string mode = "live")
+	{
+		HostSceneBuilder.AddHostViewUi(zonesRoot, mode);
 	}
 
 	private async Task EnforceMinPhaseDelay(DateTime phaseStart)

@@ -111,6 +111,44 @@ public static class PcpSeriesQuery
     }
 
     /// <summary>
+    /// Maximum URL length before switching from GET to POST.
+    /// pmproxy and most HTTP servers reject URLs longer than ~4000 chars.
+    /// </summary>
+    private const int MaxGetUrlLength = 3500;
+
+    /// <summary>
+    /// Creates an HttpRequestMessage for a /series/* endpoint with series IDs.
+    /// Uses GET when the URL is short enough; falls back to POST with
+    /// form-encoded body when the series list would blow the URI limit.
+    /// </summary>
+    public static HttpRequestMessage BuildSeriesRequest(
+        Uri baseUrl, string endpoint, IEnumerable<string> seriesIds,
+        Dictionary<string, string>? extraParams = null)
+    {
+        var ids = string.Join(",", seriesIds);
+        var queryString = $"series={Uri.EscapeDataString(ids)}";
+        if (extraParams != null)
+            foreach (var kvp in extraParams)
+                queryString += $"&{kvp.Key}={Uri.EscapeDataString(kvp.Value)}";
+
+        var getUrl = new Uri(baseUrl, $"{endpoint}?{queryString}");
+        if (getUrl.AbsoluteUri.Length <= MaxGetUrlLength)
+            return new HttpRequestMessage(HttpMethod.Get, getUrl);
+
+        // POST fallback: form-encoded body with the same parameters
+        var formParams = new Dictionary<string, string> { ["series"] = ids };
+        if (extraParams != null)
+            foreach (var kvp in extraParams)
+                formParams[kvp.Key] = kvp.Value;
+
+        var postUrl = new Uri(baseUrl, endpoint);
+        return new HttpRequestMessage(HttpMethod.Post, postUrl)
+        {
+            Content = new FormUrlEncodedContent(formParams)
+        };
+    }
+
+    /// <summary>
     /// Parses a /series/instances response into a mapping of
     /// instance hash → instance info (numeric ID + human-readable name).
     /// Multiple instances can share the same series hash (e.g. kernel.all.load
@@ -304,7 +342,7 @@ public static class PcpSeriesQuery
         return result;
     }
 
-    private static double ToEpochSeconds(DateTime utcTime)
+    public static double ToEpochSeconds(DateTime utcTime)
     {
         return ((DateTimeOffset)utcTime).ToUnixTimeMilliseconds() / 1000.0;
     }

@@ -11,9 +11,9 @@ namespace PmviewApp;
 /// SceneLayout, producing the exact same node hierarchy that TscnWriter emits
 /// as .tscn text — so SceneBinder can find and validate bindings identically.
 /// </summary>
-public static class RuntimeSceneBuilder
+public static class HostSceneBuilder
 {
-    private static readonly ILogger _log = PmviewLogger.GetLogger("RuntimeSceneBuilder");
+    private static readonly ILogger _log = PmviewLogger.GetLogger("HostSceneBuilder");
 
     // -- script paths --
     private const string ControllerScriptPath = "res://addons/pmview-bridge/host_view_controller.gd";
@@ -41,13 +41,28 @@ public static class RuntimeSceneBuilder
     /// <summary>
     /// Builds a live node hierarchy from a <see cref="SceneLayout"/>,
     /// mirroring the structure TscnWriter emits to .tscn.
+    /// Delegates to <see cref="BuildZones"/> then <see cref="AddHostViewUi"/>.
     /// </summary>
     public static Node3D Build(SceneLayout layout, string pmproxyEndpoint,
         string mode = "live", string? hostnameOverride = null,
         IProgress<float>? progress = null)
     {
-        _log.LogInformation("Build starting...");
-        var root = CreateHostViewRoot();
+        var root = BuildZones(layout, pmproxyEndpoint, mode, hostnameOverride, progress);
+        AddHostViewUi(root, mode);
+        return root;
+    }
+
+    /// <summary>
+    /// Creates a plain Node3D with MetricPoller, SceneBinder, metric zones,
+    /// and ambient labels — but NO controller script or UI panels.
+    /// Suitable for embedding as a read-only preview (e.g. fleet view).
+    /// </summary>
+    public static Node3D BuildZones(SceneLayout layout, string pmproxyEndpoint,
+        string mode = "live", string? hostnameOverride = null,
+        IProgress<float>? progress = null)
+    {
+        _log.LogInformation("BuildZones starting...");
+        var root = new Node3D { Name = "HostViewZones" };
         var hostname = hostnameOverride ?? layout.Hostname;
         AddMetricPoller(root, pmproxyEndpoint, hostname);
         AddSceneBinder(root);
@@ -60,33 +75,43 @@ public static class RuntimeSceneBuilder
         }
 
         BuildAmbientLabels(root);
-        AddRangeTuningPanel(root);
-
-        if (mode == "archive")
-            AddTimeControl(root);
-
-        // Set Owner on all descendants so find_child(owned=true) works —
-        // programmatic nodes don't get an owner automatically unlike .tscn scenes.
         SetOwnerRecursive(root, root);
 
-        _log.LogInformation("Build complete. Root children: {ChildCount}", root.GetChildCount());
+        _log.LogInformation("BuildZones complete. Root children: {ChildCount}", root.GetChildCount());
         return root;
     }
 
-    // ── root + infrastructure ──────────────────────────────────────────
-
-    private static Node3D CreateHostViewRoot()
+    /// <summary>
+    /// Attaches the host_view_controller script, renames to "HostView",
+    /// adds UI panels (range tuning, help, detail) and optionally TimeControl,
+    /// then re-sets ownership on all descendants.
+    /// </summary>
+    public static void AddHostViewUi(Node3D zonesRoot, string mode = "live")
     {
-        var root = new Node3D { Name = "HostView" };
+        _log.LogInformation("AddHostViewUi starting...");
+
         var script = GD.Load<Script>(ControllerScriptPath);
         if (script == null)
             _log.LogError("FAILED to load controller script: {ScriptPath}", ControllerScriptPath);
         else
-            _log.LogInformation("Loaded controller script: {ScriptPath}", script.ResourcePath);
-        if (script != null)
-            root.SetScript(script);
-        _log.LogInformation("Root script after SetScript: {Script}", root.GetScript());
-        return root;
+            zonesRoot.SetScript(script);
+
+        // The zones node may have been in a previous scene tree (fleet preview),
+        // which sets its internal "ready" flag. RequestReady() clears it so
+        // the controller script's _ready() fires when the node enters the
+        // HostView tree — essential for SceneBinder wiring and metric polling.
+        zonesRoot.RequestReady();
+
+        zonesRoot.Name = "HostView";
+
+        AddRangeTuningPanel(zonesRoot);
+
+        if (mode == "archive")
+            AddTimeControl(zonesRoot);
+
+        SetOwnerRecursive(zonesRoot, zonesRoot);
+
+        _log.LogInformation("AddHostViewUi complete.");
     }
 
     private static void AddMetricPoller(Node3D root, string endpoint, string hostname)
@@ -389,7 +414,7 @@ public static class RuntimeSceneBuilder
         }
         else
         {
-            GD.PushWarning($"[RuntimeSceneBuilder] Failed to load HelpPanel scene: {HelpPanelScenePath}");
+            GD.PushWarning($"[HostSceneBuilder] Failed to load HelpPanel scene: {HelpPanelScenePath}");
         }
 
         var helpHintScene = GD.Load<PackedScene>(HelpHintScenePath);
@@ -401,7 +426,7 @@ public static class RuntimeSceneBuilder
         }
         else
         {
-            GD.PushWarning($"[RuntimeSceneBuilder] Failed to load HelpHint scene: {HelpHintScenePath}");
+            GD.PushWarning($"[HostSceneBuilder] Failed to load HelpHint scene: {HelpHintScenePath}");
         }
 
         var detailPanelScene = GD.Load<PackedScene>(DetailPanelScenePath);
@@ -413,7 +438,7 @@ public static class RuntimeSceneBuilder
         }
         else
         {
-            GD.PushWarning($"[RuntimeSceneBuilder] Failed to load DetailPanel scene: {DetailPanelScenePath}");
+            GD.PushWarning($"[HostSceneBuilder] Failed to load DetailPanel scene: {DetailPanelScenePath}");
         }
 
         sceneRoot.AddChild(canvas);
