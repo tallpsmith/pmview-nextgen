@@ -236,16 +236,28 @@ public partial class SceneBinder : Node
 			var newResolved = active.Resolved with { Binding = newBinding };
 			var newActive = active with { Resolved = newResolved };
 
-			if (_smoothValues.TryGetValue(active, out var smoothState))
-			{
-				_smoothValues.Remove(active);
-				_smoothValues[newActive] = smoothState;
-			}
+			// Save state from old key before removing it.
+			_smoothValues.TryGetValue(active, out var oldSmooth);
+			_lastRawValues.TryGetValue(active, out var lastRaw);
+			_smoothValues.Remove(active);
+			_lastRawValues.Remove(active);
 
-			if (_lastRawValues.TryGetValue(active, out var lastRaw))
+			// Transfer last raw value and re-normalise immediately so bars jump
+			// to the correct position under the new range without waiting for
+			// the next poll tick.
+			if (lastRaw.HasValue)
 			{
-				_lastRawValues.Remove(active);
 				_lastRawValues[newActive] = lastRaw;
+				var normalised = (float)Normalise(lastRaw.Value,
+					newBinding.SourceRangeMin, newBinding.SourceRangeMax,
+					newBinding.TargetRangeMin, newBinding.TargetRangeMax);
+				_smoothValues[newActive] = (oldSmooth.Current, normalised);
+			}
+			else
+			{
+				// No raw value yet — just transfer existing smooth state
+				if (oldSmooth != default)
+					_smoothValues[newActive] = oldSmooth;
 			}
 
 			_activeBindings[i] = newActive;
