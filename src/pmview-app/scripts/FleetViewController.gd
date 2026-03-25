@@ -38,6 +38,13 @@ const DETAIL_VIEW_HEIGHT := 11.0
 ## Scale factor for the HostView preview — full HostView is too large for fleet context
 const PREVIEW_SCALE := 0.4
 
+# Startup matrix overlay state
+var _startup_matrix: MeshInstance3D = null
+var _host_sample_counts: Dictionary = {}
+var _hosts_ready_count: int = 0
+## Padding around grid bounds to cover outermost host bezels
+const HOST_FOOTPRINT_PADDING := 2.4
+
 # Hover tooltip state
 var _hover_tooltip: Label = null
 var _hovered_host: Node3D = null
@@ -57,6 +64,7 @@ func _ready() -> void:
 	if hostnames.is_empty():
 		hostnames = _generate_mock_hostnames(12)
 	_build_grid(hostnames)
+	_spawn_startup_matrix()
 	_position_master_timestamp()
 	patrol_camera.setup(_grid_bounds)
 	_update_esc_hint()
@@ -99,6 +107,7 @@ func _build_grid(hostnames: PackedStringArray) -> void:
 		host_node.position = offset + Vector3(col * host_spacing, 0, row * host_spacing)
 		host_node.name = "CompactHost_%d" % i
 		fleet_grid.add_child(host_node)
+		host_node.set_opacity(0.0)
 		_hosts.append(host_node)
 		_host_lookup[hostnames[i]] = host_node
 
@@ -494,6 +503,23 @@ func _compute_zones_aabb(zones: Node3D) -> AABB:
 	if min_pos.x == INF:
 		return AABB(Vector3.ZERO, Vector3.ZERO)
 	return AABB(min_pos, max_pos - min_pos)
+
+
+func _spawn_startup_matrix() -> void:
+	_startup_matrix = MeshInstance3D.new()
+	_startup_matrix.set_script(MatrixGridScript)
+	_startup_matrix.name = "StartupMatrix"
+	# Set dimensions BEFORE add_child (which triggers _ready and builds PlaneMesh)
+	_startup_matrix.grid_width = _grid_bounds.size.x + HOST_FOOTPRINT_PADDING
+	_startup_matrix.grid_depth = _grid_bounds.size.y + HOST_FOOTPRINT_PADDING
+	_startup_matrix.position = Vector3(
+		_grid_bounds.position.x + _grid_bounds.size.x / 2.0,
+		0.1,
+		_grid_bounds.position.y + _grid_bounds.size.y / 2.0
+	)
+	add_child(_startup_matrix)
+	print("[FleetView] Startup matrix spawned (%sx%s)" % [
+		_startup_matrix.grid_width, _startup_matrix.grid_depth])
 
 
 func _spawn_beam(host: Node3D) -> void:
