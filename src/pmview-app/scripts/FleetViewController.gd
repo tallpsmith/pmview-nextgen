@@ -42,8 +42,13 @@ const PREVIEW_SCALE := 0.4
 var _startup_matrix: MeshInstance3D = null
 var _host_sample_counts: Dictionary = {}
 var _hosts_ready_count: int = 0
+var _is_returning_from_hostview: bool = false
 ## Padding around grid bounds to cover outermost host bezels
 const HOST_FOOTPRINT_PADDING := 2.4
+## Duration of the startup matrix fill animation (seconds)
+const STARTUP_MATRIX_FILL_DURATION := 3.0
+## Duration of the startup matrix fade-out after fill completes (seconds)
+const STARTUP_MATRIX_FADE_DURATION := 2.0
 
 # Hover tooltip state
 var _hover_tooltip: Label = null
@@ -63,8 +68,13 @@ func _ready() -> void:
 	var hostnames: PackedStringArray = config.get("hostnames", PackedStringArray())
 	if hostnames.is_empty():
 		hostnames = _generate_mock_hostnames(12)
+	# Detect return from HostView BEFORE building grid — affects host visibility
+	var restore_hostname: String = SceneManager.fleet_focused_hostname
+	_is_returning_from_hostview = not restore_hostname.is_empty()
+
 	_build_grid(hostnames)
-	_spawn_startup_matrix()
+	if not _is_returning_from_hostview:
+		_spawn_startup_matrix()
 	_position_master_timestamp()
 	patrol_camera.setup(_grid_bounds)
 	_update_esc_hint()
@@ -73,8 +83,7 @@ func _ready() -> void:
 	_create_hover_tooltip()
 
 	# Restore focus if returning from HostView dive-in
-	var restore_hostname: String = SceneManager.fleet_focused_hostname
-	if not restore_hostname.is_empty():
+	if _is_returning_from_hostview:
 		SceneManager.fleet_focused_hostname = ""
 		for i in range(_hosts.size()):
 			if _hosts[i].hostname == restore_hostname:
@@ -107,7 +116,8 @@ func _build_grid(hostnames: PackedStringArray) -> void:
 		host_node.position = offset + Vector3(col * host_spacing, 0, row * host_spacing)
 		host_node.name = "CompactHost_%d" % i
 		fleet_grid.add_child(host_node)
-		host_node.set_opacity(0.0)
+		if not _is_returning_from_hostview:
+			host_node.set_opacity(0.0)
 		_hosts.append(host_node)
 		_host_lookup[hostnames[i]] = host_node
 
@@ -558,6 +568,19 @@ func _spawn_startup_matrix() -> void:
 	print("[FleetView] Startup matrix spawned (%sx%s)" % [
 		_startup_matrix.grid_width, _startup_matrix.grid_depth])
 
+	# Run a fluid autonomous animation — NOT tied to host loading.
+	# Smooth fill over 3s, then fade out over 2s.
+	var tween := create_tween()
+	tween.tween_method(
+		func(val: float) -> void:
+			if is_instance_valid(_startup_matrix):
+				_startup_matrix.set_progress(val),
+		0.0, 1.0, STARTUP_MATRIX_FILL_DURATION
+	).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+	tween.tween_callback(func() -> void:
+		_dissolve_startup_matrix()
+	)
+
 
 func _spawn_beam(host: Node3D) -> void:
 	_beam = MeshInstance3D.new()
@@ -760,8 +783,8 @@ func _on_fleet_metrics_updated(hostname: String, metrics: Dictionary) -> void:
 	for metric_name: String in metrics:
 		host.set_metric_value(metric_name, metrics[metric_name])
 
-	# Track sample counts for startup reveal
-	if is_instance_valid(_startup_matrix):
+	# Track sample counts for startup reveal — hosts appear when their data is meaningful
+	if not _is_returning_from_hostview:
 		var count: int = _host_sample_counts.get(hostname, 0) + 1
 		_host_sample_counts[hostname] = count
 		if count == 2:
@@ -770,6 +793,7 @@ func _on_fleet_metrics_updated(hostname: String, metrics: Dictionary) -> void:
 
 ## Fade a compact host in once its second metric sample arrives.
 ## The host appears "already running" with meaningful bar heights.
+## Independent of the startup matrix animation — hosts reveal on their own schedule.
 func _reveal_host(host: Node3D) -> void:
 	_hosts_ready_count += 1
 
@@ -787,22 +811,14 @@ func _reveal_host(host: Node3D) -> void:
 	# Snap at end to reset transparency mode (avoids alpha-blend sorting artifacts)
 	tween.tween_callback(func() -> void: host.set_opacity(target_opacity))
 
-	# Advance startup matrix progress
-	if is_instance_valid(_startup_matrix):
-		_startup_matrix.set_progress(float(_hosts_ready_count) / float(_hosts.size()))
 
-	# Check if all hosts are ready
-	if _hosts_ready_count >= _hosts.size():
-		_dissolve_startup_matrix()
-
-
-## Dissolve the startup matrix overlay.
+## Dissolve the startup matrix overlay with a slow fade.
 ## Does NOT clear _host_sample_counts — still needed by the dimming loop.
 func _dissolve_startup_matrix() -> void:
 	if not is_instance_valid(_startup_matrix):
 		return
 	_startup_matrix.tree_exiting.connect(func() -> void: _startup_matrix = null)
-	_startup_matrix.dissolve(0.8)
+	_startup_matrix.dissolve(STARTUP_MATRIX_FADE_DURATION)
 	print("[FleetView] Startup matrix dissolving")
 
 
