@@ -377,6 +377,25 @@ func _on_preview_build_completed(zones_root: Node3D) -> void:
 		# The MetricPoller in the built scene auto-starts live polling in _Ready().
 		# In archive mode, we need to switch it to playback at the correct timestamp.
 		_configure_preview_poller()
+		_wire_preview_animation()
+
+
+## Connect MetricPoller → SceneBinder in the preview zones so bars animate.
+## In full HostView this wiring lives in host_view_controller.gd, but the
+## zones-only preview doesn't have that script attached.
+func _wire_preview_animation() -> void:
+	if not _preview_zones:
+		return
+	var poller: Node = _preview_zones.find_child("MetricPoller", true, false)
+	var binder: Node = _preview_zones.find_child("SceneBinder", true, false)
+	if not poller or not binder:
+		push_warning("[FleetView] Cannot wire preview animation — missing poller or binder")
+		return
+	poller.MetricsUpdated.connect(
+		func(_hostname: String, metrics: Dictionary) -> void:
+			binder.ApplyMetrics(metrics)
+	)
+	print("[FleetView] Wired preview MetricPoller → SceneBinder")
 
 
 func _configure_preview_poller() -> void:
