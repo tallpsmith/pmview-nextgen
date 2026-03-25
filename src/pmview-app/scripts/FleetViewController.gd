@@ -215,14 +215,22 @@ func _enter_focus(host_index: int) -> void:
 	# Cancel any existing preview/pipeline if re-entering focus
 	if _fleet_pipeline or _preview_zones:
 		_cleanup_focus_state()
+	# Dissolve startup matrix early if still active
+	if is_instance_valid(_startup_matrix):
+		_dissolve_startup_matrix()
 	_focused_host_index = host_index
 	_view_mode = ViewMode.TRANSITIONING_TO_FOCUS
 	var host: Node3D = _hosts[host_index]
 
-	# Dim all other hosts
+	# Dim other hosts, but skip those that haven't received 2 samples yet
+	# (they're still invisible and have no meaningful data to show)
 	for i in range(_hosts.size()):
 		if i != host_index:
-			_hosts[i].set_opacity(0.3)
+			var h: Node3D = _hosts[i]
+			var samples: int = _host_sample_counts.get(h.hostname, 0)
+			if samples >= 2:
+				h.set_opacity(0.3)
+			# else: leave at 0.0 — _reveal_host will set 0.3 when ready
 
 	# Spawn beam immediately with a fade-in — gives instant visual feedback
 	# that the host was selected before the camera even starts moving.
@@ -435,8 +443,12 @@ func _cleanup_focus_state() -> void:
 		_preview_zones = null
 	_preview_ready = false
 
+	# Restore opacity, but only for hosts that have been revealed (2+ samples).
+	# Un-revealed hosts stay at 0.0 and continue their normal reveal flow.
 	for host: Node3D in _hosts:
-		host.set_opacity(1.0)
+		var samples: int = _host_sample_counts.get(host.hostname, 0)
+		if samples >= 2:
+			host.set_opacity(1.0)
 
 	_focused_host_index = -1
 
