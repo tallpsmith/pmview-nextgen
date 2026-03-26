@@ -200,16 +200,24 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          SUBMIT_OUTPUT=$(xcrun notarytool submit "build/${ARTIFACT}" \
+          xcrun notarytool submit "build/${ARTIFACT}" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
-            --wait 2>&1) || {
-            echo "$SUBMIT_OUTPUT"
-            # Extract submission ID and fetch detailed log
-            SUB_ID=$(echo "$SUBMIT_OUTPUT" | grep -oE '[0-9a-f-]{36}' | head -1)
+            --wait \
+            --output-format json \
+            > notarization-result.json 2>&1 || true
+
+          cat notarization-result.json
+
+          # Extract status and submission ID
+          STATUS=$(python3 -c "import json; print(json.load(open('notarization-result.json'))['status'])" 2>/dev/null || echo "unknown")
+          SUB_ID=$(python3 -c "import json; print(json.load(open('notarization-result.json'))['id'])" 2>/dev/null || echo "")
+
+          if [ "$STATUS" != "Accepted" ]; then
+            echo "::error::Notarization failed with status: $STATUS"
             if [ -n "$SUB_ID" ]; then
-              echo "::group::Notarization failure log"
+              echo "::group::Notarization rejection log"
               xcrun notarytool log "$SUB_ID" \
                 --apple-id "$APPLE_ID" \
                 --password "$APPLE_APP_SPECIFIC_PASSWORD" \
@@ -217,9 +225,8 @@ jobs:
               echo "::endgroup::"
             fi
             exit 1
-          }
-          echo "$SUBMIT_OUTPUT"
-          echo "Notarization succeeded"
+          fi
+          echo "Notarization accepted"
 
       - name: Staple notarization ticket
         if: matrix.preset == 'macOS'
