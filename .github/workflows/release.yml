@@ -224,8 +224,17 @@ jobs:
       - name: Staple notarization ticket
         if: matrix.preset == 'macOS'
         run: |
-          xcrun stapler staple "build/${ARTIFACT}"
-          echo "Notarization ticket stapled to DMG"
+          # Apple's CDN can lag behind the notarization service — retry
+          for i in 1 2 3 4 5; do
+            if xcrun stapler staple "build/${ARTIFACT}"; then
+              echo "Notarization ticket stapled to DMG"
+              exit 0
+            fi
+            echo "Staple attempt $i failed — waiting 30s for ticket propagation..."
+            sleep 30
+          done
+          echo "::error::Stapling failed after 5 attempts"
+          exit 1
 
       - name: Package Linux (.tar.gz)
         if: matrix.preset != 'macOS'
