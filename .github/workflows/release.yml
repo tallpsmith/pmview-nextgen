@@ -224,6 +224,7 @@ jobs:
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
             --wait \
+            --timeout 1800 \
             --output-format json \
             > notarization-result.json 2>&1 || true
 
