@@ -34,6 +34,7 @@ jobs:
     name: Build ${{ matrix.platform }}
     needs: validate-tag
     runs-on: ${{ matrix.runner }}
+    environment: release
     strategy:
       fail-fast: false
       matrix:
@@ -70,6 +71,39 @@ jobs:
       - name: Compute artifact name
         run: echo "ARTIFACT=pmview-${VERSION}-${{ matrix.artifact_suffix }}" >> "$GITHUB_ENV"
 
+      - name: Import Apple signing certificate
+        if: matrix.preset == 'macOS'
+        env:
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          # Create a temporary keychain
+          KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Import certificate
+          CERT_PATH="$RUNNER_TEMP/certificate.p12"
+          echo "$APPLE_CERTIFICATE_P12" | base64 --decode > "$CERT_PATH"
+          security import "$CERT_PATH" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          rm -f "$CERT_PATH"
+
+          # Allow codesign to access the keychain without UI prompt
+          security set-key-partition-list -S apple-tool:,apple: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Add temp keychain to search list (prepend so it's found first)
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+
+          # Export path for cleanup step
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+
       # The pmview-bridge addon lives in src/pmview-bridge-addon/ and is
       # symlinked into the Godot project for local dev (the symlink is
       # gitignored). On CI the symlink doesn't exist, so we copy the addon
@@ -105,6 +139,23 @@ jobs:
           echo "--- Exported files ---"
           ls -la build/
 
+      - name: Sign macOS app bundle
+        if: matrix.preset == 'macOS'
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          codesign --deep --force --options runtime \
+            --sign "Developer ID Application: ($APPLE_TEAM_ID)" \
+            --entitlements src/pmview-app/macos-entitlements.plist \
+            build/pmview.app
+          echo "App bundle signed successfully"
+
+      - name: Verify app signature
+        if: matrix.preset == 'macOS'
+        run: |
+          codesign --verify --deep --strict --verbose=2 build/pmview.app
+          echo "Signature verification passed"
+
       - name: Package macOS (.dmg)
         if: matrix.preset == 'macOS'
         run: |
@@ -118,6 +169,50 @@ jobs:
             -srcfolder build/pmview.app \
             -ov -format UDZO \
             "build/${ARTIFACT}"
+
+      - name: Sign macOS DMG
+        if: matrix.preset == 'macOS'
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          codesign --force \
+            --sign "Developer ID Application: ($APPLE_TEAM_ID)" \
+            "build/${ARTIFACT}"
+          echo "DMG signed successfully"
+
+      - name: Notarize macOS DMG
+        if: matrix.preset == 'macOS'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          SUBMIT_OUTPUT=$(xcrun notarytool submit "build/${ARTIFACT}" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait 2>&1) || {
+            echo "$SUBMIT_OUTPUT"
+            # Extract submission ID and fetch detailed log
+            SUB_ID=$(echo "$SUBMIT_OUTPUT" | grep -oE '[0-9a-f-]{36}' | head -1)
+            if [ -n "$SUB_ID" ]; then
+              echo "::group::Notarization failure log"
+              xcrun notarytool log "$SUB_ID" \
+                --apple-id "$APPLE_ID" \
+                --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+                --team-id "$APPLE_TEAM_ID" || true
+              echo "::endgroup::"
+            fi
+            exit 1
+          }
+          echo "$SUBMIT_OUTPUT"
+          echo "Notarization succeeded"
+
+      - name: Staple notarization ticket
+        if: matrix.preset == 'macOS'
+        run: |
+          xcrun stapler staple "build/${ARTIFACT}"
+          echo "Notarization ticket stapled to DMG"
 
       - name: Package Linux (.tar.gz)
         if: matrix.preset != 'macOS'
@@ -141,3 +236,13 @@ jobs:
             --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cleanup signing keychain
+        if: always() && matrix.preset == 'macOS'
+        run: |
+          if [ -n "$KEYCHAIN_PATH" ] && security list-keychains | grep -q "$(basename "$KEYCHAIN_PATH")"; then
+            security delete-keychain "$KEYCHAIN_PATH"
+            echo "Temporary keychain removed"
+          else
+            echo "No temporary keychain to clean up"
+          fi
