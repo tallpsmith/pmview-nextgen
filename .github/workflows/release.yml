@@ -106,6 +106,23 @@ jobs:
           echo "--- Exported files ---"
           ls -la build/
 
+      - name: Sign macOS app bundle
+        if: matrix.preset == 'macOS'
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          codesign --deep --force --options runtime \
+            --sign "Developer ID Application: ($APPLE_TEAM_ID)" \
+            --entitlements src/pmview-app/macos-entitlements.plist \
+            build/pmview.app
+          echo "App bundle signed successfully"
+
+      - name: Verify app signature
+        if: matrix.preset == 'macOS'
+        run: |
+          codesign --verify --deep --strict --verbose=2 build/pmview.app
+          echo "Signature verification passed"
+
       - name: Package macOS (.dmg)
         if: matrix.preset == 'macOS'
         run: |
