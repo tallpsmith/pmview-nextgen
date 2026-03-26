@@ -34,6 +34,7 @@ jobs:
     name: Build ${{ matrix.platform }}
     needs: validate-tag
     runs-on: ${{ matrix.runner }}
+    environment: release
     strategy:
       fail-fast: false
       matrix:
