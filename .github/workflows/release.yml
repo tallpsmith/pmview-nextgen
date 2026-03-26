@@ -139,13 +139,28 @@ jobs:
           echo "--- Exported files ---"
           ls -la build/
 
+      - name: Resolve signing identity
+        if: matrix.preset == 'macOS'
+        run: |
+          echo "Available signing identities:"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+          # Extract the Developer ID Application identity hash
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
+            | grep "Developer ID Application" \
+            | head -1 \
+            | awk -F'"' '{print $2}')
+          if [ -z "$IDENTITY" ]; then
+            echo "::error::No 'Developer ID Application' identity found in keychain"
+            exit 1
+          fi
+          echo "Using identity: $IDENTITY"
+          echo "SIGNING_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+
       - name: Sign macOS app bundle
         if: matrix.preset == 'macOS'
-        env:
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           codesign --deep --force --options runtime \
-            --sign "Developer ID Application: ($APPLE_TEAM_ID)" \
+            --sign "$SIGNING_IDENTITY" \
             --entitlements src/pmview-app/macos-entitlements.plist \
             build/pmview.app
           echo "App bundle signed successfully"
@@ -172,11 +187,9 @@ jobs:
 
       - name: Sign macOS DMG
         if: matrix.preset == 'macOS'
-        env:
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           codesign --force \
-            --sign "Developer ID Application: ($APPLE_TEAM_ID)" \
+            --sign "$SIGNING_IDENTITY" \
             "build/${ARTIFACT}"
           echo "DMG signed successfully"
 
