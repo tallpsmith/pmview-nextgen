@@ -156,6 +156,25 @@ jobs:
           echo "Using identity: $IDENTITY"
           echo "SIGNING_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
 
+      - name: Sign nested native binaries
+        if: matrix.preset == 'macOS'
+        run: |
+          # codesign --deep doesn't reliably reach .NET native binaries
+          # inside Godot's packed data directories. Sign them inside-out
+          # so each gets Developer ID + secure timestamp + hardened runtime.
+          echo "Signing nested native binaries..."
+          SIGNED=0
+          find build/pmview.app -type f \( -name "*.dylib" -o -name "createdump" \) -print0 \
+            | while IFS= read -r -d '' binary; do
+                codesign --force --options runtime --timestamp \
+                  --sign "$SIGNING_IDENTITY" \
+                  --entitlements src/pmview-app/macos-entitlements.plist \
+                  "$binary"
+                echo "  Signed: $binary"
+                SIGNED=$((SIGNED + 1))
+              done
+          echo "Nested binary signing complete"
+
       - name: Sign macOS app bundle
         if: matrix.preset == 'macOS'
         run: |
@@ -231,16 +250,17 @@ jobs:
       - name: Staple notarization ticket
         if: matrix.preset == 'macOS'
         run: |
-          # Apple's CDN can lag behind the notarization service — retry
-          for i in 1 2 3 4 5; do
+          # Apple's CDN can lag several minutes behind the notarization
+          # service — wait longer and retry more aggressively.
+          for i in $(seq 1 10); do
             if xcrun stapler staple "build/${ARTIFACT}"; then
               echo "Notarization ticket stapled to DMG"
               exit 0
             fi
-            echo "Staple attempt $i failed — waiting 30s for ticket propagation..."
-            sleep 30
+            echo "Staple attempt $i/10 failed — waiting 60s for ticket propagation..."
+            sleep 60
           done
-          echo "::error::Stapling failed after 5 attempts"
+          echo "::error::Stapling failed after 10 attempts (~10 minutes)"
           exit 1
 
       - name: Package Linux (.tar.gz)
