@@ -105,7 +105,7 @@ Users extract, `chmod +x`, run.
 
 Presets configured in `src/pmview-app/export_presets.cfg`:
 
-- `macOS` — universal architecture (x86_64 + arm64), ad-hoc codesign **(exists)**
+- `macOS` — universal architecture (x86_64 + arm64), signing disabled (handled post-export) **(exists)**
 - `Linux` — x86_64 architecture **(exists)**
 - `Linux ARM64` — arm64 architecture, cross-exported from x64 runner **(needs to be added)**
 
