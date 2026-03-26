@@ -15,7 +15,7 @@ Automate building and packaging the pmview Godot application for macOS and Linux
 | Target platforms | `osx-universal`, `linux-x64`, `linux-arm64` | Universal binary covers both Intel and Apple Silicon Macs; Linux covers x64 and ARM |
 | Packaging | `.dmg` (macOS), `.tar.gz` (Linux) | Native format for each platform |
 | Versioning | Git tag is single source of truth | Tag `v1.2.3` → version `1.2.3` injected at build time. No version stored in repo files |
-| Code signing | Ad-hoc for v1 (Godot preset default) | Users get Gatekeeper "unidentified developer" warning. Proper signing deferred (GitHub issue) |
+| Code signing | Developer ID signed + notarized | Implemented in #45 — see `docs/superpowers/specs/2026-03-26-macos-code-signing-design.md` |
 | Self-contained vs framework-dependent | Self-contained | Users download and run — no .NET SDK needed |
 | Workflow structure | Single `release.yml` with matrix strategy | One file, matrix handles platform parallelism |
 | Godot CI setup | `chickensoft-games/setup-godot` action | Handles Godot + export template installation |
@@ -83,7 +83,7 @@ hdiutil create -volname "pmview" -srcfolder pmview.app -ov -format UDZO pmview-<
 
 Simple disk image — no background image or Applications symlink for v1. Users mount, drag, run.
 
-**Ad-hoc signed** (Godot preset `codesign/codesign=3`) — users will see Gatekeeper "unidentified developer" warning on first launch. Bypass via right-click → Open or `xattr -cr pmview.app`. The ad-hoc codesign setting should work in headless CI on macOS runners; if it causes issues, override to disabled (`codesign=0`) as a fallback.
+**Developer ID signed and notarized** — the `.app` bundle is signed with a Developer ID Application certificate and the `.dmg` is signed and notarized via `xcrun notarytool`. No Gatekeeper warnings for end users.
 
 ### Linux (`.tar.gz`)
 
@@ -130,5 +130,4 @@ Per project guidelines, documentation ships with the code:
 ## Deferred Work (GitHub Issues)
 
 1. **CLI binary distribution** — Add `pmview-host-projector` self-contained executables to the release workflow
-2. **macOS code signing & notarization** — Sign and notarize the `.dmg` with Apple Developer certificate ($99/year)
-3. **Unify .NET target frameworks** — Evaluate consolidating CLI/test projects from `net10.0` to `net8.0`
+2. **Unify .NET target frameworks** — Evaluate consolidating CLI/test projects from `net10.0` to `net8.0`
