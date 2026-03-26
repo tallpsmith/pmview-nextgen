@@ -154,11 +154,25 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          xcrun notarytool submit "build/${ARTIFACT}" \
+          SUBMIT_OUTPUT=$(xcrun notarytool submit "build/${ARTIFACT}" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
-            --wait
+            --wait 2>&1) || {
+            echo "$SUBMIT_OUTPUT"
+            # Extract submission ID and fetch detailed log
+            SUB_ID=$(echo "$SUBMIT_OUTPUT" | grep -oE '[0-9a-f-]{36}' | head -1)
+            if [ -n "$SUB_ID" ]; then
+              echo "::group::Notarization failure log"
+              xcrun notarytool log "$SUB_ID" \
+                --apple-id "$APPLE_ID" \
+                --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+                --team-id "$APPLE_TEAM_ID" || true
+              echo "::endgroup::"
+            fi
+            exit 1
+          }
+          echo "$SUBMIT_OUTPUT"
           echo "Notarization succeeded"
 
       - name: Staple notarization ticket
@@ -189,3 +203,13 @@ jobs:
             --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cleanup signing keychain
+        if: always() && matrix.preset == 'macOS'
+        run: |
+          if [ -n "$KEYCHAIN_PATH" ] && security list-keychains | grep -q "$(basename "$KEYCHAIN_PATH")"; then
+            security delete-keychain "$KEYCHAIN_PATH"
+            echo "Temporary keychain removed"
+          else
+            echo "No temporary keychain to clean up"
+          fi
