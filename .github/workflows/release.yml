@@ -137,6 +137,36 @@ jobs:
             -ov -format UDZO \
             "build/${ARTIFACT}"
 
+      - name: Sign macOS DMG
+        if: matrix.preset == 'macOS'
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          codesign --force \
+            --sign "Developer ID Application: ($APPLE_TEAM_ID)" \
+            "build/${ARTIFACT}"
+          echo "DMG signed successfully"
+
+      - name: Notarize macOS DMG
+        if: matrix.preset == 'macOS'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          xcrun notarytool submit "build/${ARTIFACT}" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          echo "Notarization succeeded"
+
+      - name: Staple notarization ticket
+        if: matrix.preset == 'macOS'
+        run: |
+          xcrun stapler staple "build/${ARTIFACT}"
+          echo "Notarization ticket stapled to DMG"
+
       - name: Package Linux (.tar.gz)
         if: matrix.preset != 'macOS'
         run: |
