@@ -212,58 +212,6 @@ jobs:
             "build/${ARTIFACT}"
           echo "DMG signed successfully"
 
-      - name: Notarize macOS DMG
-        if: matrix.preset == 'macOS'
-        env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          xcrun notarytool submit "build/${ARTIFACT}" \
-            --apple-id "$APPLE_ID" \
-            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
-            --team-id "$APPLE_TEAM_ID" \
-            --wait \
-            --timeout 1800 \
-            --output-format json \
-            > notarization-result.json 2>&1 || true
-
-          cat notarization-result.json
-
-          # Extract status and submission ID
-          STATUS=$(python3 -c "import json; print(json.load(open('notarization-result.json'))['status'])" 2>/dev/null || echo "unknown")
-          SUB_ID=$(python3 -c "import json; print(json.load(open('notarization-result.json'))['id'])" 2>/dev/null || echo "")
-
-          if [ "$STATUS" != "Accepted" ]; then
-            echo "::error::Notarization failed with status: $STATUS"
-            if [ -n "$SUB_ID" ]; then
-              echo "::group::Notarization rejection log"
-              xcrun notarytool log "$SUB_ID" \
-                --apple-id "$APPLE_ID" \
-                --password "$APPLE_APP_SPECIFIC_PASSWORD" \
-                --team-id "$APPLE_TEAM_ID" || true
-              echo "::endgroup::"
-            fi
-            exit 1
-          fi
-          echo "Notarization accepted"
-
-      - name: Staple notarization ticket
-        if: matrix.preset == 'macOS'
-        run: |
-          # Apple's CDN can lag several minutes behind the notarization
-          # service — wait longer and retry more aggressively.
-          for i in $(seq 1 10); do
-            if xcrun stapler staple "build/${ARTIFACT}"; then
-              echo "Notarization ticket stapled to DMG"
-              exit 0
-            fi
-            echo "Staple attempt $i/10 failed — waiting 60s for ticket propagation..."
-            sleep 60
-          done
-          echo "::error::Stapling failed after 10 attempts (~10 minutes)"
-          exit 1
-
       - name: Package Linux (.tar.gz)
         if: matrix.preset != 'macOS'
         run: |
@@ -296,3 +244,87 @@ jobs:
           else
             echo "No temporary keychain to clean up"
           fi
+
+  # Notarize the signed macOS DMG and replace the release artifact with the
+  # stapled version. Disabled until Apple's notarization service processes
+  # our Developer ID quickly enough for CI (first-time certs can take hours).
+  # To enable: change `if: false` to `if: true`.
+  notarize-macos:
+    name: Notarize macOS
+    if: false
+    needs: [validate-tag, build-and-upload]
+    runs-on: macos-latest
+    environment: release
+    timeout-minutes: 45
+    env:
+      VERSION: ${{ needs.validate-tag.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute artifact name
+        run: echo "ARTIFACT=pmview-${VERSION}-macos-universal.dmg" >> "$GITHUB_ENV"
+
+      - name: Download signed DMG from release
+        run: |
+          gh release download "${{ github.event.release.tag_name }}" \
+            --pattern "${ARTIFACT}" \
+            --dir build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Notarize DMG
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          xcrun notarytool submit "build/${ARTIFACT}" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --no-s3-acceleration \
+            --wait \
+            --timeout 1800 \
+            --output-format json \
+            > notarization-result.json 2>&1 || true
+
+          cat notarization-result.json
+
+          STATUS=$(python3 -c "import json; print(json.load(open('notarization-result.json'))['status'])" 2>/dev/null || echo "unknown")
+          SUB_ID=$(python3 -c "import json; print(json.load(open('notarization-result.json'))['id'])" 2>/dev/null || echo "")
+
+          if [ "$STATUS" != "Accepted" ]; then
+            echo "::error::Notarization failed with status: $STATUS"
+            if [ -n "$SUB_ID" ]; then
+              echo "::group::Notarization rejection log"
+              xcrun notarytool log "$SUB_ID" \
+                --apple-id "$APPLE_ID" \
+                --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+                --team-id "$APPLE_TEAM_ID" || true
+              echo "::endgroup::"
+            fi
+            exit 1
+          fi
+          echo "Notarization accepted"
+
+      - name: Staple notarization ticket
+        run: |
+          for i in $(seq 1 10); do
+            if xcrun stapler staple "build/${ARTIFACT}"; then
+              echo "Notarization ticket stapled to DMG"
+              exit 0
+            fi
+            echo "Staple attempt $i/10 failed — waiting 60s for ticket propagation..."
+            sleep 60
+          done
+          echo "::error::Stapling failed after 10 attempts (~10 minutes)"
+          exit 1
+
+      - name: Replace release artifact with notarized DMG
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            "build/${ARTIFACT}" \
+            --clobber
+          echo "Replaced release artifact with notarized+stapled DMG"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
